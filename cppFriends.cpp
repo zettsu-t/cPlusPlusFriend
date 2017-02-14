@@ -17,7 +17,7 @@ class Train {
 
     // std::swapはメンバ変数を一括置換できるフレンズなんだね。おもしろーい！
     template<typename T>
-    friend void std::swap(T& is, T& train);
+    friend void std::swap(T& a, T& b);
 
     // ユニットテストはprivateメンバを読めるフレンズなんだね。たーのしー!
     FRIEND_TEST(TestSerialization, Initialize);
