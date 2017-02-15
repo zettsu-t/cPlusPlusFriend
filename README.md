@@ -17,4 +17,6 @@ class Train {
 };
 ```
 
-[cppFriends.cpp](cppFriends.cpp)では、friend関数以外にも「フレンズなんだね」を連発していますが、まあ流行語ですので。ライセンスは、[MITライセンス](LICENSE.txt)です。
+[cppFriends.cpp](cppFriends.cpp)では、friend関数以外にも「フレンズなんだね」を連発していますが、まあ流行語ですし。そういう意味で、「すごいHaskellたのしく学ぼう!」という題の本は、時代の先を行っていたのですね。
+
+ライセンスは、[MITライセンス](LICENSE.txt)です。

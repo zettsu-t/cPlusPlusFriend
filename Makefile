@@ -15,7 +15,7 @@ VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
 CXX=g++
 LD=g++
-CPPFLAGS=-std=gnu++11 -g -O -Wall $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS=-std=gnu++14 -g -O -Wall $(GTEST_GMOCK_INCLUDE)
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_serialization
