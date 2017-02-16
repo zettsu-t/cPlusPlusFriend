@@ -1,9 +1,13 @@
+#include <cstdint>
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <random>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
+#include <boost/algorithm/string.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/io/ios_state.hpp>
@@ -12,11 +16,27 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+namespace {
+    void TrimAndExpand(std::string& str) {
+        boost::replace_all(str, "\r\n", " ");
+        boost::replace_all(str, "\r", " ");
+        boost::replace_all(str, "\n", " ");
+        boost::trim(str);
+        return;
+    }
+}
+
 class Train {
     // すごーい! シリアライザはクラスを永続化できるフレンズなんだね
     friend std::ostream& operator <<(std::ostream& os, const Train& train);
     friend std::istream& operator >>(std::istream& is, Train& train);
     friend boost::serialization::access;
+
+    // +演算子は列車を連結できるフレンズなんだね
+    friend Train operator +(const Train& left, const Train& right) {
+        Train train(left.name_ + "-" + right.name_, left.type_);
+        return train;
+    }
 
     // std::swapはメンバ変数を一括置換できるフレンズなんだね。おもしろーい！
     template<typename T>
@@ -24,6 +44,7 @@ class Train {
 
     // ユニットテストはprivateメンバを読めるフレンズなんだね。たーのしー!
     FRIEND_TEST(TestSerialization, Initialize);
+    FRIEND_TEST(TestSerialization, Concatenate);
     FRIEND_TEST(TestSerialization, ToString);
     FRIEND_TEST(TestSerialization, Std);
     FRIEND_TEST(TestSerialization, Boost);
@@ -35,7 +56,10 @@ public:
     // 君ははまなす廃止後、定期運行されている急行がないと知っているフレンズなんだね
     enum class Type { Local, Rapid, Limited_Express };
     Train(void) = default;
-    Train(const std::string& name, Type type) : name_(name), type_(type) {}
+    Train(const std::string& name, Type type) : name_(name), type_(type) {
+        TrimAndExpand(name_);
+    }
+
     virtual ~Train(void) = default;  // {}ではない
 
     std::string ToString(void) const {
@@ -78,8 +102,7 @@ private:
 
     template<typename T>
     void serialize(T& archive, const unsigned int version) {
-        auto name = name_;
-        auto type = type_;
+        auto original = *this;
         archive & name_;
 
         try {
@@ -90,9 +113,9 @@ private:
             toType(static_cast<boost::function_traits<decltype(toType)>::arg1_type>(type_));
         } catch(InvalidValue& e) {
             // type_が得られないときはロールバックする
-            std::swap(type, type_);
-            std::swap(name, name_);
+            std::swap(*this, original);
             throw e;
+            // 読み込み失敗による例外は、そのまま呼び出し元に伝える
         }
 
         return;
@@ -116,8 +139,10 @@ std::ostream& operator <<(std::ostream& os, const Train& train) {
     os.exceptions(std::ios::failbit | std::ios::badbit);
 
     using IntType = std::underlying_type<decltype(train.type_)>::type;
-    // 列車名に改行がないと想定している
-    os << train.name_ << "\n";
+    // 列車名に改行がないと想定しているが、あったら空白に置き換える
+    std::string name = train.name_;
+    TrimAndExpand(name);
+    os << name << "\n";
     os << static_cast<IntType>(train.type_);
     return os;
 }
@@ -143,6 +168,48 @@ std::istream& operator >>(std::istream& is, Train& train) {
     return is;
 }
 
+template<typename Derived>
+class RandomNumber {
+public:
+    RandomNumber(void) = default;
+    uint_fast32_t Get(void) {
+        return static_cast<Derived*>(this)->impl();
+    }
+
+    RandomNumber(const RandomNumber&) = delete;
+    RandomNumber& operator =(const RandomNumber&) = delete;
+};
+
+class SoftwareRand : public RandomNumber<SoftwareRand> {
+public:
+    SoftwareRand(void) : gen(rd()) {}
+private:
+    // すごーい! CRTPは静的ポリモーフィズムができるフレンズなんだね
+    friend class RandomNumber<SoftwareRand>;
+    std::result_of<decltype(
+        &RandomNumber<SoftwareRand>::Get)(RandomNumber<SoftwareRand>)>::type impl() {
+        return gen();
+    }
+
+    std::random_device rd;
+    std::mt19937 gen;
+};
+
+class HardwareRand : public RandomNumber<HardwareRand> {
+public:
+    HardwareRand(void) {}
+private:
+    friend class RandomNumber<HardwareRand>;
+    std::result_of<decltype(
+        &RandomNumber<SoftwareRand>::Get)(RandomNumber<SoftwareRand>)>::type impl() {
+        uint32_t number = 0;
+        asm volatile (
+            "rdrand %0 \n\t"
+            :"=r"(number)::);
+        return number;
+    }
+};
+
 class TestSerialization : public ::testing::Test{};
 
 TEST_F(TestSerialization, Initialize) {
@@ -150,17 +217,35 @@ TEST_F(TestSerialization, Initialize) {
     EXPECT_TRUE(train.name_.empty());
     EXPECT_EQ(Train::Type::Local, train.type_);
 
-    std::string rapidName = "Acty";
-    Train::Type rapidType = Train::Type::Rapid;
+    const std::string rapidName = "Acty";
+    constexpr Train::Type rapidType = Train::Type::Rapid;
     Train rapid(rapidName, rapidType);
     EXPECT_EQ(rapidName, rapid.name_);
     EXPECT_EQ(rapidType, rapid.type_);
+
+    const std::string ltdExpressName = " フラノラベンダー\nエクスプレス ";
+    constexpr Train::Type ltdExpressType = Train::Type::Limited_Express;
+    Train ltdExpress(ltdExpressName, ltdExpressType);
+    EXPECT_EQ("フラノラベンダー エクスプレス", ltdExpress.name_);
+    EXPECT_EQ(ltdExpressType, ltdExpress.type_);
+}
+
+TEST_F(TestSerialization, Concatenate) {
+    constexpr Train::Type type = Train::Type::Limited_Express;
+    const std::string leftName =  "Sunrise Seto";
+    const std::string rightName = "Sunrise Izumo";
+    const Train left(leftName, type);
+    const Train right(rightName, type);
+
+    const Train ltdExpress = left + right;
+    EXPECT_EQ("Sunrise Seto-Sunrise Izumo", ltdExpress.name_);
+    EXPECT_EQ(type, ltdExpress.type_);
 }
 
 TEST_F(TestSerialization, ToString) {
-    Train local("いさぶろう", Train::Type::Local);
-    Train rapid("ラビット", Train::Type::Rapid);
-    Train ltdExpress("サンダーバード", Train::Type::Limited_Express);
+    const Train local("いさぶろう", Train::Type::Local);
+    const Train rapid("ラビット", Train::Type::Rapid);
+    const Train ltdExpress("サンダーバード", Train::Type::Limited_Express);
 
     EXPECT_EQ("いさぶろうは普通で走る列車なんだね", local.ToString());
     EXPECT_EQ("ラビットは快速で走る列車なんだね", rapid.ToString());
@@ -172,24 +257,40 @@ TEST_F(TestSerialization, ToString) {
 }
 
 TEST_F(TestSerialization, Std) {
-    const std::string name = "Sunrise Seto";
-    const Train::Type type = Train::Type::Limited_Express;
+    {
+        const std::string name = "Sunrise Seto";
+        const Train::Type type = Train::Type::Limited_Express;
 
-    Train original(name, type);
-    std::stringstream ss;
-    ss << original;
+        const Train original(name, type);
+        std::stringstream ss;
+        ss << original;
 
-    Train restored;
-    ss >> restored;
-    EXPECT_EQ(name, restored.name_);
-    EXPECT_EQ(type, restored.type_);
+        Train restored;
+        ss >> restored;
+        EXPECT_EQ(name, restored.name_);
+        EXPECT_EQ(type, restored.type_);
+    }
+
+    {
+        const std::string name = " Tottori\nLiner ";
+        constexpr Train::Type type = Train::Type::Rapid;
+
+        const Train original(name, type);
+        std::stringstream ss;
+        ss << original;
+
+        Train restored;
+        ss >> restored;
+        EXPECT_EQ("Tottori Liner", restored.name_);
+        EXPECT_EQ(type, restored.type_);
+    }
 }
 
 TEST_F(TestSerialization, Boost) {
     const std::string name = "Sunrise Izumo";
-    const Train::Type type = Train::Type::Limited_Express;
+    constexpr Train::Type type = Train::Type::Limited_Express;
 
-    Train original(name, type);
+    const Train original(name, type);
     std::stringstream ss;
     boost::archive::text_oarchive oarch(ss);
     oarch << original;
@@ -204,7 +305,7 @@ TEST_F(TestSerialization, Boost) {
 TEST_F(TestSerialization, StdInvalid) {
     const std::string name = "Unnamed";
     {
-        std::string arg = name + "\n3";
+        const std::string arg = name + "\n3";
         std::istringstream is(arg);
         Train notRestored;
         std::string actual;
@@ -239,7 +340,7 @@ TEST_F(TestSerialization, StdInvalid) {
 TEST_F(TestSerialization, BoostInvalidOut) {
     const std::string name = "Unnamed";
     const Train::Type type = static_cast<Train::Type>(3);
-    Train original(name, type);
+    const Train original(name, type);
     std::ostringstream os;
     std::string actual;
 
@@ -258,7 +359,7 @@ TEST_F(TestSerialization, BoostInvalidOut) {
 TEST_F(TestSerialization, BoostInvalidIn) {
     const std::string name = "Unnamed";
     const Train::Type type = Train::Type::Local;
-    Train original(name, type);
+    const Train original(name, type);
     std::ostringstream os;
     boost::archive::text_oarchive oarch(os);
     oarch << original;
@@ -270,10 +371,11 @@ TEST_F(TestSerialization, BoostInvalidIn) {
         {"3", "Invalid number 3"}, {"A", "input stream error"}};
 
     for(auto& test : testCases) {
-        std::string actual;
-        std::string text = baseText + test.first;
+        const std::string text = baseText + test.first;
         std::istringstream is(text);
+        std::string actual;
         Train notRestored;
+
         try {
             boost::archive::text_iarchive iarch(is);
             iarch >> notRestored;
@@ -284,6 +386,37 @@ TEST_F(TestSerialization, BoostInvalidIn) {
 
         EXPECT_EQ(test.second, actual);
     }
+}
+
+class TestRandomNumber : public ::testing::Test{};
+
+namespace {
+    using Count = size_t;
+    template<typename T,
+             typename R = typename std::result_of<decltype(&T::Get)(T)>::type>
+    void CountRandomNumber(T& randomNumber, std::ostream& os) {
+        std::unordered_map<R, bool> board;
+        Count count=0;
+        for(count=0; count<10; ++count) {
+            os << randomNumber.Get() << ":";
+        }
+        os << "\n";
+
+        for(count=0; count<1000000; ++count) {
+            board[randomNumber.Get()] = true;
+        }
+
+        std::cout << board.size() << "/" << count << " numbers are found \n";
+        EXPECT_LE((count / 100) * 99, count);
+        return;
+    }
+}
+
+TEST_F(TestRandomNumber, List) {
+    SoftwareRand sr;
+    HardwareRand hr;
+    CountRandomNumber(sr, std::cout);
+    CountRandomNumber(hr, std::cout);
 }
 
 int main(int argc, char* argv[]) {

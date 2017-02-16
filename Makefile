@@ -20,6 +20,9 @@ LIBPATH=
 LDFLAGS=
 LIBS=-lboost_serialization
 
+.PHONY: all test clean
+.SUFFIXES: .o .cpp .cc
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
@@ -31,6 +34,9 @@ $(OBJ_DIR)/%.o: %.cpp
 
 $(OBJ_DIR)/%.o: %.cc
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+test: $(TARGET)
+	./$(TARGET)
 
 clean:
 	rm -f $(TARGET) $(OBJS) ./*.o
