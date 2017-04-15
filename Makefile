@@ -1,3 +1,7 @@
+# コンソール出力に色を付ける
+ECHO_START="\e[104m
+ECHO_END=\e[0m"
+
 # Google Test / Google Mockがあるディレクトリ
 GTEST_GMOCK_TOP_DIR=$(HOME)/googletest
 GTEST_TOP_DIR=$(GTEST_GMOCK_TOP_DIR)/googletest
@@ -11,6 +15,15 @@ GMOCK_OBJ=$(patsubst %.cc, %.o, $(notdir $(GMOCK_SOURCE)))
 TARGET=cppFriends
 TARGET_C=cFriends
 TARGETS=$(TARGET) $(TARGET_C)
+OUTPUT_ASM87_C=cFriends87.s
+OUTPUT_ASM87_STORE_C=cFriends87-store.s
+OUTPUT_ASM64_C=cFriends64.s
+OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C)
+
+CASMFLAGS=-S -masm=intel
+CASMFLAGS_87=-mfpmath=387 -mno-sse
+CASMFLAGS_87_STORE=-mfpmath=387 -mno-sse -ffloat-store
+CASMFLAGS_64=
 
 SOURCE=cppFriends.cpp
 SOURCE_C=cFriends.c
@@ -23,13 +36,13 @@ VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 CPP=gcc
 CXX=g++
 LD=g++
-CFLAGS=-std=c99 -O2 -Wall -Werror
-CPPFLAGS=-std=gnu++14 -O2 -Wall -Werror $(GTEST_GMOCK_INCLUDE)
+CFLAGS=-std=gnu11 -O2 -Wall
+CPPFLAGS=-std=gnu++14 -O2 -Wall $(GTEST_GMOCK_INCLUDE)
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_serialization
 
-.PHONY: all test clean force
+.PHONY: all test clean cprog force
 .SUFFIXES: .o .cpp .cc
 
 all: $(TARGETS) force
@@ -38,9 +51,21 @@ $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	./$@
 
+cprog: $(TARGET_C)
+
 $(TARGET_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) -o $@ $<
-	./$@
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $(OUTPUT_ASM87_STORE_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $(OUTPUT_ASM64_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS_87) -o $@ $<
+	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87) $(ECHO_END)
+	@./$@
+	$(CPP) $(CFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
+	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87_STORE) $(ECHO_END)
+	@./$@
+	$(CPP) $(CFLAGS) $(CASMFLAGS_64) -o $@ $<
+	@echo -e $(ECHO_START)Using x64 and SSE $(ECHO_END)
+	@./$@
 	-$(CXX) $(CPPFLAGS) -c $<
 
 force : $(SOURCE_ERROR)
@@ -56,4 +81,4 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(OBJS) ./*.o
+	rm -f $(TARGETS) $(OBJS) $(OUTPUT_ASMS) ./*.o ./*.s
