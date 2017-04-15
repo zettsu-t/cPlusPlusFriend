@@ -9,27 +9,44 @@ GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
 GMOCK_OBJ=$(patsubst %.cc, %.o, $(notdir $(GMOCK_SOURCE)))
 
 TARGET=cppFriends
+TARGET_C=cFriends
+TARGETS=$(TARGET) $(TARGET_C)
+
 SOURCE=cppFriends.cpp
-OBJS=cppFriends.o $(GTEST_OBJ) $(GMOCK_OBJ)
+SOURCE_C=cFriends.c
+SOURCE_ERROR=cppFriendsError.cpp
+
+OBJ=cppFriends.o
+OBJS=$(OBJ) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
+CPP=gcc
 CXX=g++
 LD=g++
-CPPFLAGS=-std=gnu++14 -g -O -Wall $(GTEST_GMOCK_INCLUDE)
+CFLAGS=-std=c99 -O2 -Wall -Werror
+CPPFLAGS=-std=gnu++14 -O2 -Wall -Werror $(GTEST_GMOCK_INCLUDE)
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_serialization
 
-.PHONY: all test clean
+.PHONY: all test clean force
 .SUFFIXES: .o .cpp .cc
 
-all: $(TARGET)
+all: $(TARGETS) force
 
 $(TARGET): $(OBJS)
-	$(LD) $(LIBPATH) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
-	./$(TARGET)
+	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	./$@
 
-$(OBJ_DIR)/%.o: %.cpp
+$(TARGET_C): $(SOURCE_C)
+	$(CPP) $(CFLAGS) -o $@ $<
+	./$@
+	-$(CXX) $(CPPFLAGS) -c $<
+
+force : $(SOURCE_ERROR)
+	-$(CXX) $(CPPFLAGS) -c $<
+
+$(OBJ): $(SOURCE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_DIR)/%.o: %.cc
@@ -39,4 +56,4 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGET) $(OBJS) ./*.o
+	rm -f $(TARGETS) $(OBJS) ./*.o
