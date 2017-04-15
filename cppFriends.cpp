@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <boost/algorithm/string.hpp>
+#include <boost/any.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/io/ios_state.hpp>
@@ -417,6 +418,31 @@ TEST_F(TestRandomNumber, List) {
     HardwareRand hr;
     CountRandomNumber(sr, std::cout);
     CountRandomNumber(hr, std::cout);
+}
+
+namespace {
+    int arg1(int a) {
+        return a + 2;
+    }
+
+    int arg2(int a, int b) {
+        return a * b + 2;
+    }
+
+    using Arg1Type  = int(*)(int);
+    using Arg2Type  = int(*)(int, int);
+}
+
+class FuncAnyCast : public ::testing::Test{};
+
+TEST_F(FuncAnyCast, Initialize) {
+    boost::any func = arg1;
+    auto result1 = (boost::any_cast<Arg1Type>(func))(10);
+    EXPECT_EQ(12, result1);
+
+    func = arg2;
+    auto result2 = (boost::any_cast<Arg2Type>(func))(3, 5);
+    EXPECT_EQ(17, result2);
 }
 
 int main(int argc, char* argv[]) {

@@ -34,6 +34,7 @@ class Train {
 1. 固定アドレスの格納先を、uint32_tとuint64_tとで、#ifdefで切り替えるのはやめるのだ! uintptr_tを使うのだ!
 1. size_tのビット数が分からないからといって、printfの書式指定に%luと書くのはダメだ! %zuと書くのだ! MinGW-w64 gccだとランライムが%zuを解釈しないからコンパイルになるって、それなら仕方ないのだ...
 1. sizeofに型名を入れてはいけないのだ! 変数の型が変わった時オーバランするのだ! sizeof(*pObject)とすれば、ポインタpObjectが指すもののサイズが得られるのだ!
+1. 関数へのポインタを「どんな型でも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. コメントに「この変数は符号なしのはず」とか書いてはいけないのだ! static_assert(std::is_unsigned)を書くのだ!
 1. ```do { ... } while(--i >= 0); ```は、iが符号なし整数だと永久に終わらないのだ! プロセスの危機なのだ!
@@ -53,7 +54,7 @@ class Train {
 1. コンテナの要素の型をソースコードにべた書きしたら、コンテナの型を変えた時に修正が大変なのだ! std::vector::value_type と auto と decltypeがあるじゃないか!
 1. 配列の要素数を ```#define arraySizeof(a) (sizeof(a)/sizeof(a[0]))``` で数えるのはやめるのだ! aにポインタを渡すと、エラーにならずに変な値が返ってくるのだ! テンプレートとconstexprを使うのだ!
 1. いくらマクロより関数テンプレートの方がいいからって、 ```#define WARN(str) printf("%s at %d", str, __LINE__)``` は関数にはできないのだ! WARNを呼び出した場所ではなく、WARNを定義した場所の行番号が表示されてしまうのだ!
-1. 関数の動作を#ifdef SYM ... #endifで切り替えると、SYMをタイプミスしたときに...が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! C++17ではif constexprが使える(かもしれない)のだ!
+1. 関数の動作を```#ifdef SYM ... #endif```で切り替えると、SYMをタイプミスしたときに```...```が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! コンパイラがタイプミスを見つけてくれるのだ!  C++17ではif constexprが使える(予定な)のだ!
 1. 関数の動作を何でもかんでもboolの引数で切り替えたら、呼び出す側のコードを読んでtrueとかfalseとか書いてあっても、何をしたいか分からなくなるのだ! enum classでパラメータに名前を付けるのだ!
 1. タイピングが大変だからって、using namespace std;って書いちゃいけないのだ! boostと衝突したらどうするのだ! もうすぐC++17でstd::anyとstd::optionalがくるんだぞッ!
 1. boost::anyオブジェクトにchar*型の値を入れたとき、 boost::any_cast<char *> ではなく boost::any_cast<const char *> で取り出すのはやめるのだ! boost::bad_any_castが飛んでくるぞ!
@@ -65,6 +66,7 @@ class Train {
 1. constメンバ関数からメンバ変数を書き換えたくなったからといって、いきなりmutableとかconst_castとかしちゃいけないのだ! 呼び出し側はスレッドセーフを期待しているのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!
 1. CreateInstance()がいつでも生ポインタを返したら、誰がdeleteするかわからなくなって、メモリリークしたり二重解放したりするかもしれないのだ! deleteして欲しければ、std::unique_ptrを返すことを検討するのだ! 生ポインタは所有権を渡さないという意志なのだ!
+1. 引数としてconst T* pObjectを渡すと、ポインタpObjectが指すオブジェクトはimmutableとして扱われるが、deleteはできるのだ! deleteされたくなければ、デストラクタを非publicにするのだ!
 1. ユニットテストを書くときは、いきなりテストを成功させてはいけないのだ! でないと、テストに成功したのか、そのテストを実行していないのか、区別がつかなくなるぞ! まずテストを実行して失敗することを確かめるのだ!
 
 この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。

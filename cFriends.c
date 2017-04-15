@@ -22,8 +22,6 @@ void check_cancellation_digits(void) {
     printf("The non-volatile double value is %s the volatile\n", pResult);
 }
 
-#define MY_ARRAY_SIZE (5)
-
 void my_memcpy(uint8_t* restrict pDst, const uint8_t* restrict pSrc, size_t size) {
     for(size_t i = 0; i < size; ++i) {
         pDst[i] = pSrc[i];
@@ -31,6 +29,8 @@ void my_memcpy(uint8_t* restrict pDst, const uint8_t* restrict pSrc, size_t size
 
     return;
 }
+
+#define MY_ARRAY_SIZE (5)
 
 int main(int argc, char* argv[]) {
     uint8_t src[MY_ARRAY_SIZE] = {2,3,4,5,6};
