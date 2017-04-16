@@ -591,12 +591,75 @@ TEST_F(TestMyCounter, SingleCore) {
     runCounters(sizeOfThreads, count);
 
     MyCounter::Number expected = static_cast<decltype(expected)>(sizeOfThreads) * count;
-    // 最適化しなければこうはならない
     EXPECT_EQ(expected, MyCounter::GetValue());
     // シングルコアなら競合しない
     EXPECT_EQ(expected, MyCounter::GetVolatileValue());
     // これは常に成り立つはず
     EXPECT_EQ(expected, MyCounter::GetAtomicValue());
+}
+
+class NaiveCopy {
+public:
+    NaiveCopy(void) = default;
+    virtual ~NaiveCopy(void) = default;
+
+    void Add(int e) {
+        array_.push_back(e);
+    }
+
+    int At(size_t i) {
+        return array_.at(i);
+    }
+
+    void CopyTo(NaiveCopy& other) const {
+        // this == otherのときは、otherつまりthisの要素を消してしまう!
+        // メンバ関数宣言にconstがあっても無駄である
+        other.array_.clear();
+
+        // otherを消してしまったのなら、何もコピーされない
+        for(const auto& e : array_) {
+            other.array_.push_back(e);
+        }
+    }
+
+    void CopyTo_s(NaiveCopy& other) const {
+        if (this == &other) {
+            return;
+        }
+
+        for(const auto& e : array_) {
+            other.array_.push_back(e);
+        }
+    }
+
+private:
+    std::vector<int> array_;
+};
+
+class TestNaiveCopy : public ::testing::Test {};
+
+TEST_F(TestNaiveCopy, CopyTo) {
+    NaiveCopy original;
+    original.Add(1);
+    original.Add(2);
+    EXPECT_EQ(2, original.At(1));
+
+    NaiveCopy other;
+    original.CopyTo(other);
+    EXPECT_EQ(2, original.At(1));
+    EXPECT_EQ(2, other.At(1));
+
+    original.CopyTo(original);
+    ASSERT_ANY_THROW(original.At(1));
+}
+
+TEST_F(TestNaiveCopy, CopyTo_s) {
+    NaiveCopy original;
+    original.Add(1);
+    original.Add(2);
+    EXPECT_EQ(2, original.At(1));
+    original.CopyTo_s(original);
+    EXPECT_EQ(2, original.At(1));
 }
 
 int main(int argc, char* argv[]) {
