@@ -13,8 +13,9 @@ GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
 GMOCK_OBJ=$(patsubst %.cc, %.o, $(notdir $(GMOCK_SOURCE)))
 
 TARGET=cppFriends
+TARGET_NO_OPT=cppFriends_no_opt
 TARGET_C=cFriends
-TARGETS=$(TARGET) $(TARGET_C)
+TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C)
 OUTPUT_ASM87_C=cFriends87.s
 OUTPUT_ASM87_STORE_C=cFriends87-store.s
 OUTPUT_ASM64_C=cFriends64.s
@@ -30,14 +31,18 @@ SOURCE_C=cFriends.c
 SOURCE_ERROR=cppFriendsError.cpp
 
 OBJ=cppFriends.o
+OBJ_NO_OPT=cppFriends_no_opt.o
 OBJS=$(OBJ) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS_NO_OPT=$(OBJ_NO_OPT) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
 CPP=gcc
 CXX=g++
 LD=g++
 CFLAGS=-std=gnu11 -O2 -Wall
-CPPFLAGS=-std=gnu++14 -O2 -Wall $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS_COMMON=-std=gnu++14 -Wall $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS=$(CPPFLAGS_COMMON) -O2
+CPPFLAGS_NO_OPT=$(CPPFLAGS_COMMON) -O0 -DCPPFRIENDS_NO_OPTIMIZATION
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_serialization
@@ -50,6 +55,10 @@ all: $(TARGETS) force
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	./$@
+
+$(TARGET_NO_OPT): $(OBJS_NO_OPT)
+	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	./$@ --gtest_filter="TestMyCounter*"
 
 cprog: $(TARGET_C)
 
@@ -74,6 +83,9 @@ force : $(SOURCE_ERROR)
 $(OBJ): $(SOURCE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
+$(OBJ_NO_OPT): $(SOURCE)
+	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+
 $(OBJ_DIR)/%.o: %.cc
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
@@ -81,4 +93,4 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(OBJS) $(OUTPUT_ASMS) ./*.o ./*.s
+	rm -f $(TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) ./*.o ./*.s

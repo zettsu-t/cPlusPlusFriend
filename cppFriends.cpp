@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <future>
 #include <iostream>
 #include <random>
 #include <string>
@@ -16,6 +18,7 @@
 #include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <windows.h>
 
 namespace {
     void TrimAndExpand(std::string& str) {
@@ -433,9 +436,9 @@ namespace {
     using Arg2Type  = int(*)(int, int);
 }
 
-class FuncAnyCast : public ::testing::Test{};
+class TestFuncAnyCast : public ::testing::Test{};
 
-TEST_F(FuncAnyCast, Initialize) {
+TEST_F(TestFuncAnyCast, Initialize) {
     boost::any func = arg1;
     auto result1 = (boost::any_cast<Arg1Type>(func))(10);
     EXPECT_EQ(12, result1);
@@ -443,6 +446,157 @@ TEST_F(FuncAnyCast, Initialize) {
     func = arg2;
     auto result2 = (boost::any_cast<Arg2Type>(func))(3, 5);
     EXPECT_EQ(17, result2);
+}
+
+class MyCounter {
+public:
+    using Number = int;
+    MyCounter(Number count) : count_(count) {}
+    virtual ~MyCounter(void) = default;
+
+    void Run(void) {
+        // コンパイラが最適化すれば、足した結果をまとめてnonVolatileCounter_に格納する可能性がある
+        for(Number i = 0; i < count_; ++i) {
+            ++nonVolatileCounter_;
+        }
+
+        // volatileはatomicではないので競合する可能性がある
+        for(Number i = 0; i < count_; ++i) {
+            ++volatileCounter_;
+            ++atomicCounter_;
+        }
+    }
+
+    static void Reset(void) {
+        nonVolatileCounter_ = 0;
+        volatileCounter_ = 0;
+        atomicCounter_ = 0;
+    }
+
+    static Number GetValue(void) {
+        return nonVolatileCounter_;
+    }
+
+    static Number GetVolatileValue(void) {
+        return volatileCounter_;
+    }
+
+    static Number GetAtomicValue(void) {
+        return atomicCounter_;
+    }
+
+private:
+    Number count_ {0};
+    static Number nonVolatileCounter_;
+    static volatile Number volatileCounter_;
+    static std::atomic<Number> atomicCounter_;
+};
+
+MyCounter::Number MyCounter::nonVolatileCounter_ {0};
+volatile MyCounter::Number MyCounter::volatileCounter_ {0};
+std::atomic<MyCounter::Number> MyCounter::atomicCounter_ {0};
+
+class TestMyCounter : public ::testing::Test {
+protected:
+    using SizeOfThreads = int;
+
+    virtual void SetUp() override {
+        MyCounter::Reset();
+        hardwareConcurrency_ = static_cast<decltype(hardwareConcurrency_)>(std::thread::hardware_concurrency());
+        processAffinityMask_ = 0;
+        systemAffinityMask_ = 0;
+
+        // https://msdn.microsoft.com/ja-jp/library/cc429135.aspx
+        // https://msdn.microsoft.com/ja-jp/library/windows/desktop/ms683213(v=vs.85).aspx
+        // で引数の型が異なる。下が正しい。
+        if (!GetProcessAffinityMask(GetCurrentProcess(), &processAffinityMask_, &systemAffinityMask_)) {
+            // 取得に失敗したらシングルコアとみなす
+            std::cout << "GetProcessAffinityMask failed\n";
+            processAffinityMask_ = 1;
+            systemAffinityMask_ = 1;
+       }
+    }
+
+    virtual void TearDown() override {
+        if (!SetProcessAffinityMask(GetCurrentProcess(), processAffinityMask_)) {
+            std::cout << "Restoring ProcessAffinityMask failed\n";
+        } else {
+            std::cout << "ProcessAffinityMask restored\n";
+        }
+    }
+
+    void runCounters(SizeOfThreads sizeOfThreads, MyCounter::Number count) {
+        std::vector<std::unique_ptr<MyCounter>> counterSet;
+        std::vector<std::future<void>> futureSet;
+
+        // 並行処理を作って、後で実行できるようにする
+        for(decltype(sizeOfThreads) index = 0; index < sizeOfThreads; ++index) {
+            std::unique_ptr<MyCounter> pCounter(new MyCounter(count));
+            MyCounter* pRawCounter = pCounter.get();
+            futureSet.push_back(std::async(std::launch::async, [=](void) -> void { pRawCounter->Run(); }));
+            counterSet.push_back(std::move(pCounter));
+        }
+
+        // 並行して評価して、結果がそろうのを待つ
+        for(auto& f : futureSet) {
+            f.get();
+        }
+
+        std::cout << "MyCounter::GetValue() = " << MyCounter::GetValue() << "\n";
+        std::cout << "MyCounter::GetVolatileValue() = " << MyCounter::GetVolatileValue() << "\n";
+        std::cout << "MyCounter::GetAtomicValue() = " << MyCounter::GetAtomicValue() << "\n";
+        return;
+    }
+
+    SizeOfThreads hardwareConcurrency_ {0};
+
+private:
+    DWORD_PTR processAffinityMask_ {1};
+    DWORD_PTR systemAffinityMask_  {1};
+};
+
+TEST_F(TestMyCounter, MultiCore) {
+    if (hardwareConcurrency_ <= 1) {
+        return;
+    }
+
+    const MyCounter::Number count = 1000000;  // 十分大きくする
+    SizeOfThreads sizeOfThreads = hardwareConcurrency_;
+    std::cout << "Run on multi threading\n";
+    runCounters(sizeOfThreads, count);
+
+    MyCounter::Number expected = static_cast<decltype(expected)>(sizeOfThreads) * count;
+    // 最適化しなければこうはならない
+#ifdef CPPFRIENDS_NO_OPTIMIZATION
+    EXPECT_GT(expected, MyCounter::GetValue());
+#else
+    EXPECT_EQ(expected, MyCounter::GetValue());
+#endif
+    // マルチコアなら競合が起きるので成り立つはずだが、条件次第では競合しない可能性もある
+    EXPECT_GT(expected, MyCounter::GetVolatileValue());
+    // これは常に成り立つはず
+    EXPECT_EQ(expected, MyCounter::GetAtomicValue());
+}
+
+TEST_F(TestMyCounter, SingleCore) {
+    /* 使うCPUを1個に固定する */
+    DWORD_PTR procMask = 1;
+    if (!SetProcessAffinityMask(GetCurrentProcess(), procMask)) {
+        std::cout << "SetProcessAffinityMask failed\n";
+    }
+
+    SizeOfThreads sizeOfThreads = std::max(hardwareConcurrency_, 4);
+    const MyCounter::Number count = 1000000;
+    std::cout << "Run on a single thread\n";
+    runCounters(sizeOfThreads, count);
+
+    MyCounter::Number expected = static_cast<decltype(expected)>(sizeOfThreads) * count;
+    // 最適化しなければこうはならない
+    EXPECT_EQ(expected, MyCounter::GetValue());
+    // シングルコアなら競合しない
+    EXPECT_EQ(expected, MyCounter::GetVolatileValue());
+    // これは常に成り立つはず
+    EXPECT_EQ(expected, MyCounter::GetAtomicValue());
 }
 
 int main(int argc, char* argv[]) {
