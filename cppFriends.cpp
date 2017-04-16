@@ -6,6 +6,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -636,6 +637,8 @@ private:
     std::vector<int> array_;
 };
 
+class SubNaiveCopy : public NaiveCopy {};
+
 class TestNaiveCopy : public ::testing::Test {};
 
 TEST_F(TestNaiveCopy, CopyTo) {
@@ -660,6 +663,33 @@ TEST_F(TestNaiveCopy, CopyTo_s) {
     EXPECT_EQ(2, original.At(1));
     original.CopyTo_s(original);
     EXPECT_EQ(2, original.At(1));
+}
+
+class TestTypeId : public ::testing::Test {};
+
+TEST_F(TestTypeId, Compare) {
+    EXPECT_EQ(typeid(NaiveCopy), typeid(NaiveCopy));
+    EXPECT_EQ(typeid(const NaiveCopy), typeid(NaiveCopy));
+    EXPECT_NE(typeid(SubNaiveCopy), typeid(NaiveCopy));
+}
+
+class TestThreads : public ::testing::Test {};
+
+TEST_F(TestThreads, All) {
+    struct ThreadEnv {
+        int value;
+    };
+
+    ThreadEnv env1 {1};
+    ThreadEnv env2 {2};
+    {
+        std::thread thr1([&env1](void) { std::cout << env1.value; });
+        std::thread thr2([&env2](void) { std::cout << env2.value; });
+        thr1.join();
+        thr2.join();
+    }
+
+    std::cout << "\n";
 }
 
 int main(int argc, char* argv[]) {
