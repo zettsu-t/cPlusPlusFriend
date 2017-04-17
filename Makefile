@@ -45,7 +45,7 @@ CPPFLAGS=$(CPPFLAGS_COMMON) -O2
 CPPFLAGS_NO_OPT=$(CPPFLAGS_COMMON) -O0 -DCPPFRIENDS_NO_OPTIMIZATION
 LIBPATH=
 LDFLAGS=
-LIBS=-lboost_serialization
+LIBS=-lboost_serialization -lboost_regex
 
 .PHONY: all test clean cprog force
 .SUFFIXES: .o .cpp .cc

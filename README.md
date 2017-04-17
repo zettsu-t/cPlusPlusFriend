@@ -34,13 +34,13 @@ class Train {
 1. 固定アドレスの格納先を、uint32_tとuint64_tとで、#ifdefで切り替えるのはやめるのだ! uintptr_tを使うのだ!
 1. size_tのビット数が分からないからといって、printfの書式指定に%luと書くのはダメだ! %zuと書くのだ! MinGW-w64 gccだとランライムが%zuを解釈しないからコンパイルになるって、それなら仕方ないのだ...
 1. sizeofに型名を入れてはいけないのだ! 変数の型が変わった時オーバランするのだ! sizeof(*pObject)とすれば、ポインタpObjectが指すもののサイズが得られるのだ!
-1. 関数へのポインタを「どんな型でも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
+1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. コメントに「この変数は符号なしのはず」とか書いてはいけないのだ! static_assert(std::is_unsigned)を書くのだ!
 1. ```do { ... } while(--i >= 0); ```は、iが符号なし整数だと永久に終わらないのだ! プロセスの危機なのだ!
 1. 非PODのオブジェクトをmemcpyしてはいけないのだ! memmoveもダメだ! vtableへのポインタもコピーされてしまうのだ! 派生クラスのメンバが切り捨てられて不定値に置き換わってしまうのだ!
 1. memsetを使ってbyte単位以外の値でメモリを埋めるのは無理なのだ! std::fillを使うのだ!
-1. thisと引数が同じオブジェクトかどうか(二つの引数が同じオブジェクトかどうか)確かめずに、片方から他方にメンバをコピーするのはやめるのだ! memcpyのように要素が消滅してしまうのだ! [(NaiveCopy)](cppFriends.cpp)
+1. thisと引数が同じオブジェクトかどうか(二つの引数が同じオブジェクトかどうか)確かめずに、片方から他方にメンバをコピーするのはやめるのだ! memcpyで領域が重なっているときのように要素が消滅してしまうのだ! [(NaiveCopy)](cppFriends.cpp)
 1. 確かにC99の機能はC++でも使えるが、restrictはコンパイルエラーになることがあるのだ! 本当にrestrictが必要か考えるのだ!
 1. 立っているビット数をfor文で数えるのは遅いのだ! コンパイラのマニュアルから __builtin_popcount とかを探すのだ!
 1. strict aliasing rule警告の意味が分からないからって無視してはいけないのだ! [(参考)](http://dbp-consulting.com/tutorials/StrictAliasing.html) そもそもエンディアン変換なら、自作しないでntohlとかBoost.Endianとか探すのだ!
@@ -69,6 +69,7 @@ class Train {
 1. マルチコア環境では、volatileでスレッド間共有変数の同期は取れないのだ! std::atomicが必要なのだ! 競合動作の危機なのだ! [(Counter)](cppFriends.cpp)
 1. volatile T*へのキャストをどう書く分からないからって、Cキャストを使っちゃいけないのだ! const_castを使うのだ!
 1. constメンバ関数からメンバ変数を書き換えたくなったからといって、いきなりmutableとかconst_castとかしちゃいけないのだ! 呼び出し側はスレッドセーフを期待しているのだ!
+1. そのboost::regexをstd::regexに置き換えるのはやめるのだ! その再帰正規表現は入れ子になった括弧を、一番外側の括弧ごとに分けるのだが、std::regexは再帰正規表現をまだサポートしていないのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!
 1. CreateInstance()がいつでも生ポインタを返したら、誰がdeleteするかわからなくなって、メモリリークしたり二重解放したりするかもしれないのだ! deleteして欲しければ、std::unique_ptrを返すことを検討するのだ! 生ポインタは所有権を渡さないという意志なのだ!
 1. 引数としてconst T* pObjectを渡すと、ポインタpObjectが指すオブジェクトはimmutableとして扱われるが、deleteはできるのだ! deleteされたくなければ、デストラクタを非publicにするのだ!

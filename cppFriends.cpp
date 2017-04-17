@@ -5,6 +5,7 @@
 #include <future>
 #include <iostream>
 #include <random>
+#include <regex>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -16,6 +17,7 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
 #include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -690,6 +692,84 @@ TEST_F(TestThreads, All) {
     }
 
     std::cout << "\n";
+}
+
+class TestRegex : public ::testing::Test {
+protected:
+    static const std::string pattern_;
+    static const std::string input_;
+    static const std::string expected_;
+
+    void createStdRegex(std::regex_constants::syntax_option_type t) {
+        // 再帰正規表現はサポートしていない
+        std::regex expr(pattern_, t);
+    }
+};
+
+// ()の入れ子を、最も外側の()で分ける、再帰正規表現
+const std::string TestRegex::pattern_  {"((?>[^\\s(]+|(\\((?>[^()]+|(?-1))*\\))))"};
+const std::string TestRegex::input_    {" (a) ((b)) (((c))) (d) "};
+const std::string TestRegex::expected_ {"(a)::((b))::(((c)))::(d)::"};
+
+TEST_F(TestRegex, StdTypes1) {
+    const auto typeSet = {std::regex_constants::ECMAScript, std::regex_constants::extended,
+                          std::regex_constants::awk, std::regex_constants::egrep};
+
+    for(auto t : typeSet) {
+        ASSERT_ANY_THROW(createStdRegex(t));
+    }
+}
+
+TEST_F(TestRegex, StdTypes2) {
+    const auto typeSet = {std::regex_constants::basic, std::regex_constants::grep};
+
+    for(auto t : typeSet) {
+        using Iter = std::string::const_iterator;
+        Iter startI = input_.begin();
+        Iter endI = input_.end();
+        std::match_results<Iter> results;
+        std::regex expr(pattern_, t);
+        std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
+
+        std::ostringstream os;
+        while(std::regex_search(startI, endI, results, expr, flags)) {
+            auto& head = results[0];
+            const std::string substr(head.first, head.second);
+            os << substr << "::";
+            startI = head.second;
+            flags |= std::regex_constants::match_prev_avail;
+        }
+        EXPECT_TRUE(os.str().empty());
+    }
+}
+
+TEST_F(TestRegex, Boost) {
+    using Iter = std::string::const_iterator;
+    Iter startI = input_.begin();
+    Iter endI = input_.end();
+    boost::match_results<Iter> results;
+    boost::regex expr(pattern_);
+    boost::match_flag_type flags = boost::match_default;
+
+    std::ostringstream osSearch;
+    while(boost::regex_search(startI, endI, results, expr, flags)) {
+        auto& head = results[0];
+        const std::string substr(head.first, head.second);
+        osSearch << substr << "::";
+        startI = head.second;
+        flags |= boost::match_prev_avail;
+        flags |= boost::match_not_bob;
+    }
+    EXPECT_EQ(expected_, osSearch.str());
+
+    std::ostringstream osIter;
+    boost::sregex_token_iterator i {input_.begin(), input_.end(), expr, 1};
+    boost::sregex_token_iterator e;
+    while(i != e) {
+        osIter << *i << "::";
+        ++i;
+    }
+    EXPECT_EQ(expected_, osIter.str());
 }
 
 int main(int argc, char* argv[]) {
