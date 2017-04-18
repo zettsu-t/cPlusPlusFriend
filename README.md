@@ -46,6 +46,7 @@ class Train {
 1. strict aliasing rule警告の意味が分からないからって無視してはいけないのだ! [(参考)](http://dbp-consulting.com/tutorials/StrictAliasing.html) そもそもエンディアン変換なら、自作しないでntohlとかBoost.Endianとか探すのだ!
 1. pragmaで警告を抑止してよいのは、コードレビューで承認されてからだ!
 1. 2個のオブジェクトを交換するコードを自作してはいけないのだ! std::swapはno throw保証なのだ!
+1. 出力ファイルストリームのcloseを、いつでもデストラクタ任せにすると、closeで書き出しに失敗したことを検出できないのだ! デストラクタはnoexceptだから呼び出し元に結果を通知できないのだ!
 1. 何もしないデストラクタを{}と定義するのはダメだ! =defaultを使うのだ! 理由はEffective Modern C++ 項目17に書いてあるのだ!
 1. ユニットテストが書きにくいからって、#defineでprivateをpublicに置き換えちゃいけないのだ! アクセス指定子を超えたメンバ変数の順序は入れ替わることがあるのだ!  [(参考)](http://en.cppreference.com/w/cpp/language/access) friendを使うのだ!
 1. メンバ変数名の目印のアンダースコアは、名前の先頭につけちゃいけないのだ! _で始まり次が英大文字の名前はC++処理系の予約語なのだ!
@@ -58,6 +59,7 @@ class Train {
 1. 関数の動作を```#ifdef COLOR ... #endif```で切り替えると、COLOURと打ったときに```...```が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! コンパイラが綴りの違いを見つけてくれるのだ!  C++17ではif constexprが使える(予定な)のだ!
 1. 関数の動作を何でもかんでもboolの引数で切り替えたら、呼び出す側のコードを読んでtrueとかfalseとか書いてあっても、何をしたいか分からなくなるのだ! enum classでパラメータに名前を付けるのだ!
 1. タイピングが大変だからって、using namespace std;って書いちゃいけないのだ! boostと衝突したらどうするのだ! もうすぐC++17でstd::anyとstd::optionalがくるんだぞッ!
+1. そのboost::regexをstd::regexに置き換えるのはやめるのだ! その再帰正規表現は入れ子になった括弧を、一番外側の括弧ごとに分けるのだが、std::regexは再帰正規表現をまだサポートしていないのだ!
 1. boost::anyオブジェクトにchar*型の値を入れたとき、 boost::any_cast<char *> ではなく boost::any_cast<const char *> で取り出すのはやめるのだ! boost::bad_any_castが飛んでくるぞ! typeidとは違って、constを無視しないのだ!
 1. 基底クラスと派生クラスのtypeidは異なるのだ! 素直にmarker interfaceを使うのだ!
 1. 空の構造体がたくさんあるからって、全部まとめて一つにするのはやめるのだ! それらはBoost.MultiIndexのタグなのだ!
@@ -69,7 +71,6 @@ class Train {
 1. マルチコア環境では、volatileでスレッド間共有変数の同期は取れないのだ! std::atomicが必要なのだ! 競合動作の危機なのだ! [(Counter)](cppFriends.cpp)
 1. volatile T*へのキャストをどう書く分からないからって、Cキャストを使っちゃいけないのだ! const_castを使うのだ!
 1. constメンバ関数からメンバ変数を書き換えたくなったからといって、いきなりmutableとかconst_castとかしちゃいけないのだ! 呼び出し側はスレッドセーフを期待しているのだ!
-1. そのboost::regexをstd::regexに置き換えるのはやめるのだ! その再帰正規表現は入れ子になった括弧を、一番外側の括弧ごとに分けるのだが、std::regexは再帰正規表現をまだサポートしていないのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!
 1. CreateInstance()がいつでも生ポインタを返したら、誰がdeleteするかわからなくなって、メモリリークしたり二重解放したりするかもしれないのだ! deleteして欲しければ、std::unique_ptrを返すことを検討するのだ! 生ポインタは所有権を渡さないという意志なのだ!
 1. 引数としてconst T* pObjectを渡すと、ポインタpObjectが指すオブジェクトはimmutableとして扱われるが、deleteはできるのだ! deleteされたくなければ、デストラクタを非publicにするのだ!

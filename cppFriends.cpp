@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <random>
@@ -770,6 +771,27 @@ TEST_F(TestRegex, Boost) {
         ++i;
     }
     EXPECT_EQ(expected_, osIter.str());
+}
+
+class TestFileStream : public ::testing::Test {};
+
+TEST_F(TestFileStream, Close) {
+    EXPECT_FALSE(errno);
+    {
+        std::ofstream fs1;
+        fs1.exceptions(std::ifstream::failbit);
+        // ファイルに関連付けられていなければcloseに失敗する
+        ASSERT_ANY_THROW(fs1.close());
+    }
+    EXPECT_FALSE(errno);
+
+    {
+        std::ofstream fs2;
+        fs2.exceptions(std::ifstream::failbit);
+        fs2 << "test";
+        // ofstreamのデストラクタは失敗しても何も教えてくれない
+    }
+    EXPECT_FALSE(errno);
 }
 
 int main(int argc, char* argv[]) {
