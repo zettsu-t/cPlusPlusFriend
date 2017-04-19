@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdlib>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -792,6 +793,191 @@ TEST_F(TestFileStream, Close) {
         // ofstreamのデストラクタは失敗しても何も教えてくれない
     }
     EXPECT_FALSE(errno);
+}
+
+class TestZeroInitialize : public ::testing::Test {
+protected:
+    virtual void SetUp() override {
+        // リセット
+        decltype(os_) os;
+        os_.swap(os);
+    }
+
+    // PODの配列
+    template <typename T, size_t S>
+    typename std::enable_if_t<std::is_pod<T>::value, void>
+    ZeroInitialize(T (&argArray)[S]) {
+        // どのパターンにマッチングしたか記録を残す
+        os_ << "array(" << sizeof(argArray) << "),";
+        // 配列の先頭要素だけでなく、配列全体のサイズ
+        ::memset(argArray, 0, sizeof(argArray));
+        return;
+    }
+
+    // nullptr
+    template <typename T>
+    typename std::enable_if_t<std::is_null_pointer<T>::value, void>
+    ZeroInitialize(T) {
+        os_ << "nullptr,";
+        return;
+    }
+
+    // PODを指すポインタ
+    template <typename T>
+    typename std::enable_if_t<std::is_pointer<T>::value && std::is_pod<std::remove_pointer_t<T>>::value, void>
+    ZeroInitialize(T pObject) {
+        if (pObject) {
+            os_ << "pointer(" << sizeof(*pObject) << "),";
+            ::memset(pObject, 0, sizeof(*pObject));
+        } else {
+            os_ << "null-pointer,";
+        }
+        return;
+    }
+
+    // PODへの参照
+    template <typename T>
+    typename std::enable_if_t<!std::is_pointer<T>::value && std::is_pod<T>::value, void>
+               ZeroInitialize(T& object) {
+        os_ << "reference(" << sizeof(object) << "),";
+        ::memset(&object, 0, sizeof(object));
+        return;
+    }
+
+    // NULL=0は何もしない
+    // 0以外の整数も無意味なので何もしない(本当はコンパイルエラーにしたい)
+    template <typename T>
+    typename std::enable_if_t<std::is_integral<T>::value, void>
+    ZeroInitialize(const T&) {
+        os_ << "integral,";
+        return;
+    }
+
+    // 呼び出しログ
+    std::ostringstream os_;
+
+    class Inner {
+    public:
+        Inner(void) = default;
+        Inner(int a) : a_(a) {}
+        virtual ~Inner(void) = default;
+        virtual int Get(void) const { return a_; }
+    private:
+        int a_ {0};
+    };
+};
+
+TEST_F(TestZeroInitialize, All) {
+    std::string expected;
+
+    short primitive = 1;
+    {
+        EXPECT_TRUE(primitive);
+        ZeroInitialize(primitive);
+        EXPECT_FALSE(primitive);
+        expected += "reference(2),";
+
+        primitive = 2;
+        EXPECT_TRUE(primitive);
+        ZeroInitialize(&primitive);
+        EXPECT_FALSE(primitive);
+        expected += "pointer(2),";
+    }
+
+    constexpr size_t arraySize = 5;
+    {
+        int array1[arraySize] {2,3,4,5,6};
+        ZeroInitialize(array1);
+        for(const auto e : array1) {
+            EXPECT_FALSE(e);
+        }
+        expected += "array(20),";
+    }
+    {
+        int array2[arraySize] {2,3,4,5,6};
+        ZeroInitialize(&array2[0]);
+        EXPECT_FALSE(array2[0]);
+        for(size_t i = 1; i < arraySize; ++i) {
+            EXPECT_TRUE(array2[i]);
+        }
+        expected += "pointer(4),";
+
+        ZeroInitialize(array2[arraySize - 1]);
+        EXPECT_FALSE(array2[arraySize - 1]);
+        expected += "reference(4),";
+    }
+    {
+        int v = 0;
+        int* arrayP[arraySize] {&v,&v,&v,&v,&v};
+        ZeroInitialize(arrayP);
+        for(const auto e : arrayP) {
+            EXPECT_FALSE(e);
+        }
+        // 32bit環境では異なる
+        expected += "array(40),";
+    }
+
+    struct Data {
+        int m1;
+        int* p;
+        int m2;
+    };
+    {
+        Data data1 {1, nullptr, 2};
+        data1.p = &data1.m1;
+        ZeroInitialize(data1);
+        EXPECT_FALSE(data1.m1);
+        EXPECT_FALSE(data1.p);
+        EXPECT_FALSE(data1.m2);
+        // 32bit環境では異なる
+        expected += "reference(24),";
+    }
+    {
+        Data data2 {3, nullptr, 4};
+        data2.p = &data2.m1;
+        ZeroInitialize(&data2);
+        EXPECT_FALSE(data2.m1);
+        EXPECT_FALSE(data2.p);
+        EXPECT_FALSE(data2.m2);
+        expected += "pointer(24),";
+    }
+    {
+        Data dataArray[] {{1, nullptr, 2}, {3, nullptr, 4}};
+        ZeroInitialize(dataArray);
+        for(const auto& e : dataArray) {
+            EXPECT_FALSE(e.m1);
+            EXPECT_FALSE(e.p);
+            EXPECT_FALSE(e.m2);
+        }
+        expected += "array(48),";
+    }
+
+    static_assert(!std::is_pointer<decltype(nullptr)>::value, "nullptr is a pointer");
+    static_assert(std::is_integral<decltype(NULL)>::value, "NULL is a number");
+    static_assert(!std::is_pod<Inner>::value, "Inner is a POD type");
+
+    ZeroInitialize(nullptr);
+    expected += "nullptr,";
+    Data* pNull = nullptr;
+    ZeroInitialize(pNull);
+    expected += "null-pointer,";
+
+    ZeroInitialize(NULL);
+    ZeroInitialize(0);
+    ZeroInitialize(1);
+    ZeroInitialize(0x123456789ull);
+    expected += "integral,integral,integral,integral,";
+
+    // vtableへのポインタをクリアすると異常になるので、コンパイルエラーにする
+#if 0
+    Inner inner(1);
+    Inner innerArray[2];
+    ZeroInitialize(inner);
+    ZeroInitialize(&inner);
+    ZeroInitialize(innerArray);
+#endif
+
+    EXPECT_EQ(expected, os_.str());
 }
 
 int main(int argc, char* argv[]) {
