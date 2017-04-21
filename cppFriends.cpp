@@ -553,6 +553,35 @@ protected:
         return;
     }
 
+    class IntBox {
+    public:
+        using Data = int;
+        IntBox(Data n) : var_(n), mvar_(n), cvar_(n) {}
+        virtual ~IntBox() = default;
+
+        Data Get(void) const { return var_; }
+        Data GetMutableVar(void) const { return mvar_; }
+        Data GetConstVar(void) const { return cvar_; }
+        void Set(Data n) { var_ = n; }
+        void SetMutableVar(Data n) const { mvar_ = n; }
+
+        // コンパイラはメンバ変数が不変だとは断定できないので、動作するだろう
+        // Exceptional C++ Style 項目24を参照
+        void Overwrite1(Data n) const {
+            const_cast<IntBox*>(this)->var_ = n;
+        }
+
+        void Overwrite2(Data n) const {
+            *(const_cast<Data*>(&var_)) = n;
+            *(const_cast<Data*>(&cvar_)) = n;
+        }
+
+    private:
+        Data var_;
+        mutable Data mvar_;
+        const Data cvar_;
+    };
+
     SizeOfThreads hardwareConcurrency_ {0};
 
 private:
@@ -601,6 +630,31 @@ TEST_F(TestMyCounter, SingleCore) {
     EXPECT_EQ(expected, MyCounter::GetVolatileValue());
     // これは常に成り立つはず
     EXPECT_EQ(expected, MyCounter::GetAtomicValue());
+}
+
+TEST_F(TestMyCounter, ConstMemberFunction) {
+    IntBox::Data n = 1;
+    IntBox box {n};
+    EXPECT_EQ(n, box.Get());
+    EXPECT_EQ(n, box.GetMutableVar());
+    EXPECT_EQ(n, box.GetConstVar());
+
+    ++n;
+    box.Set(n);
+    EXPECT_EQ(n, box.Get());
+
+    ++n;
+    box.SetMutableVar(n);
+    EXPECT_EQ(n, box.GetMutableVar());
+
+    ++n;
+    box.Overwrite1(n);
+    EXPECT_EQ(n, box.Get());
+
+    ++n;
+    box.Overwrite2(n);
+    EXPECT_EQ(n, box.Get());
+    EXPECT_EQ(n, box.GetConstVar());
 }
 
 class NaiveCopy {
