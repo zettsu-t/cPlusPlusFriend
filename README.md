@@ -34,6 +34,7 @@ class Train {
 1. 固定アドレスの格納先を、uint32_tとuint64_tとで、#ifdefで切り替えるのはやめるのだ! uintptr_tを使うのだ!
 1. size_tのビット数が分からないからといって、printfの書式指定に%luと書くのはダメだ! %zuと書くのだ! MinGW-w64 gccだとランライムが%zuを解釈しないからコンパイルになるって、それなら仕方ないのだ...
 1. sizeofに型名を入れてはいけないのだ! 変数の型が変わった時オーバランするのだ! sizeof(*pObject)とすれば、ポインタpObjectが指すもののサイズが得られるのだ!
+1. sizeofにリテラルを渡すのはやめるのだ! sizeof('a')はCとC++で違うのだ! [(参考)](http://david.tribble.com/text/cdiffs.htm#C99-char-literal)
 1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. ビットフィールドを上から下に並べても、MSBから順に並ぶとは限らないのだ! エンディアンとコンパイラの仕様を確認するのだ!
@@ -61,6 +62,7 @@ class Train {
 1. いくらマクロより関数テンプレートの方がいいからって、 ```#define WARN(str) printf("%s at %d", str, __LINE__)``` は関数にはできないのだ! WARNを呼び出した場所ではなく、WARNを定義した場所の行番号が表示されてしまうのだ!
 1. 関数の動作を```#ifdef COLOR ... #endif```で切り替えると、COLOURと打ったときに```...```が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! コンパイラが綴りの違いを見つけてくれるのだ!  C++17ではif constexprが使える(予定な)のだ!
 1. テンプレートマッチングをstd::is_pointerだけで済ましてはいけないのだ! 配列T(&)[SIZE]とstd::is_null_pointerに対するマッチングも必要なのだ!
+1. f(uint8_t)とf(BYTETYPE)とf(unsigned char)を同時には定義できないのだ! 関数を再定義してますと言われてしまうのだ! プログラマには違う型に見えても、コンパイラには区別がつかないのだ!
 1. 関数の動作を何でもかんでもboolの引数で切り替えたら、呼び出す側のコードを読んでtrueとかfalseとか書いてあっても、何をしたいか分からなくなるのだ! enum classでパラメータに名前を付けるのだ!
 1. タイピングが大変だからって、using namespace std;って書いちゃいけないのだ! boostと衝突したらどうするのだ! もうすぐC++17でstd::anyとstd::optionalがくるんだぞッ!
 1. そのboost::regexをstd::regexに置き換えるのはやめるのだ! その再帰正規表現は入れ子になった括弧を、一番外側の括弧ごとに分けるのだが、std::regexは再帰正規表現をまだサポートしていないのだ!

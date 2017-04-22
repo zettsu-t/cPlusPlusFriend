@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
+// Cではこうなる。C++ではこうならない。
+static_assert(sizeof('a') == sizeof(int), "Expect sizeof('a') == sizeof(int)");
+
 // 桁落ちを意図的に起こす
 void check_cancellation_digits(void) {
     // x87なら内部80bitで、SSEなら64bitで計算する

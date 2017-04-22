@@ -1090,6 +1090,15 @@ TEST_F(TestMacroExpansion, Well) {
 }
 
 namespace {
+    static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
+    static_assert(sizeof('a') == 1, "Expect sizeof(char) == 1");
+    __attribute__((unused)) void funcTakesByte(uint8_t e) {}
+    /* これら上とを同時には定義できない
+    using BYTETYPE = uint8_t;
+    void funcTakesByte(unsigned char e) {}
+    void funcTakesByte(BYTETYPE e) {}
+    */
+
     using Paragraph = std::vector<std::string>;
     const std::string MyJoinStrings(const Paragraph& paragraph) {
         std::ostringstream os;
