@@ -1,3 +1,4 @@
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <algorithm>
@@ -1086,6 +1087,89 @@ TEST_F(TestMacroExpansion, Well) {
     if (!out.tellp()) WELL_DEBUG_PRINT(out, err, message);
     EXPECT_EQ(log, out.str());
     EXPECT_EQ(log, err.str());
+}
+
+namespace {
+    using Paragraph = std::vector<std::string>;
+    const std::string MyJoinStrings(const Paragraph& paragraph) {
+        std::ostringstream os;
+        auto size = paragraph.size();
+
+        for(decltype(size) i=0; i<size; ++i) {
+            const auto& str = paragraph.at(i);
+            os << str;
+            if (((i + 1) < size) && !str.empty() && ::isascii(*(str.rbegin()))) {
+                // 正規のUTF-8を仮定し、MSBが1でなければUS-ASCIIとみなす
+                os << " ";
+            }
+        }
+
+        const std::string result = os.str();
+        return result;
+    }
+}
+
+class TestJoinStrings : public ::testing::Test {
+protected:
+    static const Paragraph sentence1_;
+    static const Paragraph sentence2_;
+    static const std::string expectedNoSpaces_;
+    static const std::string expectedWithSpaces1_;
+    static const std::string expectedWithSpaces2_;
+
+    static const Paragraph sentenceJ1_;
+    static const Paragraph sentenceJ2_;
+    static const std::string expectedJapanese_;
+    static const std::string expectedWithSpacesJ1_;
+    static const std::string expectedWithSpacesJ2_;
+};
+
+// https://www.rain.org/~mkummel/stumpers/15feb02a.html
+const Paragraph TestJoinStrings::sentence1_ {"Now", "here", "is", "water"};
+const Paragraph TestJoinStrings::sentence2_ {"Nowhere", "is", "water"};
+const std::string TestJoinStrings::expectedNoSpaces_ = "Nowhereiswater";
+const std::string TestJoinStrings::expectedWithSpaces1_ = "Now here is water";
+const std::string TestJoinStrings::expectedWithSpaces2_ = "Nowhere is water";
+
+const Paragraph TestJoinStrings::sentenceJ1_ {"弁慶が", "なぎなたを振り回し"};
+const Paragraph TestJoinStrings::sentenceJ2_ {"弁慶がな", "ぎなたを振り回し"};
+const std::string TestJoinStrings::expectedJapanese_ = "弁慶がなぎなたを振り回し";
+const std::string TestJoinStrings::expectedWithSpacesJ1_ = "弁慶が なぎなたを振り回し";
+const std::string TestJoinStrings::expectedWithSpacesJ2_ = "弁慶がな ぎなたを振り回し";
+
+TEST_F(TestJoinStrings, English) {
+    const auto actualNoSpaces1 = boost::algorithm::join(sentence1_, "");
+    const auto actualNoSpaces2 = boost::algorithm::join(sentence2_, "");
+    const auto actualWithSpaces1 = boost::algorithm::join(sentence1_, " ");
+    const auto actualWithSpaces2 = boost::algorithm::join(sentence2_, " ");
+    EXPECT_EQ(expectedNoSpaces_, actualNoSpaces1);
+    EXPECT_EQ(expectedNoSpaces_, actualNoSpaces2);
+    EXPECT_EQ(expectedWithSpaces1_, actualWithSpaces1);
+    EXPECT_EQ(expectedWithSpaces2_, actualWithSpaces2);
+
+    const auto actual1 = MyJoinStrings(sentence1_);
+    const auto actual2 = MyJoinStrings(sentence2_);
+    EXPECT_EQ(expectedWithSpaces1_, actual1);
+    EXPECT_EQ(expectedWithSpaces2_, actual2);
+}
+
+TEST_F(TestJoinStrings, NonAlpha) {
+    const Paragraph vec {"1", "2 ", "", "3!", "$"};
+    const std::string expected = "1 2  3! $";
+    const auto actual = MyJoinStrings(vec);
+    EXPECT_EQ(expected, actual);
+}
+
+TEST_F(TestJoinStrings, Japanese) {
+    const auto actualWithSpaces1 = boost::algorithm::join(sentenceJ1_, " ");
+    const auto actualWithSpaces2 = boost::algorithm::join(sentenceJ2_, " ");
+    EXPECT_EQ(expectedWithSpacesJ1_, actualWithSpaces1);
+    EXPECT_EQ(expectedWithSpacesJ2_, actualWithSpaces2);
+
+    const auto actual1 = MyJoinStrings(sentenceJ1_);
+    const auto actual2 = MyJoinStrings(sentenceJ2_);
+    EXPECT_EQ(expectedJapanese_, actual1);
+    EXPECT_EQ(expectedJapanese_, actual2);
 }
 
 int main(int argc, char* argv[]) {
