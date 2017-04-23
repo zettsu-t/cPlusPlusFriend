@@ -36,6 +36,7 @@ class Train {
 1. sizeofに型名を入れてはいけないのだ! 変数の型が変わった時オーバランするのだ! sizeof(*pObject)とすれば、ポインタpObjectが指すもののサイズが得られるのだ!
 1. sizeofにリテラルを渡すのはやめるのだ! sizeof('a')はCとC++で違うのだ! [(参考)](http://david.tribble.com/text/cdiffs.htm#C99-char-literal)
 1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
+1. 関数への参照は、&をつけるのとつけないのと使い分けるのだ! テンプレートマッチングに失敗することがあるのだ!
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. ビットフィールドを上から下に並べても、MSBから順に並ぶとは限らないのだ! エンディアンとコンパイラの仕様を確認するのだ!
 1. unionを使ってstructをuint8_t[]に読み替えるのは、実行時にはできても、constexprでコンパイル時にできるとは限らないのだ!

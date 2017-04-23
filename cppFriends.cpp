@@ -1181,6 +1181,100 @@ TEST_F(TestJoinStrings, Japanese) {
     EXPECT_EQ(expectedJapanese_, actual2);
 }
 
+// std::functionによる遅延実行を行うオブジェクトをコンテナに入れるための
+// 処理に共通なクラス
+class BaseCommand {
+protected:
+    BaseCommand(void) = default;
+    virtual void exec(void) = 0;
+public:
+    virtual ~BaseCommand(void) = default;
+    void Exec(void) { exec(); }
+};
+
+// &関数名, std::function, ラムダ式, operator() をマッチングする
+template <typename Functor>
+class ConcreteCommand : public BaseCommand {
+public:
+    ConcreteCommand(const Functor& f) : BaseCommand(), f_(f) {}
+    virtual ~ConcreteCommand(void) = default;
+    virtual void exec(void) override { f_(); }
+private:
+    Functor f_;
+};
+
+// 関数名をマッチングする
+template <typename Result, typename ... ArgTypes>
+class ConcreteCommandF : public BaseCommand {
+    using Function = Result(&)(ArgTypes...);
+public:
+    ConcreteCommandF(const Function f) : BaseCommand(), f_(f) {}
+    virtual ~ConcreteCommandF(void) = default;
+    virtual void exec(void) override { f_(); }
+private:
+    Function f_;
+};
+
+template <typename T>
+auto CreateConcreteCommand(const T& f) {
+    std::unique_ptr<BaseCommand> command(new ConcreteCommand<T>(f));
+    return command;
+}
+
+template <typename Result, typename ... ArgTypes>
+auto CreateConcreteCommand(Result(&f)(ArgTypes...)) {
+    std::unique_ptr<BaseCommand> command(new ConcreteCommandF<Result, ArgTypes...>(f));
+    return command;
+}
+
+namespace {
+    int g_anGlobalVariable = 0;
+    void setVarToOne(void) {
+        g_anGlobalVariable = 1;
+    }
+
+    void doubleVar(void) {
+        g_anGlobalVariable *= 2;
+    }
+
+    struct TripleVar {
+        void operator()(void) { g_anGlobalVariable *= 3; }
+        void addFour(void) { g_anGlobalVariable += 4; }
+    };
+
+    struct ClassFunction {
+        static void decrement(void) { --g_anGlobalVariable; }
+    };
+
+    void squareVar(void) {
+        g_anGlobalVariable = g_anGlobalVariable * g_anGlobalVariable;
+    }
+}
+
+class TestCommandPattern : public ::testing::Test{};
+
+TEST_F(TestCommandPattern, All) {
+    std::vector<std::unique_ptr<BaseCommand>> commands;
+
+    g_anGlobalVariable = 0;
+    commands.push_back(CreateConcreteCommand(&setVarToOne));
+    std::function<decltype(doubleVar)> func = doubleVar;
+    commands.push_back(CreateConcreteCommand(func));
+    commands.push_back(CreateConcreteCommand([=](void){ g_anGlobalVariable += 5;}));
+    TripleVar op;
+    commands.push_back(CreateConcreteCommand(op));
+    commands.push_back(CreateConcreteCommand(&ClassFunction::decrement));
+    commands.push_back(CreateConcreteCommand(squareVar));
+    commands.push_back(CreateConcreteCommand(ClassFunction::decrement));
+
+    for(auto& command : commands) {
+        command->Exec();
+    }
+
+    // (((1 * 2 + 5) * 3) - 1) ^ 2 - 1
+    EXPECT_EQ(399, g_anGlobalVariable);
+}
+
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
