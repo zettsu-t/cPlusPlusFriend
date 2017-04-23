@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <iostream>
 #include <iomanip>
+#include <windows.h>
 
 extern void checkPacket(void);
 
@@ -55,6 +56,10 @@ void checkPacket(void) {
     std::cout << "\n";
     return;
 }
+
+struct YieldIsMacro {
+    void Yield() { return; }
+};
 
 /*
 Local Variables:
