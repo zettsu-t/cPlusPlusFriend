@@ -14,8 +14,9 @@ GMOCK_OBJ=$(patsubst %.cc, %.o, $(notdir $(GMOCK_SOURCE)))
 
 TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
+TARGET_C_SJIS=cFriendsShiftJis
 TARGET_C=cFriends
-TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C)
+TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C)
 OUTPUT_ASM87_C=cFriends87.s
 OUTPUT_ASM87_STORE_C=cFriends87-store.s
 OUTPUT_ASM64_C=cFriends64.s
@@ -27,6 +28,7 @@ CASMFLAGS_87_STORE=-mfpmath=387 -mno-sse -ffloat-store
 CASMFLAGS_64=
 
 SOURCE=cppFriends.cpp
+SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_ERROR=cppFriendsError.cpp
 
@@ -60,7 +62,12 @@ $(TARGET_NO_OPT): $(OBJS_NO_OPT)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	./$@ --gtest_filter="TestMyCounter*"
 
-cprog: $(TARGET_C)
+cprog: $(TARGET_C_SJIS) $(TARGET_C)
+
+$(TARGET_C_SJIS): $(SOURCE_C_SJIS)
+	$(CPP) -o $@ $<
+	@./$@
+	-$(CPP) $(CFLAGS) -Werror -o $@ $<
 
 $(TARGET_C): $(SOURCE_C)
 	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
