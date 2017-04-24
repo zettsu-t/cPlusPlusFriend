@@ -47,9 +47,10 @@ class Train {
 1. 確かにC99の機能はC++でも使えるが、restrictはコンパイルエラーになることがあるのだ! 本当にrestrictが必要か考えるのだ!
 1. 立っているビット数をfor文で数えるのは遅いのだ! コンパイラのマニュアルから __builtin_popcount とかを探すのだ!
 1. strict aliasing rule警告の意味が分からないからって無視してはいけないのだ! [(参考)](http://dbp-consulting.com/tutorials/StrictAliasing.html) そもそもエンディアン変換なら、自作しないでntohlとかBoost.Endianとか探すのだ!
-1. pragmaで警告を抑止してよいのは、コードレビューで承認されてからだ!
+1. pragmaで警告を抑止してよいのは、コードレビューで承認されてからだ! -Wall -Werror は必須なのだ!
 1. 2個のオブジェクトを交換するコードを自作してはいけないのだ! std::swapはno throw保証なのだ!
 1. 出力ファイルストリームのcloseを、いつでもデストラクタ任せにすると、closeで書き出しに失敗したことを検出できないのだ! デストラクタはnoexceptだから呼び出し元に結果を通知できないのだ!
+1. 実行環境を確認せずに、いきなりnoexceptと書かないで欲しいのだ! 例外中立にして欲しいのだ! MinGW32 + pthreadGCE2.dll + clangだと、[pthread_exit](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/pthread_exit.c)が例外を投げて、[スレッドエントリ関数](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/ptw32_threadStart.c)が拾うまでに、noexcept違反でstd::terminateされてしまうのだ! (pthreadGCE-3.dllではこうならず、スレッドを正常に終了できます)
 1. 何もしないデストラクタを{}と定義するのはダメだ! =defaultを使うのだ! 理由はEffective Modern C++ 項目17に書いてあるのだ!
 1. ユニットテストが書きにくいからって、#defineでprivateをpublicに置き換えちゃいけないのだ! アクセス指定子を超えたメンバ変数の順序は入れ替わることがあるのだ!  [(参考)](http://en.cppreference.com/w/cpp/language/access) friendを使うのだ!
 1. メンバ変数名の目印のアンダースコアは、名前の先頭につけちゃいけないのだ! _で始まり次が英大文字の名前はC++処理系の予約語なのだ!
@@ -79,6 +80,7 @@ class Train {
 1. constメンバ関数からメンバ変数を書き換えたくなったからといって、いきなりmutableとかconst_castとかしちゃいけないのだ! 呼び出し側はスレッドセーフを期待しているのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!
 1. CreateInstance()がいつでも生ポインタを返したら、誰がdeleteするかわからなくなって、メモリリークしたり二重解放したりするかもしれないのだ! deleteして欲しければ、std::unique_ptrを返すことを検討するのだ! 生ポインタは所有権を渡さないという意志なのだ!
+1. abi::__cxa_demangleが返したものはfreeしないと[メモリリークするのだ!](https://gcc.gnu.org/onlinedocs/libstdc++/libstdc++-html-USERS-4.3/a01696.html) 誰がメモリを解放するか、仕様を確認するのだ!
 1. 引数としてconst T* pObjectを渡すと、ポインタpObjectが指すオブジェクトはimmutableとして扱われるが、deleteはできるのだ! deleteされたくなければ、デストラクタを非publicにするのだ!
 1. thread_localを使う前によく考えるんだ! 特定のスレッドしか参照しない値は、スレッド起動時の引数で参照できるのだ! アライさんはその辺ばっちりなのだ!
 1. pthread_t型の変数を、pthread_createを呼び出す前に初期化はできないのだ! pthread_tの型はopaqueで、CygwinはポインタでMinGWはstructだから、ユーザが設定できる初期値などないのだ!

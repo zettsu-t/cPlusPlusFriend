@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     // -Wallなし、つまりで警告なしでこの問題を見抜くのは不可能
     printf("Second line\n");
 
-    // ではないだと思いますが、-Wall -Werrorすべきだと思うのです
+    // ではないと思いますが、-Wall -Werror をつけるべきだと思うのです
     printf("Third line\n");
     return 0;
 }

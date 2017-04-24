@@ -457,7 +457,7 @@ TEST_F(TestFuncAnyCast, Initialize) {
 class MyCounter {
 public:
     using Number = int;
-    MyCounter(Number count) : count_(count) {}
+    explicit MyCounter(Number count) : count_(count) {}
     virtual ~MyCounter(void) = default;
 
     void Run(void) {
@@ -557,7 +557,7 @@ protected:
     class IntBox {
     public:
         using Data = int;
-        IntBox(Data n) : var_(n), mvar_(n), cvar_(n) {}
+        explicit IntBox(Data n) : var_(n), mvar_(n), cvar_(n) {}
         virtual ~IntBox() = default;
 
         Data Get(void) const { return var_; }
@@ -687,6 +687,7 @@ public:
             return;
         }
 
+        other.array_.clear();
         for(const auto& e : array_) {
             other.array_.push_back(e);
         }
@@ -722,6 +723,11 @@ TEST_F(TestNaiveCopy, CopyTo_s) {
     EXPECT_EQ(2, original.At(1));
     original.CopyTo_s(original);
     EXPECT_EQ(2, original.At(1));
+
+    NaiveCopy other;
+    other.Add(3);
+    original.CopyTo_s(other);
+    EXPECT_EQ(2, other.At(1));
 }
 
 class TestTypeId : public ::testing::Test {};
@@ -914,7 +920,7 @@ protected:
     class Inner {
     public:
         Inner(void) = default;
-        Inner(int a) : a_(a) {}
+        explicit Inner(int a) : a_(a) {}
         virtual ~Inner(void) = default;
         virtual int Get(void) const { return a_; }
     private:
@@ -1009,7 +1015,7 @@ TEST_F(TestZeroInitialize, All) {
 
     static_assert(!std::is_pointer<decltype(nullptr)>::value, "nullptr is a pointer");
     static_assert(std::is_integral<decltype(NULL)>::value, "NULL is a number");
-    static_assert(!std::is_pod<Inner>::value, "Inner is a POD type");
+    static_assert(!std::is_pod<Inner>::value, "Inner is a non-POD type");
 
     ZeroInitialize(nullptr);
     expected += "nullptr,";
@@ -1181,7 +1187,7 @@ TEST_F(TestJoinStrings, Japanese) {
     EXPECT_EQ(expectedJapanese_, actual2);
 }
 
-// std::functionによる遅延実行を行うオブジェクトをコンテナに入れるための
+// std::functionなどを遅延実行するオブジェクトをコンテナに入れるための
 // 処理に共通なクラス
 class BaseCommand {
 protected:
@@ -1196,7 +1202,7 @@ public:
 template <typename Functor>
 class ConcreteCommand : public BaseCommand {
 public:
-    ConcreteCommand(const Functor& f) : BaseCommand(), f_(f) {}
+    explicit ConcreteCommand(const Functor& f) : BaseCommand(), f_(f) {}
     virtual ~ConcreteCommand(void) = default;
     virtual void exec(void) override { f_(); }
 private:
@@ -1208,7 +1214,7 @@ template <typename Result, typename ... ArgTypes>
 class ConcreteCommandF : public BaseCommand {
     using Function = Result(&)(ArgTypes...);
 public:
-    ConcreteCommandF(const Function f) : BaseCommand(), f_(f) {}
+    explicit ConcreteCommandF(const Function f) : BaseCommand(), f_(f) {}
     virtual ~ConcreteCommandF(void) = default;
     virtual void exec(void) override { f_(); }
 private:
@@ -1239,7 +1245,6 @@ namespace {
 
     struct TripleVar {
         void operator()(void) { g_anGlobalVariable *= 3; }
-        void addFour(void) { g_anGlobalVariable += 4; }
     };
 
     struct ClassFunction {

@@ -35,17 +35,17 @@ public:
 } __attribute__((__packed__));
 
 void checkPacket(void) {
-    constexpr Packet packet({4, 3, 2, 1, {0, 0, 0, 0, 0}});
+    constexpr Packet packet({4, 5, 1, 32, {0, 0, 0, 0, 0}});
 
     static_assert(sizeof(packet.header) == 24, "not IPv4");
     // Cygwin-64 g++ 5.4.0ではコンパイルできない
 #if defined(__GNUC__) && (__GNUC__ > 5)
     static_assert(packet.header.version == 4,       "");
-    static_assert(packet.header.headerLength == 3,  "");
-    static_assert(packet.header.typeOfService == 2, "");
-    static_assert(packet.header.totalLength == 1,   "");
+    static_assert(packet.header.headerLength == 5,  "");
+    static_assert(packet.header.typeOfService == 1, "");
+    static_assert(packet.header.totalLength == 32,  "");
 #endif
-    static_assert(packet(1) == 0x40, "not IPv4");
+    static_assert(packet(0) == 0x40, "not IPv4");
 
     // リトルエンディアンでは順番に並べてもMSBから順には並ばないことを確認する
     for(size_t i=0; i<4; ++i) {
@@ -58,6 +58,8 @@ void checkPacket(void) {
 }
 
 struct YieldIsMacro {
+    // winbase.hでYieldを「何もしない」マクロと定義しているので
+    // 異常なエラーメッセージが出る
     void Yield() { return; }
 };
 
