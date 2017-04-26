@@ -48,6 +48,7 @@ class Train {
 1. 立っているビット数をfor文で数えるのは遅いのだ! コンパイラのマニュアルから __builtin_popcount とかを探すのだ!
 1. strict aliasing rule警告の意味が分からないからって無視してはいけないのだ! [(参考)](http://dbp-consulting.com/tutorials/StrictAliasing.html) そもそもエンディアン変換なら、自作しないでntohlとかBoost.Endianとか探すのだ!
 1. pragmaで警告を抑止してよいのは、コードレビューで承認されてからだ! -Wall -Werror は必須なのだ!
+1. /* Local Variables: c-file-style: "stroustrup" */ を理解できないからって消さないで欲しいのだ! それはEmacs上でソースコードを整形するのに必要なのだ!
 1. 2個のオブジェクトを交換するコードを自作してはいけないのだ! std::swapはno throw保証なのだ!
 1. 出力ファイルストリームのcloseを、いつでもデストラクタ任せにすると、closeで書き出しに失敗したことを検出できないのだ! デストラクタはnoexceptだから呼び出し元に結果を通知できないのだ!
 1. 実行環境を確認せずに、いきなりnoexceptと書かないで欲しいのだ! 例外中立にして欲しいのだ! MinGW32 + pthreadGCE2.dll + clangだと、[pthread_exit](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/pthread_exit.c)が例外を投げて、[スレッドエントリ関数](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/ptw32_threadStart.c)が拾うまでに、noexcept違反でstd::terminateされてしまうのだ! (pthreadGCE-3.dllではこうならず、スレッドを正常に終了できます)
@@ -88,6 +89,7 @@ class Train {
 1. ファイルをShift_JISで保存するのはやめるのだ! //コメントが「でゲソ」とか「可能」とかで終わると、次の行もコメント扱いされてコンパイルされなくなってしまうのだ!
 1. ユニットテストを書くときは、いきなりテストを成功させてはいけないのだ! でないと、テストに成功したのか、そのテストを実行していないのか、区別がつかなくなるぞ! まずテストを実行して失敗することを確かめるのだ!
 1. ユニットテストに共通の初期化は、Ruby test/unitはsetupで、CppUnitはsetUpで、Google TestはSetUpなのだ! 大文字小文字に注意するのだ! overrideをつければコンパイラが間違いに気づいてくれるのだ!
+1. .sファイルのアセンブリマクロをテストできないと諦めないのだ! 単にマクロを展開して、C++のインラインアセンブリからcallすればテストできるのだ!
 1. メンバ関数にYieldという名前は使えないのだ! winbase.hでYieldを「何もしない」マクロと定義しているのだ! 理解不能なエラーメッセージの危機なのだ!
 
 この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。

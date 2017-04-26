@@ -7,6 +7,7 @@
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <regex>
 #include <string>
@@ -1223,12 +1224,13 @@ private:
 
 template <typename T>
 auto CreateConcreteCommand(const T& f) {
-    std::unique_ptr<BaseCommand> command(new ConcreteCommand<T>(f));
-    return command;
+    // Return Value Optimization を期待している
+    return std::unique_ptr<BaseCommand>(new ConcreteCommand<T>(f));
 }
 
 template <typename Result, typename ... ArgTypes>
 auto CreateConcreteCommand(Result(&f)(ArgTypes...)) {
+    // Named Return Value Optimization を期待している
     std::unique_ptr<BaseCommand> command(new ConcreteCommandF<Result, ArgTypes...>(f));
     return command;
 }
@@ -1279,6 +1281,24 @@ TEST_F(TestCommandPattern, All) {
     // (((1 * 2 + 5) * 3) - 1) ^ 2 - 1
     EXPECT_EQ(399, g_anGlobalVariable);
 }
+
+static_assert(std::numeric_limits<uint64_t>::digits10 == 19, "");
+static_assert(std::numeric_limits<int64_t>::digits10 == 18, "");
+
+// 敢えて自作する
+template <typename T>
+constexpr int MyNumericLimits(T a, int digits) {
+    auto n = a * 10 + 9;
+    return (n > a) ? MyNumericLimits(n, digits + 1) : digits;
+}
+
+template <typename T>
+constexpr int MyNumericLimits(void) {
+    return MyNumericLimits<T>(9,1);
+}
+
+static_assert(MyNumericLimits<uint64_t>() == 19, "");
+static_assert(MyNumericLimits<int64_t>() == 18, "");
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
