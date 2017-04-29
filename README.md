@@ -60,6 +60,7 @@ class Train {
 1. コードにstd::coutを直書きしてはいけないのだ! ユニットテストが書けないでないか! std::ostreamへの参照を渡すのだ! もちろんstd::cinもだ! ユニットテストでキー入力するのは大変なのだ!
 1. コンテナの要素の型をソースコードにべた書きしたら、コンテナの型を変えた時に修正が大変なのだ! std::vector::value_type と auto と decltypeがあるじゃないか!
 1. 配列の要素数を ```#define arraySizeof(a) (sizeof(a)/sizeof(a[0]))``` で数えるのはやめるのだ! aにポインタを渡すと、エラーにならずに変な値が返ってくるのだ! テンプレートとconstexprを使うのだ!
+1. ```#if (sizeof(uintptr_t) > 4)```とは書けないのだ! ```if constexpr (sizeof(uintptr_t) > 4)```が使えるようになるのを待つのだ!
 1. いくらマクロより関数テンプレートの方がいいからって、 ```#define WARN(str) printf("%s at %d", str, __LINE__)``` は関数にはできないのだ! WARNを呼び出した場所ではなく、WARNを定義した場所の行番号が表示されてしまうのだ!
 1. 関数の動作を```#ifdef COLOR ... #endif```で切り替えると、COLOURと打ったときに```...```が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! コンパイラが綴りの違いを見つけてくれるのだ!  C++17ではif constexprが使える(予定な)のだ!
 1. テンプレートマッチングをstd::is_pointerだけで済ましてはいけないのだ! 配列T(&)[SIZE]とstd::is_null_pointerに対するマッチングも必要なのだ!

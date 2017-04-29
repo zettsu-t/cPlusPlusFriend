@@ -57,6 +57,38 @@ void checkPacket(void) {
     return;
 }
 
+// 最近のclangでC++1z対応のもの
+#if defined(__clang__)
+namespace {
+    // 明らかに範囲外のポインタならtrue
+    constexpr bool bogusRsizeCheckWithConstexpr(uintptr_t address) {
+        bool result = false;
+        if constexpr (sizeof(uintptr_t) > 4) {
+                // アドレスが下位48bitしか有効でないとする
+                // 上位アドレス0xffff....は考慮していない
+                result = (address >= 0x1000000000000ull);
+            } else {
+            result = (address >= 0x80000000u);
+        }
+        return result;
+    }
+    static_assert(bogusRsizeCheckWithConstexpr (0x1000000000000ull), "");
+    static_assert(!bogusRsizeCheckWithConstexpr(0xffffffffffffull), "");
+}
+#endif
+
+// 明らかに範囲外のポインタならtrue
+constexpr bool bogusRsizeCheckWithMacro(uintptr_t address) {
+    bool result = false;
+#if (sizeof(uintptr_t) > 4)
+    // 上位アドレス0xffff....は考慮していない
+    result = (address >= 0x1000000000000ull);
+#else
+    result = (address >= 0x80000000u);
+#endif
+    return result;
+}
+
 struct YieldIsMacro {
     // winbase.hでYieldを「何もしない」マクロと定義しているので
     // 異常なエラーメッセージが出る

@@ -1303,10 +1303,25 @@ static_assert(MyNumericLimits<int64_t>() == 18, "");
 class TestShifter : public ::testing::Test{};
 
 TEST_F(TestShifter, All) {
-    int32_t var = 1;
+    constexpr int32_t var = 2;
     int32_t result = -1;
-    Shift35ForInt32(result, var);
-    EXPECT_EQ(8, result);
+    constexpr int32_t expected = var << 3;
+
+    // 35回のはずが3回しかシフトされないのは、シフト回数がCLレジスタの値 mod 32だから
+    Shift35ForInt32Asm(result, var);
+
+#ifdef CPPFRIENDS_NO_OPTIMIZATION
+    // 0でもexpectedでもない値が返る
+    // EXPECT_EQ(expected, result);
+    EXPECT_EQ(expected, Shift35ForInt32(var));
+#else
+    // N-bit整数をNビット以上シフトしたときの値は未定義なので、
+    // コンパイラは35回シフトして0になったと考えるが、CPUの動作とは一致しない
+    EXPECT_EQ(expected, result);
+    EXPECT_EQ(0, Shift35ForInt32(var));
+#endif
+
+    EXPECT_EQ(expected, ShiftForInt32(var, CPPFRIENDS_SHIFT_COUNT));
 }
 
 int main(int argc, char* argv[]) {
