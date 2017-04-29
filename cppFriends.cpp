@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <codecvt>
 #include <fstream>
 #include <future>
 #include <iostream>
 #include <limits>
+#include <locale>
 #include <random>
 #include <regex>
 #include <string>
@@ -1367,6 +1369,51 @@ TEST_F(TestShifter, All) {
 #endif
 
     EXPECT_EQ(expected, ShiftForInt32(var, CPPFRIENDS_SHIFT_COUNT));
+}
+
+class TestUtfCharCounter : public ::testing::Test{};
+
+TEST_F(TestUtfCharCounter, Well) {
+    // http://en.cppreference.com/w/cpp/locale/wstring_convert/from_bytes
+    // の例で、utf8.data()を使っているが、utf8.data()は
+    // C++11以前では null terminateされているとは限らない(C++11ではされている)
+    std::string utf8jp = "かばんちゃん急に何を言い出すの";
+    std::u16string utf16jp = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(utf8jp);
+    EXPECT_EQ(15, utf16jp.size());
+
+    // ラッキービーストは複数いるはず
+    std::string utf8 = "I'm a lucky beast";
+    std::u16string utf16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(utf8);
+    EXPECT_EQ(17, utf16.size());
+
+    constexpr size_t length = 5;
+    std::vector<char> vec(length, ' ');
+    vec.push_back(0);
+    std::u16string utf16sp = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(vec.data());
+    EXPECT_EQ(length, utf16sp.size());
+}
+
+TEST_F(TestUtfCharCounter, Bad) {
+    // 半角空白 = 00100000 をわざと冗長なUTF-8で表現する
+    // 11100000 10000000 10100000
+    const std::vector<uint8_t> elements {0xe0, 0x80, 0xa0};
+
+    constexpr size_t length = 5;
+    std::vector<char> vec;
+    for(size_t i=0; i<length; ++i) {
+        for(auto e : elements) {
+            vec.push_back(static_cast<char>(e));
+        }
+    }
+    vec.push_back(0);
+
+    bool thrown = false;
+    try {
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(vec.data());
+    } catch(std::range_error& e) {
+        thrown = true;
+    }
+    EXPECT_TRUE(thrown);
 }
 
 int main(int argc, char* argv[]) {

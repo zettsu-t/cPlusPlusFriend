@@ -47,6 +47,17 @@ int main(int argc, char* argv[]) {
         printf("%u:", (unsigned int)dst[i]);
     }
 
-    printf("\n\n");
+    double f = -1.0;
+    for(int i= 0; i < 308; ++i) {
+        f /= 10.00001;
+    }
+    printf("\nf=%.0e\n", f);
+
+    f = -1.0;
+    for(int i= 0; i < 309; ++i) {
+        f *= 10.00001;
+    }
+    printf("f=%.0e\n", f);
+    printf("f=-infinity\n");
     return 0;
 }

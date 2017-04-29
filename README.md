@@ -36,6 +36,8 @@ class Train {
 1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 関数への参照は、&をつけるのとつけないのと使い分けるのだ! テンプレートマッチングに失敗することがあるのだ!
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
+1. 浮動小数をprintf("%.0e")して7文字(-1e-308)で収まると、決め打ちするのはやめるのだ! -infinityと表示するときは9文字なのだ!
+1. std::wstring_convertによるUTF-8/16変換は、例外を捕捉するのだ! わざと冗長にUTF-8エンコードした文字列を入力すると、std::range_errorが飛ぶことがあるのだ!
 1. ビットフィールドを上から下に並べても、MSBから順に並ぶとは限らないのだ! エンディアンとコンパイラの仕様を確認するのだ!
 1. unionを使ってstructをuint8_t[]に読み替えるのは、実行時にはできても、constexprでコンパイル時にできるとは限らないのだ!
 1. コメントに「この変数は符号なしのはず」とか書いてはいけないのだ! static_assert(std::is_unsigned)を書くのだ!
@@ -116,7 +118,8 @@ class Train {
 * [私が読んだ書籍](https://github.com/zettsu-t/zettsu-t.github.io/wiki/Books)
 * [Boost C++ Libraries](http://www.boost.org/)
 * [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
-* [Intel 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/en-us/articles/intel-sdm)
+* [More C++ Idioms](https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms) 
+* [Intel 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/en-us/articles/intel-sdm) and [Intel 64 and IA-32 Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html)
 * http://stackoverflow.com/ などの各記事
 
 ## おまけ
