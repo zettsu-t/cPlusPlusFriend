@@ -11,18 +11,15 @@
 #include <regex>
 #include <string>
 #include <thread>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 #include <boost/algorithm/string.hpp>
 #include <boost/any.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-#include <boost/type_traits.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
-#include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <windows.h>
@@ -476,21 +473,31 @@ TEST_F(TestTypeCast, EnumCast) {
         (UINT_ENUM_MEMBER);
     auto llEnum = static_cast<std::underlying_type_t<decltype(LL_ENUM_MEMBER)>>
         (LL_ENUM_MEMBER);
-    static_assert(std::is_same<decltype(intEnum), int>::value, "");
-    static_assert(std::is_same<decltype(uintEnum), unsigned int>::value, "");
-    static_assert(std::is_same<decltype(llEnum), long long int>::value, "");
+    static_assert(std::is_same<decltype(intEnum), int>::value, "not int");
+    static_assert(std::is_same<decltype(uintEnum), unsigned int>::value, "not unsigned int");
+    static_assert(std::is_same<decltype(llEnum), long long int>::value, "not long long int");
 
     EXPECT_EQ(31, __builtin_popcount(intEnum));
-
     // __builtin_popcountの引数はunsigned int : テンプレートではない
-    static_assert(std::is_same<boost::function_traits<decltype(arg1)>::arg1_type, int>::value, "");
-    static_assert(std::is_same<boost::function_traits<decltype(__builtin_popcount)>::arg1_type, unsigned int>::value, "");
+    static_assert(std::is_same<boost::function_traits<decltype(arg1)>::arg1_type,
+                  int>::value,"not int");
+    static_assert(std::is_same<boost::function_traits<decltype(__builtin_popcount)>::arg1_type,
+                  unsigned int>::value, "not unsigned int");
     EXPECT_EQ(32, __builtin_popcount(llEnum));
     EXPECT_EQ(63, __builtin_popcountll(llEnum));
 
     std::ostringstream os;
     os << std::hex << intEnum << std::hex << uintEnum << std::hex << llEnum;
     EXPECT_EQ("7fffffffefffffff7fffffffffffffff", os.str());
+}
+
+TEST_F(TestTypeCast, PopCount) {
+    constexpr short svalue = 0x7fff;
+    EXPECT_EQ(15, MyPopCount(svalue));
+
+    // 1111 0111 0011 0000 0100 0010 0010 0101b
+    //    4    7    9        10   11   12   14個
+    EXPECT_EQ(14, MySlowPopCount(0xf7304225u));
 }
 
 class MyCounter {

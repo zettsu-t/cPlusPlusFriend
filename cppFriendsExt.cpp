@@ -15,7 +15,16 @@ void Shift35ForInt32Asm(int32_t& result, int32_t src) {
 
 int32_t Shift35ForInt32(int32_t src) {
     decltype(src) result = src;
+// シフト回数が多すぎる警告を出さないようにする
+#if CPPFRIENDS_SHIFT_COUNT >= 32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshift-count-overflow"
+#endif
     result <<= CPPFRIENDS_SHIFT_COUNT;
+// 以後は、シフト回数が多すぎる警告を出す
+#if CPPFRIENDS_SHIFT_COUNT >= 32
+#pragma GCC diagnostic pop
+#endif
     return result;
 }
 
