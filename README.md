@@ -46,6 +46,7 @@ class Train {
 1. thisと引数が同じオブジェクトかどうか(二つの引数が同じオブジェクトかどうか)確かめずに、片方から他方にメンバをコピーするのはやめるのだ! memcpyで領域が重なっているときのように要素が消滅してしまうのだ! [(NaiveCopy)](cppFriends.cpp)
 1. 確かにC99の機能はC++でも使えるが、restrictはコンパイルエラーになることがあるのだ! 本当にrestrictが必要か考えるのだ!
 1. 立っているビット数をfor文で数えるのは遅いのだ! コンパイラのマニュアルから __builtin_popcount とかを探すのだ!
+1. __builtin_popcountの引数はunsigned intなのだ! long long intを渡すと正しい答えを返さないことがあるのだ! テンプレートではないのだ! __builtin_popcountllとかもみるのだ!
 1. strict aliasing rule警告の意味が分からないからって無視してはいけないのだ! [(参考)](http://dbp-consulting.com/tutorials/StrictAliasing.html) そもそもエンディアン変換なら、自作しないでntohlとかBoost.Endianとか探すのだ!
 1. pragmaで警告を抑止してよいのは、コードレビューで承認されてからだ! -Wall -Werror は必須なのだ!
 1. /* Local Variables: c-file-style: "stroustrup" */ を理解できないからって消さないで欲しいのだ! それはEmacs上でソースコードを整形するのに必要なのだ!

@@ -18,6 +18,7 @@
 #include <boost/any.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/type_traits.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
@@ -443,9 +444,22 @@ namespace {
     using Arg2Type  = int(*)(int, int);
 }
 
-class TestFuncAnyCast : public ::testing::Test{};
+class TestTypeCast : public ::testing::Test{
+protected:
+    enum class IntEnum : int {
+        INT_ENUM_MEMBER = 0x7fffffff
+    };
 
-TEST_F(TestFuncAnyCast, Initialize) {
+    enum UintEnum : unsigned int{
+        UINT_ENUM_MEMBER = 0xefffffffu
+    };
+
+    enum LongLongEnum : long long int {
+        LL_ENUM_MEMBER = 0x7fffffffffffffffu
+    };
+};
+
+TEST_F(TestTypeCast, AnyCast) {
     boost::any func = arg1;
     auto result1 = (boost::any_cast<Arg1Type>(func))(10);
     EXPECT_EQ(12, result1);
@@ -453,6 +467,30 @@ TEST_F(TestFuncAnyCast, Initialize) {
     func = arg2;
     auto result2 = (boost::any_cast<Arg2Type>(func))(3, 5);
     EXPECT_EQ(17, result2);
+}
+
+TEST_F(TestTypeCast, EnumCast) {
+    auto intEnum = static_cast<std::underlying_type_t<decltype(IntEnum::INT_ENUM_MEMBER)>>
+        (IntEnum::INT_ENUM_MEMBER);
+    auto uintEnum = static_cast<std::underlying_type_t<decltype(UINT_ENUM_MEMBER)>>
+        (UINT_ENUM_MEMBER);
+    auto llEnum = static_cast<std::underlying_type_t<decltype(LL_ENUM_MEMBER)>>
+        (LL_ENUM_MEMBER);
+    static_assert(std::is_same<decltype(intEnum), int>::value, "");
+    static_assert(std::is_same<decltype(uintEnum), unsigned int>::value, "");
+    static_assert(std::is_same<decltype(llEnum), long long int>::value, "");
+
+    EXPECT_EQ(31, __builtin_popcount(intEnum));
+
+    // __builtin_popcountの引数はunsigned int : テンプレートではない
+    static_assert(std::is_same<boost::function_traits<decltype(arg1)>::arg1_type, int>::value, "");
+    static_assert(std::is_same<boost::function_traits<decltype(__builtin_popcount)>::arg1_type, unsigned int>::value, "");
+    EXPECT_EQ(32, __builtin_popcount(llEnum));
+    EXPECT_EQ(63, __builtin_popcountll(llEnum));
+
+    std::ostringstream os;
+    os << std::hex << intEnum << std::hex << uintEnum << std::hex << llEnum;
+    EXPECT_EQ("7fffffffefffffff7fffffffffffffff", os.str());
 }
 
 class MyCounter {
