@@ -479,6 +479,9 @@ TEST_F(TestTypeCast, EnumCast) {
     static_assert(std::is_same<decltype(uintEnum), unsigned int>::value, "not unsigned int");
     static_assert(std::is_same<decltype(llEnum), long long int>::value, "not long long int");
 
+    // ついでに
+    static_assert(std::is_signed<std::ptrdiff_t>::value, "ptrdiff_t is unsigned");
+
     EXPECT_EQ(31, __builtin_popcount(intEnum));
     // __builtin_popcountの引数はunsigned int : テンプレートではない
     static_assert(std::is_same<boost::function_traits<decltype(arg1)>::arg1_type,

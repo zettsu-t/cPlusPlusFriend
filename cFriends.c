@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
 // Cではこうなる。C++ではこうならない。
@@ -36,7 +37,7 @@ void my_memcpy(uint8_t* restrict pDst, const uint8_t* restrict pSrc, size_t size
 
 #define MY_ARRAY_SIZE (5)
 
-int main(int argc, char* argv[]) {
+void exec_my_memcpy(void) {
     uint8_t src[MY_ARRAY_SIZE] = {2,3,4,5,6};
     uint8_t dst[MY_ARRAY_SIZE] = {0,0,0,0,0};
     size_t size = MY_ARRAY_SIZE;
@@ -47,11 +48,16 @@ int main(int argc, char* argv[]) {
         printf("%u:", (unsigned int)dst[i]);
     }
 
+    printf("\n");
+    return;
+}
+
+void print_infinity(void) {
     double f = -1.0;
     for(int i= 0; i < 308; ++i) {
         f /= 10.00001;
     }
-    printf("\nf=%.0e\n", f);
+    printf("f=%.0e\n", f);
 
     f = -1.0;
     for(int i= 0; i < 309; ++i) {
@@ -59,5 +65,37 @@ int main(int argc, char* argv[]) {
     }
     printf("f=%.0e\n", f);
     printf("f=-infinity\n");
+    return;
+}
+
+void exec_snprintf(void) {
+    char buffer[4] = "END";    // 壊れているかどうか後で調べる
+    char dst[8];               // 転送先
+    char src[9] = "12345678";  // 転送元
+    static_assert(sizeof(buffer) < sizeof(dst), "Wrong size setting");
+    static_assert(sizeof(dst) < sizeof(src), "Wrong size setting");
+
+    // 下の変数ほど番地が大きいと仮定しているが、そうでないかもしれない
+    ptrdiff_t diff = src - dst;
+    if (diff < 0) {
+        diff = buffer - dst;
+    }
+    diff -= sizeof(dst);
+    printf("gap for dst:%td bytes\n", diff);
+
+    snprintf(dst, sizeof(dst), "%s", src);
+    printf("snprintf:%s\n", dst);
+
+    strncpy(dst, buffer, sizeof(dst));
+    strncpy(dst, src, sizeof(dst));
+    dst[sizeof(dst) - 1] = 0;  // これがないとdstがNUL終端されない
+    printf("strncpy:%s.%s\n", dst, buffer);
+    return;
+}
+
+int main(int argc, char* argv[]) {
+    exec_my_memcpy();
+    exec_snprintf();
+    print_infinity();
     return 0;
 }
