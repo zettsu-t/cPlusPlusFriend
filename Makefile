@@ -27,15 +27,18 @@ CASMFLAGS_87=-mfpmath=387 -mno-sse
 CASMFLAGS_87_STORE=-mfpmath=387 -mno-sse -ffloat-store
 CASMFLAGS_64=
 
-SOURCE=cppFriends.cpp
+SOURCE_MAIN=cppFriends.cpp
+SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_ERROR=cppFriendsError.cpp
 
-OBJ=cppFriends.o
-OBJ_NO_OPT=cppFriends_no_opt.o
-OBJS=$(OBJ) $(GTEST_OBJ) $(GMOCK_OBJ)
-OBJS_NO_OPT=$(OBJ_NO_OPT) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJ_MAIN=cppFriends.o
+OBJ_EXT=cppFriendsExt.o
+OBJ_NO_OPT_MAIN=cppFriends_no_opt.o
+OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
+OBJS=$(OBJ_MAIN) $(OBJ_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS_NO_OPT=$(OBJ_NO_OPT_MAIN) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
 CPP=gcc
@@ -60,7 +63,7 @@ $(TARGET): $(OBJS)
 
 $(TARGET_NO_OPT): $(OBJS_NO_OPT)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
-	./$@ --gtest_filter="TestMyCounter*"
+	./$@ --gtest_filter="TestMyCounter*:TestShifter*"
 
 cprog: $(TARGET_C_SJIS) $(TARGET_C)
 
@@ -87,10 +90,16 @@ $(TARGET_C): $(SOURCE_C)
 force : $(SOURCE_ERROR)
 	-$(CXX) $(CPPFLAGS) -c $<
 
-$(OBJ): $(SOURCE)
+$(OBJ_MAIN): $(SOURCE_MAIN)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_NO_OPT): $(SOURCE)
+$(OBJ_EXT): $(SOURCE_EXT)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_NO_OPT_MAIN): $(SOURCE_MAIN)
+	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+
+$(OBJ_NO_OPT_EXT): $(SOURCE_EXT)
 	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
 
 $(OBJ_DIR)/%.o: %.cc

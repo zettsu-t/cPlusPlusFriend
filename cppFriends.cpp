@@ -1,5 +1,4 @@
 #include <cctype>
-#include <cstdint>
 #include <cstdlib>
 #include <algorithm>
 #include <array>
@@ -26,6 +25,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <windows.h>
+#include "cppFriends.hpp"
 
 namespace {
     void TrimAndExpand(std::string& str) {
@@ -1299,6 +1299,15 @@ constexpr int MyNumericLimits(void) {
 
 static_assert(MyNumericLimits<uint64_t>() == 19, "");
 static_assert(MyNumericLimits<int64_t>() == 18, "");
+
+class TestShifter : public ::testing::Test{};
+
+TEST_F(TestShifter, All) {
+    int32_t var = 1;
+    int32_t result = -1;
+    Shift35ForInt32(result, var);
+    EXPECT_EQ(8, result);
+}
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
