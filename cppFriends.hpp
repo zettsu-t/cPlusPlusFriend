@@ -31,6 +31,14 @@ namespace {
     }
 }
 
+// enum classは前方宣言できるので、メンバを増やしてもリコンパイルが必要とは限らない
+enum class FriendType : int;
+
+struct FriendTypeBox {
+    FriendType type_;  // underlying typeがあればメンバは知らなくてよい
+    // 他に必要なメンバを追加する
+};
+
 #endif // CPPFRIENDS_CPPFRIENDS_HPP
 
 /*

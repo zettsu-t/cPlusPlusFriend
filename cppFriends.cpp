@@ -443,7 +443,7 @@ namespace {
     using Arg2Type  = int(*)(int, int);
 }
 
-class TestTypeCast : public ::testing::Test{
+class TestTypeCast : public ::testing::Test {
 protected:
     enum class IntEnum : int {
         INT_ENUM_MEMBER = 0x7fffffff
@@ -1469,6 +1469,8 @@ public:
         CPPFRIENDS_REGISTER_OBJECT(this, __PRETTY_FUNCTION__);
     }
     virtual ~RegisteredObject(void) = default;
+private:
+    long long int member_ {0};
 };
 
 // ここで定義すると、初期化済の GlobalVariableTable::instance_ を
@@ -1487,7 +1489,7 @@ namespace {
 
 class TestCtorOnFirstUse : public ::testing::Test{};
 
-TEST_F(TestCtorOnFirstUse, All) {
+TEST_F(TestCtorOnFirstUse, GetName) {
     RegisteredObject obj;
     auto actual = GlobalVariableTable::GetInstance().GetName(nullptr);
     std::string expected = "0x0 : ";
@@ -1527,6 +1529,42 @@ TEST_F(TestCtorOnFirstUse, All) {
         uintptr_t expected = reinterpret_cast<decltype(expected)>(&g_obj2);
         ASSERT_EQ(expected, toHex(match[1]));
     }
+}
+
+struct StandardLayoutObject {
+    uint64_t memberA_;
+    uint64_t memberB_;
+};
+
+class DynamicObject {
+public:
+    virtual ~DynamicObject() = default;
+    uint64_t memberA_;
+    uint64_t memberB_;
+};
+
+static_assert(offsetof(StandardLayoutObject, memberA_) == 0, "Not standard layout");
+static_assert(offsetof(StandardLayoutObject, memberB_) == 8, "Not standard layout");
+static_assert(offsetof(DynamicObject, memberA_) > 0, "Standard layout");
+
+// 本当はどこかのヘッダファイルにまとめて書き、必要な.cppファイルだけがインクルードする
+enum class FriendType : int {
+    SERVAL,
+    COMMON_RACCOON,
+    FENNEC_FOX,
+};
+
+class TestEnumClass : public ::testing::Test{};
+
+TEST_F(TestEnumClass, ForwardDecl) {
+    constexpr FriendTypeBox serval {FriendType::SERVAL};
+    EXPECT_EQ(0, std::underlying_type<decltype(serval.type_)>::type(serval.type_));
+
+    constexpr FriendTypeBox raccoon {FriendType::COMMON_RACCOON};
+    EXPECT_EQ(1, std::underlying_type<decltype(raccoon.type_)>::type(raccoon.type_));
+
+    constexpr FriendTypeBox fennec {FriendType::FENNEC_FOX};
+    EXPECT_EQ(2, std::underlying_type<decltype(fennec.type_)>::type(fennec.type_));
 }
 
 int main(int argc, char* argv[]) {
