@@ -1419,6 +1419,116 @@ TEST_F(TestUtfCharCounter, Bad) {
     EXPECT_TRUE(thrown);
 }
 
+// TEST_Fのように、書くだけでテーブルに登録されるものを作る
+class GlobalVariableTable {
+public:
+    void Register(const void* p, const std::string& name) {
+        std::uintptr_t address = reinterpret_cast<decltype(address)>(p);
+        table_[address] = name;
+    }
+
+    std::string GetName(const void* p) const {
+        // pは解放済かもしれないので、アクセスしてはならない
+        std::ostringstream os;
+        std::uintptr_t address = reinterpret_cast<decltype(address)>(p);
+
+        os << "0x" << std::hex << address << " : ";
+        auto i = table_.find(address);
+        if (i != table_.cend()) {
+            os << i->second;
+        }
+        return os.str();
+    }
+
+    static GlobalVariableTable& GetInstance(void) {
+// グローバル変数の初期化順序に依存するコードを書いてはならないので、
+// construct on first use イディオムを使う。
+// main実行前で、シングルスレッドで動作する前提である
+//      return instance_;
+        static GlobalVariableTable instance;
+        return instance;
+    }
+
+private:
+    GlobalVariableTable(void) = default;
+    virtual ~GlobalVariableTable(void) = default;
+    // ヒープには置かないようにする
+    static void* operator new(std::size_t) = delete;
+    static void* operator new[](std::size_t) = delete;
+
+    std::unordered_map<std::uintptr_t, std::string> table_;
+    static GlobalVariableTable instance_;  // こうはできない
+};
+
+#define CPPFRIENDS_REGISTER_OBJECT(ptr, name) \
+    GlobalVariableTable::GetInstance().Register(ptr, name)
+
+class RegisteredObject {
+public:
+    RegisteredObject(void) {
+        CPPFRIENDS_REGISTER_OBJECT(this, __PRETTY_FUNCTION__);
+    }
+    virtual ~RegisteredObject(void) = default;
+};
+
+// ここで定義すると、初期化済の GlobalVariableTable::instance_ を
+// g_obj1 が使用するので動作する。しかしグローバル変数の初期化順序に
+// 依存するコードを書いてはならない
+GlobalVariableTable GlobalVariableTable::instance_;
+
+namespace {
+    RegisteredObject g_obj1;
+    RegisteredObject g_obj2;
+}
+
+// ここで定義すると、未初期化の GlobalVariableTable::instance_ を
+// g_obj1 が使用するので異常終了する
+// GlobalVariableTable GlobalVariableTable::instance_;
+
+class TestCtorOnFirstUse : public ::testing::Test{};
+
+TEST_F(TestCtorOnFirstUse, All) {
+    RegisteredObject obj;
+    auto actual = GlobalVariableTable::GetInstance().GetName(nullptr);
+    std::string expected = "0x0 : ";
+    EXPECT_EQ(expected, actual);
+
+    std::regex re("0x([0-9a-fA-F]+)\\s+:\\s+RegisteredObject::RegisteredObject.*");
+    auto toHex = [=](const std::string& str) -> auto {
+        std::istringstream is(str);
+        uintptr_t addr;
+        is >> std::hex >> addr;
+        return addr;
+    };
+
+    {
+        const auto str = GlobalVariableTable::GetInstance().GetName(&obj);
+        std::smatch match;
+        ASSERT_TRUE(std::regex_match(str, match, re));
+        ASSERT_EQ(2, match.size());
+        uintptr_t expected = reinterpret_cast<decltype(expected)>(&obj);
+        ASSERT_EQ(expected, toHex(match[1]));
+    }
+
+    {
+        const auto str = GlobalVariableTable::GetInstance().GetName(&g_obj1);
+        std::smatch match;
+        ASSERT_TRUE(std::regex_match(str, match, re));
+        ASSERT_EQ(2, match.size());
+        uintptr_t expected = reinterpret_cast<decltype(expected)>(&g_obj1);
+        ASSERT_EQ(expected, toHex(match[1]));
+    }
+
+    {
+        const auto str = GlobalVariableTable::GetInstance().GetName(&g_obj2);
+        std::smatch match;
+        ASSERT_TRUE(std::regex_match(str, match, re));
+        ASSERT_EQ(2, match.size());
+        uintptr_t expected = reinterpret_cast<decltype(expected)>(&g_obj2);
+        ASSERT_EQ(expected, toHex(match[1]));
+    }
+}
+
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
