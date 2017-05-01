@@ -29,15 +29,17 @@ CASMFLAGS_64=
 
 SOURCE_MAIN=cppFriends.cpp
 SOURCE_EXT=cppFriendsExt.cpp
+SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_ERROR=cppFriendsError.cpp
 
 OBJ_MAIN=cppFriends.o
+OBJ_THREAD=cppFriendsThread.o
 OBJ_EXT=cppFriendsExt.o
 OBJ_NO_OPT_MAIN=cppFriends_no_opt.o
 OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
-OBJS=$(OBJ_MAIN) $(OBJ_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS=$(OBJ_MAIN) $(OBJ_THREAD) $(OBJ_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
 OBJS_NO_OPT=$(OBJ_NO_OPT_MAIN) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
@@ -93,6 +95,9 @@ force : $(SOURCE_ERROR)
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_THREAD): $(SOURCE_THREAD)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_EXT): $(SOURCE_EXT)

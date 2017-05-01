@@ -646,7 +646,7 @@ TEST_F(TestMyCounter, MultiCore) {
         return;
     }
 
-    const MyCounter::Number count = 1000000;  // 十分大きくする
+    const MyCounter::Number count = 4000000;  // 十分大きくする
     SizeOfThreads sizeOfThreads = hardwareConcurrency_;
     std::cout << "Run on multi threading\n";
     runCounters(sizeOfThreads, count);
@@ -672,7 +672,7 @@ TEST_F(TestMyCounter, SingleCore) {
     }
 
     SizeOfThreads sizeOfThreads = std::max(hardwareConcurrency_, 4);
-    const MyCounter::Number count = 1000000;
+    const MyCounter::Number count = 4000000;
     std::cout << "Run on a single thread\n";
     runCounters(sizeOfThreads, count);
 
@@ -1396,6 +1396,25 @@ TEST_F(TestUtfCharCounter, Well) {
     EXPECT_EQ(length, utf16sp.size());
 }
 
+TEST_F(TestUtfCharCounter, ByteOrderMark) {
+    // BOM + 半角空白
+    const std::vector<uint8_t> elements {0xef, 0xbb, 0xbf, 0x20};
+
+    std::vector<char> vec;
+    for(auto e : elements) {
+        vec.push_back(static_cast<char>(e));
+    }
+    vec.push_back(0);
+
+    bool thrown = false;
+    try {
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(vec.data());
+    } catch(std::range_error& e) {
+        thrown = true;
+    }
+    EXPECT_FALSE(thrown);
+}
+
 TEST_F(TestUtfCharCounter, Bad) {
     // 半角空白 = 00100000 をわざと冗長なUTF-8で表現する
     // 11100000 10000000 10100000
@@ -1543,9 +1562,25 @@ public:
     uint64_t memberB_;
 };
 
+struct NestedStandardLayoutObject {
+    StandardLayoutObject memberA_;
+    uint64_t memberB_;
+};
+
+struct NestedDynamicObject {
+    DynamicObject memberA_;
+    uint64_t memberB_;
+};
+
 static_assert(offsetof(StandardLayoutObject, memberA_) == 0, "Not standard layout");
 static_assert(offsetof(StandardLayoutObject, memberB_) == 8, "Not standard layout");
+// 警告が出ることの確認
 static_assert(offsetof(DynamicObject, memberA_) > 0, "Standard layout");
+
+static_assert(std::is_standard_layout<StandardLayoutObject>::value, "Not standard layout");
+static_assert(std::is_standard_layout<NestedStandardLayoutObject>::value, "Not standard layout");
+static_assert(!std::is_standard_layout<DynamicObject>::value, "Standard layout");
+static_assert(!std::is_standard_layout<NestedDynamicObject>::value, "Standard layout");
 
 // 本当はどこかのヘッダファイルにまとめて書き、必要な.cppファイルだけがインクルードする
 enum class FriendType : int {

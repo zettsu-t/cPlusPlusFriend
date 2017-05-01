@@ -1,0 +1,311 @@
+#include <algorithm>
+#include <atomic>
+#include <future>
+#include <mutex>
+#include <thread>
+#include <tuple>
+#include <time.h>
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
+#include "cppFriends.hpp"
+
+// 排他制御が完全でないと何が起きるか確認する実験だが、
+// memory fenceがないと競合するケースが再現できていない
+
+class TestMemoryFence : public ::testing::Test {
+protected:
+    using DataElement = int;
+    struct Data {
+        // std::atomicを使うときは明示的に初期化する。自動的に0になる訳ではない。
+        std::atomic<DataElement> element {0};
+        // キャッシュのラインサイズ分だけ他のatomic変数と離す。
+        // C++17ではこのサイズ(64)を取得できる。
+        uint8_t gap[64];
+    };
+    using DataSet = std::vector<Data>;
+    using Count = DataElement;
+    static constexpr DataElement WriteLocked = 1;
+    static constexpr Count TrialCountSpin = 2000000;
+    static constexpr Count TrialCountMutex = 200000; // Mutexは時間が掛かり過ぎ
+
+    enum class MODE {
+        ASYNC,  // 同期処理を何もしないのでメチャクチャになる(というのを作りたい)
+        SPIN,   // Compare and Swapによるスピンロックで同期する
+        MUTEX,  // std::mutexで同期する
+    };
+
+    // データを更新する
+    class Producer {
+    public:
+        Producer(MODE mode, Count loopCount, DataSet& dataSet,
+                 std::mutex& mx, Data& ready, Data& reader, Data& writer) :
+            mode_(mode), loopCount_(loopCount), dataSet_(dataSet),
+            mx_(mx), ready_(ready), reader_(reader), writer_(writer) {
+        }
+
+        virtual ~Producer(void) = default;
+
+        void Run(void) {
+            // データを消費するスレッドが起きるまで少し待つ
+            timespec req {0, 10000000};
+            timespec rem = req;
+            for(;;) {
+                auto result = nanosleep(&req, &rem);
+                if (!result) {
+                    break;
+                }
+
+                if (result == EINTR) {
+                    // Spurious wakeup
+                    req = rem;
+                } else {
+                    break;
+                }
+            }
+
+            ready_.element = 1;
+            switch(mode_) {
+            case MODE::ASYNC:
+                runIncorrectly();
+                break;
+            case MODE::SPIN:
+                runInSpinning();
+                break;
+            case MODE::MUTEX:
+                runInMutex();
+                break;
+            default:
+                break;
+            }
+        }
+
+    private:
+        MODE  mode_ {MODE::ASYNC};
+        Count loopCount_ {0};
+        DataSet& dataSet_;
+        std::mutex& mx_;
+        Data& ready_;
+        Data& reader_;
+        Data& writer_;
+
+        void runIncorrectly(void) {
+            // これを作る
+        }
+
+        void runInSpinning(void) {
+            for(Count i = 0; i<loopCount_; ++i) {
+                // Writeに対する排他を確保する
+                while(writer_.element.exchange(WriteLocked, std::memory_order_seq_cst) == WriteLocked) {}
+
+                // すべてのatomic要素を更新する
+                for(auto& d : dataSet_) {
+                    ++d.element;
+                }
+                // 排他制御を出る前に、他スレッドから見て要素が更新されているようにする
+                // C++11標準。std::atomic以外の変数の順序性は指示しない。
+                std::atomic_thread_fence(std::memory_order_seq_cst);
+#if 0
+                // x86なら、std::atomic以外の変数の順序性も巻き込んで指示する
+                __sync_synchronize();
+                asm volatile (
+                    "mfence \n\t"
+                    :::);
+#endif
+
+                // Writeに対する排他を解放する
+                writer_.element = 0;
+            }
+        }
+
+        void runInMutex(void) {
+            for(Count i = 0; i<loopCount_; ++i) {
+                // ブロックスコープ内を排他制御する。mfenceも行う。
+                std::lock_guard<std::mutex> lock{mx_};
+
+                for(auto& d : dataSet_) {
+                    ++d.element;
+                }
+            }
+        }
+    };
+
+    class Consumer {
+    public:
+        Consumer(MODE mode, Count loopCount, DataSet& dataSet,
+                 std::mutex& mx, Data& ready, Data& reader, Data& writer) :
+            mode_(mode), loopCount_(loopCount), dataSet_(dataSet),
+            mx_(mx), ready_(ready), reader_(reader), writer_(writer) {
+        }
+        virtual ~Consumer(void) = default;
+
+        void Run(void) {
+            while(!ready_.element) {}
+
+            switch(mode_) {
+            case MODE::ASYNC:
+                runIncorrectly();
+                break;
+            case MODE::SPIN:
+                runInSpinning();
+                break;
+            case MODE::MUTEX:
+                runInMutex();
+                break;
+            default:
+                break;
+            }
+        }
+
+        Count GetCount(void) const {
+            return count_;
+        }
+
+        void runIncorrectly(void) {
+            // これを作る
+        }
+
+        void runInSpinning(void) {
+            for(Count i = 0; i<loopCount_; ++i) {
+                // Writeに対する排他を確保する
+                // 同時に複数のreadersからは読めない
+                // (工夫すればできそうだが、readerが多すぎるとライブロックしてwriterが更新できなくなる)
+                while(writer_.element.exchange(WriteLocked, std::memory_order_seq_cst) == WriteLocked) {}
+
+                // happens beforeは受け側でも指示する
+                std::atomic_thread_fence(std::memory_order_seq_cst);
+                checkConsistency();
+
+                // readerは読むだけなのでfenceは必要ない
+                writer_.element = 0;
+            }
+        }
+
+        void runInMutex(void) {
+            for(Count i = 0; i<loopCount_; ++i) {
+                // ブロックスコープ内を排他制御する
+                std::lock_guard<std::mutex> lock{mx_};
+                checkConsistency();
+            }
+        }
+
+        void checkConsistency(void) {
+            DataElement prev = std::numeric_limits<decltype(prev)>::max();
+            for(auto& d : dataSet_) {
+                DataElement e = d.element;
+                // 更新順序が逆転している
+                // 周回をまたぐことはないのでこれでよい
+                if (prev < e) {
+                    ++count_;
+                    break;
+                }
+                prev = e;
+            }
+        }
+
+    private:
+        MODE  mode_ {MODE::ASYNC};
+        Count loopCount_ {0};
+        DataSet& dataSet_;
+        std::mutex& mx_;
+        Data& ready_;
+        Data& reader_;
+        Data& writer_;
+        Count count_ {0};
+    };
+
+    void exec(MODE mode, Count loopCount, Count& minCount, Count& maxCount) {
+        minCount = 0;
+        maxCount = 0;
+
+        DataSet  dataSet(16);  // キャッシュの連想度を超えるくらい
+        std::mutex mx;
+        Data ready  {{0},{0}};
+        Data reader {{0},{0}};
+        Data writer {{0},{0}};
+        constexpr Count readerSize = 3;  // writerと併せて論理コアくらい
+
+        // One-writer, multi-reader
+        Producer producer(mode, loopCount, dataSet, mx, ready, reader, writer);
+        std::vector<std::unique_ptr<Consumer>> consumers;
+        for(Count i=0; i<readerSize; ++i) {
+            consumers.push_back(std::unique_ptr<Consumer>(
+                                    new Consumer(mode, loopCount, dataSet, mx, ready, reader, writer)));
+        }
+
+        {
+            // 並行処理を作って、後で実行できるようにする
+            std::vector<std::future<void>> futureSet;
+            for(auto& p : consumers) {
+                // futureの方が寿命が短いのだから、shared_ptrにする必要はない
+                Consumer* pConsumer = p.get();
+                futureSet.push_back(std::async(std::launch::async, [=](void) -> void { pConsumer->Run(); }));
+            }
+            futureSet.push_back(std::async(std::launch::async, [&](void) -> void { producer.Run(); }));
+
+            // 並行して評価して、結果がそろうのを待つ
+            for(auto& f : futureSet) {
+                f.get();
+            }
+        }
+
+        for(auto& d : dataSet) {
+            EXPECT_EQ(loopCount, d.element);
+        }
+
+        decltype(consumers)::iterator minComsumer;
+        decltype(consumers)::iterator maxComsumer;
+        std::tie(minComsumer, maxComsumer) = std::minmax_element(
+            consumers.begin(), consumers.end(),
+            [] (const decltype(consumers)::value_type& l, const decltype(consumers)::value_type& r)
+            { return l->GetCount() < r->GetCount(); });
+
+        minCount = (*minComsumer)->GetCount();
+        maxCount = (*maxComsumer)->GetCount();
+        return;
+    }
+};
+
+TEST_F(TestMemoryFence, Async) {
+    // これを作る
+    return;
+}
+
+TEST_F(TestMemoryFence, Spin) {
+    if (std::thread::hardware_concurrency() <= 1) {
+        return;
+    }
+
+    Count minCount = 0;
+    Count maxCount = 0;
+    exec(MODE::SPIN, TrialCountSpin, minCount, maxCount);
+
+    std::cout << "consumer.GetCount(spin) = count " << minCount << "\n";
+    EXPECT_FALSE(minCount);
+    EXPECT_FALSE(maxCount);
+    return;
+}
+
+TEST_F(TestMemoryFence, Mutex) {
+    if (std::thread::hardware_concurrency() <= 1) {
+        return;
+    }
+
+    Count minCount = 0;
+    Count maxCount = 0;
+    // あまりにも時間が掛かるので、テストサイズを減らす
+    exec(MODE::MUTEX, TrialCountMutex, minCount, maxCount);
+
+    std::cout << "consumer.GetCount(mutex) = count " << minCount << "\n";
+    EXPECT_FALSE(minCount);
+    EXPECT_FALSE(maxCount);
+    return;
+}
+
+/*
+Local Variables:
+mode: c++
+coding: utf-8-dos
+tab-width: nil
+c-file-style: "stroustrup"
+End:
+*/
