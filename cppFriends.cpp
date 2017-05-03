@@ -21,6 +21,12 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/multiprecision/miller_rabin.hpp>
+#include <boost/random.hpp>
+#include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -1600,6 +1606,56 @@ TEST_F(TestEnumClass, ForwardDecl) {
 
     constexpr FriendTypeBox fennec {FriendType::FENNEC_FOX};
     EXPECT_EQ(2, std::underlying_type<decltype(fennec.type_)>::type(fennec.type_));
+}
+
+class TestPrimalityTesting : public ::testing::Test{};
+
+TEST_F(TestPrimalityTesting, MersenneNumber) {
+    boost::random::random_device seed;
+    std::mt19937 gen(seed);
+
+    const unsigned int index[] = {3,5,7,13,17,19,31,61,89,107,127,521,607};
+    using BigNumber = boost::multiprecision::uint1024_t;
+    BigNumber base = 2;
+    for(auto i : index) {
+        BigNumber n = boost::multiprecision::pow(base, i);
+        n -= 1;
+        EXPECT_TRUE(boost::multiprecision::miller_rabin_test(n, 25, gen));
+    }
+}
+
+TEST_F(TestPrimalityTesting, QuizBoard) {
+    using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<200>>;
+//  const std::string str にすると、770行のエラーメッセージが出る
+    std::string str = boost::math::constants::e<LongFloat>().convert_to<decltype(str)>();
+
+    boost::random::random_device seed;
+    std::mt19937 gen(seed);
+    long long int digits = 0;
+    decltype(digits) solution = 0;
+    constexpr decltype(digits) expected = 7427466391ll;
+    constexpr decltype(digits) base = 10000000000ll;  // 10桁
+    static_assert(std::numeric_limits<decltype(digits)>::max() > base, "Too small");
+
+    size_t i = 0;
+    char digit[] = {'\0', '\0'};
+    for(auto c : str) {
+        ++i;
+        if (!::isdigit(c)) {
+            continue;
+        }
+
+        digits *= 10;
+        digit[0] = c;
+        digits += boost::lexical_cast<decltype(digits)>(digit);
+        digits %= base;
+        if ((i >= 10) && (boost::multiprecision::miller_rabin_test(digits, 25, gen))) {
+            solution = digits;
+            break;
+        }
+    }
+
+    EXPECT_EQ(expected, solution);
 }
 
 int main(int argc, char* argv[]) {

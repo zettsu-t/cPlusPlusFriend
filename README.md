@@ -133,6 +133,7 @@ class Train {
 1. /usr/binのツールが古かったり、/usr/libのライブラリが足りなかったりすると、新しいGCCをビルドできないのだ! 服を買いに行く服がないのは困るのだ!
 1. LLVMをビルドするのに、もうconfigureは使えないのだ! cmakeの使い方を覚えるのだ!
 1. トイレットペーパーが2ロールセットされているのを、両方少しずつ使っちゃ嫌なのだ! 両方同時に無くなったら危機なのだ! ダブルバッファリングを思い出すのだ!
+1. Googleの看板"{first 10-digit prime found in consecutive digits of e}.com"を解くのに、エラトステネスの篩を自作するのはイケてないのだ! boost::multiprecision::miller_rabin_testを使うのだ!
 1. "The dinosaur book"は恐竜のフレンズ図鑑じゃないのだ! "Operating System Concepts"の通称なのだ!
 1. "The dragon book"はドラゴンのフレンズじゃないのだ! "Compilers: Principles, Techniques, and Tools"の通称なのだ!
 
