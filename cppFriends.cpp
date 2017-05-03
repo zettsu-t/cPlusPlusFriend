@@ -11,6 +11,7 @@
 #include <locale>
 #include <random>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -1624,10 +1625,13 @@ TEST_F(TestPrimalityTesting, MersenneNumber) {
     }
 }
 
+// Googleの看板"{first 10-digit prime found in consecutive digits of e}.com"を解く
 TEST_F(TestPrimalityTesting, QuizBoard) {
     using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<200>>;
-//  const std::string str にすると、770行のエラーメッセージが出る
-    std::string str = boost::math::constants::e<LongFloat>().convert_to<decltype(str)>();
+    // const std::string にすると、770行のエラーメッセージが出る
+    // decltype(str) = const std::string なので変換できない
+    // std::string str = boost::math::constants::e<LongFloat>().convert_to<decltype(str)>();
+    const auto str = boost::math::constants::e<LongFloat>().convert_to<std::string>();
 
     boost::random::random_device seed;
     std::mt19937 gen(seed);
