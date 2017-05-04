@@ -144,6 +144,40 @@ class Train {
 
 この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。
 
+## 動作確認
+
+### フェネックとアライさんのやり取りを一通り実行する
+
+```bash
+make
+```
+
+を実行すると、一通りテストをビルドして実行します。最後はコンパイルエラーで終わりますが、これはコンパイルエラーを意図的に再現しているものです。
+
+当方の実行環境は以下の通りです。
+
+* Windows 10 Anniversary Update 64bit Edition
+* Cygwin 64bit version (2.8.0)
+* Google Test / Mock (1.7.0)
+* gcc (5.4.0)
+
+### MinGWで何種類の空白文字を認識するか確認する
+
+コマンドプロンプトから、
+
+```bash
+cppFriendsSpace.bat
+```
+
+を実行すると、ビルドして実行します。MinGWのインストール先はC:\MinGWに固定していますので、適宜cppFriendsSpace.batを変更してください。
+
+当方の実行環境は以下の通りです。
+
+* Windows 10 Anniversary Update 64bit Edition
+* MinGW-w64 (Distro 14.1)
+* gcc (6.3.0)
+* Boost C++ Libraries (1.63.0)
+
 ## ライセンス
 
 本レポジトリのライセンスは、[MITライセンス](LICENSE.txt)です。

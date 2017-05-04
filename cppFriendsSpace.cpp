@@ -1,18 +1,22 @@
 // ビルド方法
 // このディレクトリ全体ではなく、このcppだけで実行するexeを作成するときは、以下のマクロを有効にする
-// #define CPPFRIENDS_BUILD_STAND_ALONE
+// #define CPPFRIENDS_REGEX_BUILD_STAND_ALONE
 
 // MinGW GCC 6.3.0でコンパイルするときは、コマンドプロンプトから下記を実行する
 // インクルードパスや実行ファイル名は適宜変更する
-// g++ -std=gnu++14 -Wall -IC:\MinGW\include -o cppFriendsSpace cppFriendsSpace.cpp -lboost_regex
+// chcp 932でもchcp 65001でも、実行結果の表示がおかしい
+// g++ -std=gnu++14 -Wall -IC:\MinGW\include -DCPPFRIENDS_REGEX_BUILD_STAND_ALONE -o cppFriendsSpace cppFriendsSpace.cpp -lboost_regex
+// cppFriendsSpace.bat を実行してもよい
 
 #include <codecvt>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
 #include <boost/regex.hpp>
+#include <boost/version.hpp>
+
 // このディレクトリ全体ではなく、このcppだけで実行するexeを作成するときは不要
-#ifndef CPPFRIENDS_BUILD_STAND_ALONE
+#ifndef CPPFRIENDS_REGEX_BUILD_STAND_ALONE
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #endif
@@ -22,136 +26,137 @@
 
 namespace {
     // くいなちゃんが出した空白文字一覧(UTF-8)
-    // 二番目は0xa0に戻してある
-    const std::string spaceSet = "「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「　」";
+    // くいなちゃんは17種類挙げたが、サーバで変換されて14種類になってしまったようだ
+    // 二番目は0xa0に戻してあるので、計15種類
+    const std::string SpaceSet = "「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「 」「　」";
     // 空白以外は一致しないことを確認する
-    const std::string nonSpaceSet = "「.」「,」「x」「!」";
+    const std::string NonSpaceSet = "「.」「,」「x」「!」";
+    // 正規表現パターン(POSIX文字クラスの空白:UTF-8)。US-ASCII以外の空白もつかまえる。
+    const std::string PosixSpacePattern = "(「[[:space:]]」)";
+    // 正規表現パターン(メタ文字)
+    const std::string MetaSpacePattern = "(「\\s」)";
+
+    // Unicodeの一文字
+    using CodePoint = uint32_t;
+    // 出現した文字を登録する表
+    using OccurredCodePoint = std::unordered_map<CodePoint, bool>;
+
+    auto Utf8ToUtf16(const std::string& str) {
+        return std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(str);
+    }
+
+    template <typename T>
+    auto ConvertToUtf8(const T& str) {
+        using CharType = typename T::value_type;
+        return std::wstring_convert<std::codecvt_utf8_utf16<CharType>, CharType>{}.to_bytes(str);
+    }
+
+    template <typename T>
+    void PrintCodePoints(const T& str, std::ostream& os) {
+        const auto strInner = Utf8ToUtf16(str);
+
+        for(auto c : strInner) {
+            // 「」以外を表示する
+            if ((c != 0x300c) && (c != 0x300d)) {
+                auto code = static_cast<CodePoint>(c);
+                os << std::hex << code << ":";
+            }
+        }
+
+        return;
+    }
+
+    template <typename T, typename U>
+    size_t ScanSpaces(const T& str, const U& pattern, std::ostream& os) {
+        const auto strInner = Utf8ToUtf16(str);
+        const auto patternInner = Utf8ToUtf16(pattern);
+
+        // 正規表現
+        boost::basic_regex<wchar_t> expr(patternInner.begin(), patternInner.end());
+        // 「」区切りのイテレータ
+        boost::regex_token_iterator<decltype(strInner.begin()), wchar_t> i {strInner.begin(), strInner.end(), expr, 1};
+        // 「」区切りのイテレータ(終端)
+        decltype(i) e;
+
+        // 文字の重複は省く
+        OccurredCodePoint codeMap;
+        while(i != e) {
+            const auto strPart = i->str();
+            // 「 」をキャプチャしたはずがそうではなかった
+            if (strPart.size() < 3) {
+                continue;
+            }
+
+            const auto code = static_cast<CodePoint>(strPart.at(1));
+            if (codeMap.find(code) == codeMap.end()) {
+                const auto s = ConvertToUtf8(strPart);
+                // UTF-8にしてから、文字と文字コードを表示する
+                os << s << ":" << std::hex << code << "&";
+            }
+
+            codeMap[code] = true;
+            ++i;
+        }
+
+        // 何種類の文字を空白として扱ったか
+        auto count = codeMap.size();
+        os << std::dec << "\n" << count << " spaces found";
+        return count;
+    }
 }
 
 // このディレクトリ全体のテストを実行する
-#ifndef CPPFRIENDS_BUILD_STAND_ALONE
+#ifndef CPPFRIENDS_REGEX_BUILD_STAND_ALONE
 class TestSpaceSet : public ::testing::Test{};
 
-TEST_F(TestSpaceSet, Space) {
+TEST_F(TestSpaceSet, PosixClass) {
+    // 結果を受け取る文字ストリーム
     std::ostringstream os;
-
-    // くいなちゃんが出した空白文字一覧(UTF-16)
-    auto spaceSet16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(spaceSet);
-    for(auto c : spaceSet16) {
-        uint32_t code = static_cast<decltype(code)>(c);
-        // 「」以外を表示する
-        if ((c != 0x300c) && (c != 0x300d)) {
-            os << std::hex << code << ":";
-        }
-    }
-
-    // 正規表現パターン(POSIX文字クラスの空白:UTF-8)
-    std::string pattern = "(「[[:space:]]」)";
-    // 同UTF-16
-    const auto pattern16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(pattern);
-    // 正規表現(UTF-16)
-    boost::basic_regex<wchar_t> expr(pattern16.begin(), pattern16.end());
-
-    // 「」区切りのイテレータ
-    boost::regex_token_iterator<decltype(spaceSet16.begin()), wchar_t> i {spaceSet16.begin(), spaceSet16.end(), expr, 1};
-    // 「」区切りのイテレータ(終端)
-    decltype(i) e;
-
-    // イテレータで捜査する
-    using Code = uint32_t;
-    std::unordered_map<Code, bool> codeMap;
-
-    size_t count = 0;
-    while(i != e) {
-        const auto str16 = i->str();
-        if (str16.size() < 3) {
-            continue;
-        }
-
-        const auto code = static_cast<Code>(str16.at(1));
-        if (codeMap.find(code) == codeMap.end()) {
-            const auto s = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.to_bytes(str16);
-            // UTF-8にしてから、文字と文字コードを表示する
-            os << s << ":" << std::hex << code << "&";
-            ++count;
-        }
-
-        codeMap[code] = true;
-        ++i;
-    }
-
-    os << std::dec << count << " spaces found";
+    PrintCodePoints(SpaceSet, os);
+    ScanSpaces(SpaceSet, PosixSpacePattern, os);
 
     // Cygwin GCC 5.4.0 の出力結果
-    std::string expected = "20:a0:1680:2002:2003:2002:2003:2004:2005:2006:2007:2008:2009:200a:202f:205f:3000:「 」:20&「 」:1680&「 」:2002&「 」:2003&「 」:2004&「 」:2005&「 」:2006&「 」:2008&「 」:2009&「 」:200a&「 」:205f&「　」:3000&12 spaces found";
+    std::string expected = "20:a0:1680:2002:2003:2002:2003:2004:2005:"
+        "2006:2007:2008:2009:200a:202f:205f:3000:"
+        "「 」:20&「 」:1680&「 」:2002&「 」:2003&「 」:2004&「 」:2005&「 」:"
+        "2006&「 」:2008&「 」:2009&「 」:200a&「 」:205f&「　」:3000&\n12 spaces found";
     EXPECT_EQ(expected, os.str());
-
-    // 空白でなければ一致しないことを確認する
-    auto nonSpaceSet16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(nonSpaceSet);
-    boost::regex_token_iterator<decltype(spaceSet16.begin()), wchar_t> in {nonSpaceSet16.begin(), nonSpaceSet16.end(), expr, 1};
-    decltype(in) en;
-    EXPECT_TRUE(in == en);
 }
 
-// このcppだけで実行するexeを作成するときは、以下のマクロを有効にする
+TEST_F(TestSpaceSet, MetaSpace) {
+    // Cygwin GCC 5.4.0 の出力結果
+    std::ostringstream os;
+    EXPECT_EQ(12, ScanSpaces(SpaceSet, MetaSpacePattern, os));
+}
+
+TEST_F(TestSpaceSet, NonSpace) {
+    std::ostringstream os;
+    EXPECT_FALSE(ScanSpaces(NonSpaceSet, PosixSpacePattern, os));
+    EXPECT_FALSE(ScanSpaces(NonSpaceSet, MetaSpacePattern, os));
+}
+
+// このcppだけで実行するexeを作成するときは、以下のマクロが有効になる
 #else
 
 int main(int argc, char* argv[]) {
-    // くいなちゃんが出した空白文字一覧(UTF-16)
-    auto spaceSet16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(spaceSet);
-    for(auto c : spaceSet16) {
-        uint32_t code = static_cast<decltype(code)>(c);
-        // 「」以外を表示する
-        if ((c != 0x300c) && (c != 0x300d)) {
-            std::cout << std::hex << code << ":";
-        }
-    }
-
-    // 正規表現パターン(POSIX文字クラスの空白:UTF-8)
-    std::string pattern = "(「[[:space:]]」)";
-    // 同UTF-16
-    const auto pattern16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(pattern);
-    // 正規表現(UTF-16)
-    boost::basic_regex<wchar_t> expr(pattern16.begin(), pattern16.end());
-
-    // 「」区切りのイテレータ
-    boost::regex_token_iterator<decltype(spaceSet16.begin()), wchar_t> i {spaceSet16.begin(), spaceSet16.end(), expr, 1};
-    // 「」区切りのイテレータ(終端)
-    decltype(i) e;
-
-    // イテレータで捜査する
-    using Code = uint32_t;
-    std::unordered_map<Code, bool> codeMap;
-
-    size_t count = 0;
-    while(i != e) {
-        const auto str16 = i->str();
-        if (str16.size() < 3) {
-            continue;
-        }
-
-        const auto code = static_cast<Code>(str16.at(1));
-        if (codeMap.find(code) == codeMap.end()) {
-            const auto s = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.to_bytes(str16);
-            // UTF-8にしてから、文字と文字コードを表示する
-            std::cout << s << ":" << std::hex << code << "&";
-            ++count;
-        }
-
-        codeMap[code] = true;
-        ++i;
-    }
+    std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
+    std::cout << "." << (BOOST_VERSION % 100) << "\n";
 
     // MinGW GCC 6.3.0は、Cygwin GCC 5.4.0と異なり、U+00a0, U+2007. U+202fも空白と扱う
-    std::cout << "\n" << std::dec << count << " spaces found\n";
+    PrintCodePoints(SpaceSet, std::cout);
+    ScanSpaces(SpaceSet, PosixSpacePattern, std::cout);
+    std::cout << "\n";
 
     // 空白でなければ一致しないことを確認する
-    auto nonSpaceSet16 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>{}.from_bytes(nonSpaceSet);
-    boost::regex_token_iterator<decltype(spaceSet16.begin()), wchar_t> in {nonSpaceSet16.begin(), nonSpaceSet16.end(), expr, 1};
-    decltype(in) en;
-    bool skipped = (in == en);
-    std::cout << (skipped ? "Non-space characters skipped\n" : "A non-space character captured!\n");
-    return (skipped ? 0 : 1);
+    auto patternSet = {PosixSpacePattern, MetaSpacePattern};
+    for(auto& pattern : patternSet) {
+        std::ostringstream os;
+        auto size = ScanSpaces(NonSpaceSet, pattern, os);
+        std::cout << pattern << ":";
+        std::cout << ((size == 0) ? "Non-space characters skipped\n" : "A non-space character captured!\n");
+    }
+
+    return 0;
 }
 
 #endif
