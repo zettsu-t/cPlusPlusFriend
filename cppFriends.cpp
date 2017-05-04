@@ -29,6 +29,7 @@
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
+#include <boost/version.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <windows.h>
@@ -1663,6 +1664,9 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
 }
 
 int main(int argc, char* argv[]) {
+    std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
+    std::cout << "." << (BOOST_VERSION % 100) << "\n";
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

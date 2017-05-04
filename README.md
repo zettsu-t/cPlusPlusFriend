@@ -160,8 +160,11 @@ make
 * Cygwin 64bit version (2.8.0)
 * Google Test / Mock (1.7.0)
 * gcc (5.4.0)
+* Boost C++ Libraries (1.60.0)
 
 ### MinGWで何種類の空白文字を認識するか確認する
+
+くいなちゃんによると、Unicodeの空白文字は17種類あるそうです。[ここに](https://twitter.com/kuina_ch/status/816977065480069121)あるものは、サーバで変換されて14種類になっているので、U+00A0を加えた15種類を空白文字として扱うかどうかを、[cppFriendsSpace.cpp](cppFriendsSpace.cpp)で調べます。
 
 コマンドプロンプトから、
 
@@ -177,6 +180,8 @@ cppFriendsSpace.bat
 * MinGW-w64 (Distro 14.1)
 * gcc (6.3.0)
 * Boost C++ Libraries (1.63.0)
+
+MinGWでは、Boost.Regexの空白文字(\sと[:space:])は、15文字すべてを空白とみなしました。しかしCygwinでは12文字しか空白とみなしませんでした。
 
 ## ライセンス
 
