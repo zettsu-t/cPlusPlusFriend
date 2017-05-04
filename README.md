@@ -159,7 +159,7 @@ make
 
 を実行すると、一通りテストをビルドして実行します。最後はコンパイルエラーで終わりますが、これはコンパイルエラーを意図的に再現しているものです。
 
-当方の実行環境は以下の通りです。
+当方の実行環境は以下の通りです。Google Test / Mockは$HOME直下にあると仮定していますので、それ以外の場合はMakefileを変更してください。
 
 * Windows 10 Anniversary Update 64bit Edition
 * Cygwin 64bit version (2.8.0)
@@ -201,7 +201,7 @@ MinGWでは、Boost.Regexの空白文字(\sと[:space:])は、15文字すべて�
 * [私が読んだ書籍](https://github.com/zettsu-t/zettsu-t.github.io/wiki/Books)
 * [Boost C++ Libraries](http://www.boost.org/)
 * [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
-* [More C++ Idioms](https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms) 
+* [More C++ Idioms](https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms)
 * [Intel 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/en-us/articles/intel-sdm) and [Intel 64 and IA-32 Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html)
 * http://stackoverflow.com/ などの各記事
 
