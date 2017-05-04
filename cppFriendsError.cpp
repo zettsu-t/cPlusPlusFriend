@@ -14,6 +14,16 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+// 不完全型
+struct InnerDataStruct;
+// struct InnerDataStruct {
+//     int a_;
+// };
+
+struct OuterDataStruct {
+    InnerDataStruct inner_;  // 不完全型はインスタンス化できない
+};
+
 // http://qiita.com/iwiwi/items/859753b829cddfd8426c
 // を参考に作りました
 
