@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "cFriends.h"
+
+// 定義が見えていたらどうだろう?
+volatile int g_memoryMappedClock;  // レジスタから値を読みに行くイメージ
+int g_nonVolatileClock;            // レジスタから値を読みに行くが、うまくいかないイメージ
 
 static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
 // Cではこうなる。C++ではこうならない。
@@ -93,9 +98,36 @@ void exec_snprintf(void) {
     return;
 }
 
+void exec_io_with_definition(void) {
+    static volatile int memoryMappedClock;
+    static int nonVolatileClock;
+    char buf[64];
+
+    for(int i = 0; i < 3; ++i) {
+        // これはvolatileなので、毎回メモリから値を読みに行く
+        snprintf(buf, sizeof(buf), "%64d", g_memoryMappedClock);
+        // これはvolatileではないが、snprintfが書き換えたかもしれないので毎回メモリから値を読みに行く
+        snprintf(buf, sizeof(buf), "%64d", g_nonVolatileClock);
+        // これはvolatileなので、毎回メモリから値を読みに行く
+        snprintf(buf, sizeof(buf), "%64d", memoryMappedClock);
+        // これはvolatileではないので、メモリは読まず、"xor r9d, r9d"で定数0が入る!
+        snprintf(buf, sizeof(buf), "%64d", nonVolatileClock);
+    }
+    return;
+}
+
 int main(int argc, char* argv[]) {
     exec_my_memcpy();
     exec_snprintf();
     print_infinity();
     return 0;
 }
+
+/*
+Local Variables:
+mode: c
+coding: utf-8-dos
+tab-width: nil
+c-file-style: "stroustrup"
+End:
+*/
