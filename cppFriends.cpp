@@ -6,6 +6,7 @@
 #include <codecvt>
 #include <fstream>
 #include <future>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <locale>
@@ -16,13 +17,18 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <time.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/any.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/local_time/local_time.hpp>
+#include <boost/date_time/time_facet.hpp>
 #include <boost/fusion/container/vector.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/locale.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
@@ -1666,6 +1672,58 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
 
 // C++98では違う型、C++11は同じ型
 static_assert(std::is_same<boost::fusion::vector<int,int>, boost::fusion::vector2<int,int>>::value, "Diffrent");
+
+namespace {
+    std::string convertLocalTimeToUTC(const std::string& timeStr, const std::string& localeStr) {
+        auto* input_facet = new boost::posix_time::time_input_facet("%d/%m/%Y %H:%M:%S %ZP");
+        std::istringstream is(timeStr);
+        boost::locale::generator gen;
+        if (!localeStr.empty()) {
+            is.imbue(gen(localeStr));
+        }
+        is.imbue(std::locale(is.getloc(), input_facet));
+        boost::local_time::local_date_time lt(boost::posix_time::not_a_date_time);
+        is >> lt;
+
+        std::ostringstream os;
+        os << lt.utc_time();
+        return os.str();
+    }
+}
+
+class TestDateFormat : public ::testing::Test{};
+
+TEST_F(TestDateFormat, LeapSecond) {
+    const char* dataDormat = "%Y-%m-%d %H:%M:%S";
+    std::tm t = {};
+
+    {
+        std::istringstream is("2017-01-01 08:59:59");
+        is >> std::get_time(&t, dataDormat);
+        ASSERT_FALSE(is.fail());
+        EXPECT_EQ(1483228799, std::mktime(&t));
+    }
+
+    {
+        std::istringstream is("2017-01-01 08:59:60");
+        is >> std::get_time(&t, dataDormat);
+        ASSERT_FALSE(is.fail());
+        EXPECT_EQ(1483228800, std::mktime(&t));
+
+    }
+
+    {
+        std::istringstream is("2017-01-01 08:59:61");
+        is >> std::get_time(&t, dataDormat);
+        ASSERT_TRUE(is.fail());
+    }
+}
+
+TEST_F(TestDateFormat, RepeatTime) {
+    EXPECT_EQ("2017-Oct-29 00:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 BST+1", "en_GB.UTF-8"));
+    EXPECT_EQ("2017-Oct-29 01:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 GMT+0", "en_GB.UTF-8"));
+    EXPECT_EQ("2017-Oct-28 16:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 JST+9", "ja_JP.UTF-8"));
+}
 
 int main(int argc, char* argv[]) {
     std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);

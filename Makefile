@@ -61,7 +61,7 @@ CPPFLAGS_NO_OPT=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -O0 -DCPPFRIENDS_NO_OPTIM
 CPPFLAGS_ERROR=-std=gnu++1z -Wall $(CPPFLAGS_COMMON) -O2
 LIBPATH=
 LDFLAGS=
-LIBS=-lboost_serialization -lboost_random -lboost_regex
+LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex
 
 .PHONY: all test clean cprog force
 .SUFFIXES: .o .cpp .cc
