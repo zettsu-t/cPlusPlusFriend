@@ -33,6 +33,7 @@ SOURCE_MAIN=cppFriends.cpp
 SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
+SOURCE_CPP98=cppFriends98.cpp
 SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_C_EXT=cFriendsExt.c
@@ -42,9 +43,10 @@ OBJ_MAIN=cppFriends.o
 OBJ_THREAD=cppFriendsThread.o
 OBJ_EXT=cppFriendsExt.o
 OBJ_SPACE=cppFriendsSpace.o
+OBJ_CPP98=cppFriends98.o
 OBJ_NO_OPT_MAIN=cppFriends_no_opt.o
 OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
-OBJS=$(OBJ_MAIN) $(OBJ_THREAD) $(OBJ_EXT) $(OBJ_SPACE) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS=$(OBJ_MAIN) $(OBJ_THREAD) $(OBJ_EXT) $(OBJ_SPACE) $(OBJ_CPP98) $(GTEST_OBJ) $(GMOCK_OBJ)
 OBJS_NO_OPT=$(OBJ_NO_OPT_MAIN) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
@@ -116,6 +118,9 @@ $(OBJ_EXT): $(SOURCE_EXT)
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CPP98): $(SOURCE_CPP98)
+	$(CXX) $(CPPFLAGS_COMMON) -O2 -o $@ -c $<
 
 $(OBJ_NO_OPT_MAIN): $(SOURCE_MAIN)
 	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<

@@ -20,6 +20,7 @@
 #include <boost/any.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/fusion/container/vector.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/math/constants/constants.hpp>
@@ -1662,6 +1663,9 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
 
     EXPECT_EQ(expected, solution);
 }
+
+// C++98では違う型、C++11は同じ型
+static_assert(std::is_same<boost::fusion::vector<int,int>, boost::fusion::vector2<int,int>>::value, "Diffrent");
 
 int main(int argc, char* argv[]) {
     std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
