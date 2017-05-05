@@ -46,10 +46,12 @@ class Train {
 1. コメントに「この変数は符号なしのはず」とか書いてはいけないのだ! static_assert(std::is_unsigned)を書くのだ!
 1. ```do { ... } while(--i >= 0); ```は、iが符号なし整数だと永久に終わらないのだ! プロセスの危機なのだ!
 1. マクロに複数の文を入れるときは、```do { ... } while(0) ```で囲むのだ! そうしないと、if文の直後でそのマクロを使ったときに、予想外の動作をすることがあるのだ!
+1. do {...} while(0)はループ実行のオーバヘッドが掛かるから無駄とか言っちゃいけないのだ! 今どきのコンパイラは最適化でこのループを取り除くのだ! アセンブリコードを出力して確認するのだ!
 1. 非PODのオブジェクトをmemcpyしてはいけないのだ! memmoveもダメだ! vtableへのポインタもコピーされてしまうのだ! 派生クラスのメンバが切り捨てられて不定値に置き換わってしまうのだ! clang++ 4.0.0は警告してくれるが、g++ 6.3.0は警告しないのだ!
 1. クラスにoffsetofを取ると警告が出るのだ! Non standard layout型に対してoffsetofを取る意味があるのか考えるのだ!
 1. memsetを使ってbyte単位以外の値でメモリを埋めるのは無理なのだ! std::fillを使うのだ!
 1. snprintf(dst,N,"%s")で長さNのときにdstにN文字書き込もうとすると最後はNUL終端されるが、strncpyで長さNのときにN文字コピーしようとすると最後は終端されないのだ! バッファオーバランの危機なのだ!
+1. 実行時に任意の正規表現を入力として受け取るのはやめるのだ! 複雑な正規表現を食わされて落ちる(ReDoS)ことがあるのだ!
 1. thisと引数が同じオブジェクトかどうか(二つの引数が同じオブジェクトかどうか)確かめずに、片方から他方にメンバをコピーするのはやめるのだ! memcpyで領域が重なっているときのように要素が消滅してしまうのだ! [(NaiveCopy)](cppFriends.cpp)
 1. 確かにC99の機能はC++でも使えるが、restrictはコンパイルエラーになることがあるのだ! 本当にrestrictが必要か考えるのだ!
 1. 立っているビット数をfor文で数えるのは遅いのだ! コンパイラのマニュアルから __builtin_popcount とかを探すのだ!
@@ -61,6 +63,8 @@ class Train {
 1. /* Local Variables: c-file-style: "stroustrup" */ を理解できないからって消さないで欲しいのだ! それはEmacs上でソースコードを整形するのに必要なのだ!
 1. 2個のオブジェクトを交換するコードを自作してはいけないのだ! std::swapはno throw保証なのだ!
 1. 出力ファイルストリームのcloseを、いつでもデストラクタ任せにすると、closeで書き出しに失敗したことを検出できないのだ! デストラクタはnoexceptだから呼び出し元に結果を通知できないのだ!
+1. 関数内で異常が発生したから、それまで確保したメモリやファイルハンドルを解放する処理を、gotoで関数の最後に飛んで行うのはやめるのだ! Cではそれでよいが、C++ではRAIIを使わないと例外安全にならないのだ!
+1. C++にfinally節やensure節はないのだ! リソースリークの防止にはRAIIを使うのだ!
 1. 実行環境を確認せずに、いきなりnoexceptと書かないで欲しいのだ! 例外中立にして欲しいのだ! MinGW32 + pthreadGCE2.dll + clangだと、[pthread_exit](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/pthread_exit.c)が例外を投げて、[スレッドエントリ関数](https://github.com/Tieske/pthreads-win32/blob/master/pthreads.2/ptw32_threadStart.c)が拾うまでに、noexcept違反でstd::terminateされてしまうのだ! (pthreadGCE-3.dllではこうならず、スレッドを正常に終了できます)
 1. 何もしないデストラクタを{}と定義するのはダメだ! =defaultを使うのだ! 理由はEffective Modern C++ 項目17に書いてあるのだ!
 1. ユニットテストが書きにくいからって、#defineでprivateをpublicに置き換えちゃいけないのだ! アクセス指定子を超えたメンバ変数の順序は入れ替わることがあるのだ!  [(参考)](http://en.cppreference.com/w/cpp/language/access) friendを使うのだ!
@@ -75,6 +79,7 @@ class Train {
 1. 関数の動作を```#ifdef COLOR ... #endif```で切り替えると、COLOURと打ったときに```...```が除外されてしまうのだ! if (定数式)が使えるならそうするのだ! コンパイラが綴りの違いを見つけてくれるのだ!  C++17ではif constexprが使える(予定な)のだ!
 1. 複数行のコードをとりあえずコメントアウトするのに/* */を使うと、/* */が入れ子になっておかしくなることがあるのだ! #if 0 - #endifにして欲しいのだ!
 1. テンプレートマッチングをstd::is_pointerだけで済ましてはいけないのだ! 配列T(&)[SIZE]とstd::is_null_pointerに対するマッチングも必要なのだ!
+1. free(p);をif(p){}で囲む必要はないのだ! freeにNULLを渡しても無害なのだ! こういうインタフェースはnull object patternにして欲しいのだ! アライさんはその辺ばっちりなのだ!
 1. f(uint8_t)とf(BYTETYPE)とf(unsigned char)を同時には定義できないのだ! 関数を再定義してますと言われてしまうのだ! プログラマには違う型に見えても、コンパイラには区別がつかないのだ!
 1. 関数の動作を何でもかんでもboolの引数で切り替えたら、呼び出す側のコードを読んでtrueとかfalseとか書いてあっても、何をしたいか分からなくなるのだ! enum classでパラメータに名前を付けるのだ!
 1. そのエラーメッセージ"has incomplete type T"は、T型が不完全型だと言ってる訳じゃないのだ! インクルードしているヘッダファイルが足りないから、T型の定義が見つからなくて困ると言っているのだ!
@@ -98,6 +103,7 @@ class Train {
 1. 関数名を付けるときは辞書をひいて欲しいのだ! 間違った英単語も困るが、ローマ字はもっと困るのだ!
 1. テストの成功をOKと書くのはよいが、失敗をNGと報告しないで欲しいのだ! Failedと書かないと通じないのだ!
 1. 変数名をtimeと書いて時間と読ませるのは、点(時刻)なのか幅(狭義の時間)なのか分からないのだ! timestampかdurationと書いてほしいのだ!
+1. 任意精度実数の「任意」に相当する形容詞は、anyではないのだ! arbitraryなのだ! 単語を間違えると、検索で引っかからないのだ!
 1. 実行権を取れるまでセマフォを待つのはacquireなのだ! Getと書くとセマフォのインスタンスを取得すると読めてしまうのだ! 獲ると取るは違うのだ!
 1. その代入は最適化で削除されるかもしれないのだ! メモリとレジスタに書きにいかないのだ! デバッグビルドでは動作してもリリースビルドでは正しく動かないのだ! volatileをつけるのだ!
 1. printfを入れたら動いた、とか言っちゃダメなのだ! それはprintfをまたぐ最適化が抑止されたから、volatileではない変数を読みに行くようになっただけなのだ! Memory mapped I/Oを読むときは、忘れずにvolatileをつけるのだ!
@@ -212,6 +218,8 @@ MinGWでは、Boost.Regexの空白文字(\sと[:space:])は、15文字すべて�
 * [More C++ Idioms](https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms)
 * [Intel 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/en-us/articles/intel-sdm) and [Intel 64 and IA-32 Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html)
 * http://stackoverflow.com/ などの各記事
+
+「やめるのだフェネック! たとえ英語が嫌いでも、プログラマに英語は必要なのだ! 英語が読み書きできて、語彙が十分でないと、stackoverflow.com で解決策を調べられないのだ! 」
 
 ## おまけ
 

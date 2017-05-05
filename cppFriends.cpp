@@ -901,6 +901,20 @@ TEST_F(TestRegex, Boost) {
     EXPECT_EQ(expected_, osIter.str());
 }
 
+namespace {
+    void parseComplexRegex(void) {
+        // https://www.checkmarx.com/wp-content/uploads/2015/03/ReDoS-Attacks.pdf
+        std::regex expr("^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$");
+        std::smatch match;
+        std::string str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+        ASSERT_TRUE(std::regex_match(str, match, expr));
+    }
+}
+
+TEST_F(TestRegex, ReDos) {
+    ASSERT_ANY_THROW(parseComplexRegex());
+}
+
 class TestFileStream : public ::testing::Test {};
 
 TEST_F(TestFileStream, Close) {

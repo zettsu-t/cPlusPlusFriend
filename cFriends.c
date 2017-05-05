@@ -53,7 +53,10 @@ void exec_my_memcpy(void) {
         printf("%u:", (unsigned int)dst[i]);
     }
 
-    printf("\n");
+    // このdo-whileは最適化されてなくなるので、ループ実行のオーバヘッドはなくなるという実験
+    do {
+        printf("\n");
+    } while(0);
     return;
 }
 
