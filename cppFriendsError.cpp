@@ -1,8 +1,16 @@
 #include <cstdio>
 #include <cstdint>
+#include <chrono>
 #include <iostream>
 #include <iomanip>
 #include <windows.h>
+
+std::chrono::time_point<std::chrono::steady_clock> get_current_time(void) {
+    /*
+    return std::chrono::system_clock::now();  /* 単調増加とは限らない */
+    */
+    return std::chrono::steady_clock::now();  /* 単調増加 */
+};
 
 extern void checkPacket(void);
 
