@@ -2,6 +2,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+// C++98にはstatic_assertもstd::is_sameもない
+// Boostのを使うこともできますが
 class TestCpp98BoostFusionVector : public ::testing::Test{};
 
 TEST_F(TestCpp98BoostFusionVector, Numbered) {

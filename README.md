@@ -37,6 +37,7 @@ class Train {
 1. sizeofにリテラルを渡すのはやめるのだ! sizeof('a')はCとC++で違うのだ! [(参考)](http://david.tribble.com/text/cdiffs.htm#C99-char-literal)
 1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 関数への参照は、&をつけるのとつけないのと使い分けるのだ! テンプレートマッチングに失敗することがあるのだ!
+1. 参照とポインタは「どっちも間接アドレッシング」ではないのだ。ポインタはnullable(optional)とかiteratorとか、もっと多義的なのだ!
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. 浮動小数をprintf("%.0e")して7文字(-1e-308)で収まると、決め打ちするのはやめるのだ! -infinityと表示するときは9文字なのだ!
 1. std::wstring_convertによるUTF-8/16変換は、例外を捕捉するのだ! わざと冗長にUTF-8エンコードした文字列を入力すると、std::range_errorが飛ぶことがあるのだ!
@@ -96,9 +97,11 @@ class Train {
 1. BBC World Serviceの"Popular Programmes and Clips"は人気のソフトウエアプロジェクトじゃないのだ! 番組のことなのだ! ちなみにNAND flash memoryに書き込むのは、動詞で"program"だ!
 1. 関数名を付けるときは辞書をひいて欲しいのだ! 間違った英単語も困るが、ローマ字はもっと困るのだ!
 1. テストの成功をOKと書くのはよいが、失敗をNGと報告しないで欲しいのだ! Failedと書かないと通じないのだ!
+1. 変数名をtimeと書いて時間と読ませるのは、点(時刻)なのか幅(狭義の時間)なのか分からないのだ! timestampかdurationと書いてほしいのだ!
 1. 実行権を取れるまでセマフォを待つのはacquireなのだ! Getと書くとセマフォのインスタンスを取得すると読めてしまうのだ! 獲ると取るは違うのだ!
 1. その代入は最適化で削除されるかもしれないのだ! メモリとレジスタに書きにいかないのだ! デバッグビルドでは動作してもリリースビルドでは正しく動かないのだ! volatileをつけるのだ!
-1. やめるのだフェネック! 「printfを入れたら動いた」とか言っちゃダメなのだ! それはprintfをまたぐ最適化が抑止されたから、volatileではない変数を読みに行くようになっただけなのだ! Memory mapped I/Oを読むときは、忘れずにvolatileをつけるのだ!
+1. printfを入れたら動いた、とか言っちゃダメなのだ! それはprintfをまたぐ最適化が抑止されたから、volatileではない変数を読みに行くようになっただけなのだ! Memory mapped I/Oを読むときは、忘れずにvolatileをつけるのだ!
+1. 関数定義をヘッダに移したら動かなくなった、とか言っちゃダメなのだ! 定義がみえる関数呼び出しをまたぐ最適化が適用されたから、volatileでない変数を読みに行かなくなったのだ! Memory mapped I/Oを読むときは、忘れずにvolatileをつけるのだ!
 1. マルチコア環境では、volatileでスレッド間共有変数の同期は取れないのだ! std::atomicが必要なのだ! 競合動作の危機なのだ! [(Counter)](cppFriends.cpp)
 1. std::atomic<int>は明示的に初期化する必要があるのだ! 初期化を忘れてもコンパイラは教えてくれないのだ!
 1. autoは便利だが万能ではないのだ! std::atomic<int> aから値を取り出すのに、auto v=a;とは書けないのだ! atomicなオブジェクトをコピーしようとして失敗するのだ! 明示的な型に代入するか、a.load()が必要なのだ!

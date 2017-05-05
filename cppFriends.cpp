@@ -1671,7 +1671,7 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
 }
 
 // C++98では違う型、C++11は同じ型
-static_assert(std::is_same<boost::fusion::vector<int,int>, boost::fusion::vector2<int,int>>::value, "Diffrent");
+static_assert(std::is_same<boost::fusion::vector<int,int>, boost::fusion::vector2<int,int>>::value, "Different");
 
 namespace {
     std::string convertLocalTimeToUTC(const std::string& timeStr, const std::string& localeStr) {
