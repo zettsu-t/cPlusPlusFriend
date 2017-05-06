@@ -70,6 +70,7 @@ all: $(TARGETS) force
 
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	-find . -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cpp" | etags --language-force=C++ -L -
 	./$@
 
 $(TARGET_NO_OPT): $(OBJS_NO_OPT)
