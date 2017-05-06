@@ -586,7 +586,7 @@ protected:
             std::cout << "GetProcessAffinityMask failed\n";
             processAffinityMask_ = 1;
             systemAffinityMask_ = 1;
-       }
+        }
     }
 
     virtual void TearDown() override {
@@ -979,7 +979,7 @@ protected:
     // PODへの参照
     template <typename T>
     typename std::enable_if_t<!std::is_pointer<T>::value && std::is_pod<T>::value, void>
-               ZeroInitialize(T& object) {
+        ZeroInitialize(T& object) {
         os_ << "reference(" << sizeof(object) << "),";
         ::memset(&object, 0, sizeof(object));
         return;
@@ -1737,6 +1737,61 @@ TEST_F(TestDateFormat, RepeatTime) {
     EXPECT_EQ("2017-Oct-29 00:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 BST+1", "en_GB.UTF-8"));
     EXPECT_EQ("2017-Oct-29 01:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 GMT+0", "en_GB.UTF-8"));
     EXPECT_EQ("2017-Oct-28 16:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 JST+9", "ja_JP.UTF-8"));
+}
+
+class TestSaturationArithmetic : public ::testing::Test{};
+
+TEST_F(TestSaturationArithmetic, Add) {
+    constexpr size_t XmmRegisterSizeInByte = 16;
+    constexpr size_t NumberOfRegister = 2;
+    std::aligned_storage<XmmRegisterSizeInByte, XmmRegisterSizeInByte>::type xmmRegisters[NumberOfRegister];
+    const uint8_t presetValue[XmmRegisterSizeInByte * NumberOfRegister] = {
+        0,   0, 1, 1,   1,   1, 2, 2,   2,   2,   2, 254, 254, 254, 255, 255,   // 足される数
+        0, 255, 0, 1, 254, 255, 0, 1, 253, 254, 255,   0,   1,   2,   0,   1    // 足す数
+    };
+
+    static_assert(sizeof(xmmRegisters) >= sizeof(presetValue), "Too large");
+    ::memmove(xmmRegisters, presetValue, sizeof(presetValue));
+
+    const uint8_t expected[XmmRegisterSizeInByte] = {
+        0, 255, 1, 2, 255, 255, 2, 3, 255, 255, 255, 254, 255, 255, 255, 255};  // 和
+
+    // Windows/Linuxの両方で使えるscratch registers
+    asm volatile (
+        "movdqa  (%0),   %%xmm4 \n\t"
+        "movdqa  16(%0), %%xmm5 \n\t"
+        "paddusb %%xmm5, %%xmm4 \n\t"
+        "movdqa  %%xmm4, (%0)    \n\t"
+        ::"r"(xmmRegisters):"memory");
+
+    static_assert(sizeof(expected) <= sizeof(xmmRegisters), "Too large");
+    EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
+}
+
+TEST_F(TestSaturationArithmetic, Sub) {
+    constexpr size_t XmmRegisterSizeInByte = 16;
+    constexpr size_t NumberOfRegister = 2;
+    std::aligned_storage<XmmRegisterSizeInByte, XmmRegisterSizeInByte>::type xmmRegisters[NumberOfRegister];
+    const uint8_t presetValue[XmmRegisterSizeInByte * NumberOfRegister] = {
+        0,   0, 0,   0,   0, 1, 1, 1, 254, 254, 254, 254, 255, 255, 255, 255,  // 引かれる数
+        0,   1, 2, 254, 255, 0, 1, 2,   1, 253, 254, 255,   0,   1, 254, 255   // 引く数
+    };
+    static_assert(sizeof(xmmRegisters) >= sizeof(presetValue), "Too large");
+    ::memmove(xmmRegisters, presetValue, sizeof(presetValue));
+
+    const uint8_t expected[XmmRegisterSizeInByte] = {
+        0,   0, 0,   0,   0, 1, 0, 0, 253,   1,   0,   0, 255, 254,   1,   0}; // 差
+
+    // Windows/Linuxの両方で使えるscratch registers
+    asm volatile (
+        "movdqa  (%0),   %%xmm4 \n\t"
+        "movdqa  16(%0), %%xmm5 \n\t"
+        "psubusb %%xmm5, %%xmm4 \n\t"
+        "movdqa  %%xmm4, (%0)    \n\t"
+        ::"r"(xmmRegisters):"memory");
+
+    static_assert(sizeof(expected) <= sizeof(xmmRegisters), "Too large");
+    EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
 }
 
 int main(int argc, char* argv[]) {
