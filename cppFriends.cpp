@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <list>
 #include <locale>
 #include <random>
 #include <regex>
@@ -904,7 +905,7 @@ TEST_F(TestRegex, Boost) {
 namespace {
     void parseComplexRegex(void) {
         // https://www.checkmarx.com/wp-content/uploads/2015/03/ReDoS-Attacks.pdf
-        std::regex expr("^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$");
+        std::regex expr("^[a-zA-Z]+(([\\'\\,\\.\\- ][a-zA-Z ])?[a-zA-Z]*)*$");
         std::smatch match;
         std::string str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
         ASSERT_TRUE(std::regex_match(str, match, expr));
@@ -1792,6 +1793,45 @@ TEST_F(TestSaturationArithmetic, Sub) {
 
     static_assert(sizeof(expected) <= sizeof(xmmRegisters), "Too large");
     EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
+}
+
+class TestForEach : public ::testing::Test{};
+
+TEST_F(TestForEach, Vector) {
+    const std::vector<int> vec = {2,3,5,7,11,13,17};
+    decltype(vec)::value_type sum = 0;
+    for(auto e : vec) {
+        sum += e;
+    }
+    EXPECT_EQ(58, sum);
+
+    int product = 1;
+    std::for_each(std::begin(vec), std::end(vec), [&](auto e) { product *= e; });
+    EXPECT_EQ(510510, product);
+}
+
+TEST_F(TestForEach, Array) {
+    const int vec[] = {2,3,5,7,11,13,17};
+    int sum = 0;
+    for(auto e : vec) {
+        sum += e;
+    }
+    EXPECT_EQ(58, sum);
+
+    int product = 1;
+    std::for_each(std::begin(vec), std::end(vec), [&](auto e) { product *= e; });
+    EXPECT_EQ(510510, product);
+}
+
+TEST_F(TestForEach, EraseAfterRemove) {
+    std::vector<int> vec = {1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39};
+    // これはイディオム
+    vec.erase(std::remove_if(vec.begin(), vec.end(), [](auto i) { return ((i % 10) != 5);}), vec.end());
+    int sum = 0;
+    for(auto e : vec) {
+        sum += e;
+    }
+    EXPECT_EQ(80, sum);
 }
 
 int main(int argc, char* argv[]) {
