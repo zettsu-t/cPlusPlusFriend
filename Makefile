@@ -24,6 +24,9 @@ OUTPUT_ASM_C_EXT2=cFriendsSideEffect.s
 OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2)
 TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(OUTPUT_ASMS)
 
+# cppFriendsSpace.batで作るが、このMakefileで消去する
+EXTERNAL_TARGETS=cppFriendsSpace
+
 CASMFLAGS=-S -masm=intel
 CASMFLAGS_87=-mfpmath=387 -mno-sse
 CASMFLAGS_87_STORE=-mfpmath=387 -mno-sse -ffloat-store
@@ -136,4 +139,4 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) ./*.o ./*.s
+	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) ./*.o ./*.s

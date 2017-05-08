@@ -1,0 +1,30 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# Executables and output files
+*.exe
+*.s
+TAGS
+
+# Other intermediate files
+*.d
+*.processed
+*.stackdump
+
+# Text editor backup files
+*~
+*.bak
+
+# Files that Windows automatically generates
+Thumbs.db
