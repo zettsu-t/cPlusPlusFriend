@@ -42,6 +42,7 @@
 #include <gmock/gmock.h>
 #include <windows.h>
 #include "cppFriends.hpp"
+#include "cFriendsCommon.h"
 
 namespace {
     void TrimAndExpand(std::string& str) {
@@ -1182,6 +1183,7 @@ TEST_F(TestMacroExpansion, Well) {
 namespace {
     static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
     static_assert(sizeof('a') == 1, "Expect sizeof(char) == 1");
+    static_assert(sizeof(g_arrayForTestingSize) == 1, "g_arrayForTestingSize must have one element");
     __attribute__((unused)) void funcTakesByte(uint8_t e) {}
     /* これら上とを同時には定義できない
     using BYTETYPE = uint8_t;
@@ -1835,6 +1837,110 @@ TEST_F(TestForEach, EraseAfterRemove) {
         sum += e;
     }
     EXPECT_EQ(80, sum);
+}
+
+TEST_F(TestForEach, RawPointer) {
+    std::ostringstream os;
+    std::vector<int> vec1(0x40000, 123);  // 1Mbytes
+    auto pData1 = vec1.data();
+    os << *pData1;
+
+    std::vector<int> vec2(0x40000, 456);
+    auto pData2 = vec2.data();
+    os << *pData2;
+
+    vec2.resize(1, 987);
+    vec1.resize(0x80000, 789);
+    // pData1 と pData2 は無効になっているかもしれないので、
+    // Segmentation faultが発生する(ことがある)
+//  os << *pData1;
+//  EXPECT_NE(pData1, vec1.data());
+    EXPECT_EQ("123456", os.str());
+}
+
+namespace {
+    using ProcessorClock = uint64_t;
+    using ProcessorClockSet = std::vector<ProcessorClock>;
+    using ProcessorClockMap = std::unordered_map<ProcessorClock, size_t>;
+    std::string g_expString;
+
+    ProcessorClock getProcessorClock() {
+        uint64_t clock = 0;
+        auto pClock = &clock;
+
+        // クロックだけ測る
+        asm volatile (
+            "rdtsc \n\t"
+            "mov %%eax, (%0)  \n\t"
+            "mov %%edx, 4(%0) \n\t"
+            ::"r"(pClock):"eax", "edx", "memory");
+        return clock;
+    }
+
+    ProcessorClock getProcessorClockWithLoad() {
+        // 負荷を書ける
+        using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<50>>;
+        g_expString += boost::math::constants::e<LongFloat>().str().at(0);
+        return getProcessorClock();
+    }
+
+    using FuncGetClock = std::function<ProcessorClock()>;
+    void checkProcessorClock(FuncGetClock& f) {
+        ProcessorClockSet clockSet;
+        for(size_t i = 0; i < 120000; ++i) {
+            clockSet.push_back(f());
+        }
+
+        // 周回しないものと仮定している
+        ProcessorClockMap clockMap;
+        constexpr ProcessorClock mod = 12;
+
+        for(ProcessorClock i=0; i<mod; ++i) {
+            clockMap[i] = 0;
+        }
+
+        decltype(clockSet)::value_type prevTimestamp = clockSet.at(0);
+        for(auto timestamp : clockSet) {
+            ASSERT_LE(prevTimestamp, timestamp);
+            clockMap[timestamp % mod] += 1;
+            prevTimestamp = timestamp;
+        }
+
+        // 出現確率が二項分布なら、標準偏差は sqrt(n*p*(1-p))になる
+        // p=1/12なら、1σ = sqrt(n) * 0.28, 6σ = sqrt(n) * 1.66
+        // n=120000なら、平均=10000, 6σ=575なので、9000回は出るはず
+        // 1000回に満たないのはおかしい
+        bool foundBias = false;
+        for(ProcessorClock i=0; i<mod; ++i) {
+            auto count = clockMap[i];
+            std::cout << count << ":";
+            foundBias |= (count < 1000);
+        }
+
+        EXPECT_TRUE(foundBias);
+        std::cout << "\n";
+        return;
+    }
+}
+
+class TestProcessorClock : public ::testing::Test{
+    virtual void SetUp() override {
+        g_expString.clear();
+    }
+
+    virtual void TearDown() override {
+        g_expString.clear();
+    }
+};
+
+TEST_F(TestProcessorClock, Light) {
+    FuncGetClock f(getProcessorClock);
+    checkProcessorClock(f);
+}
+
+TEST_F(TestProcessorClock, Heavy) {
+    FuncGetClock f(getProcessorClockWithLoad);
+    checkProcessorClock(f);
 }
 
 int main(int argc, char* argv[]) {

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "cFriends.h"
+#include "cFriendsCommon.h"
 
 // 定義が見えていたらどうだろう?
 volatile int g_memoryMappedClock;  // レジスタから値を読みに行くイメージ
@@ -11,6 +12,7 @@ int g_nonVolatileClock;            // レジスタから値を読みに行くが
 static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
 // Cではこうなる。C++ではこうならない。
 static_assert(sizeof('a') == sizeof(int), "Expect sizeof('a') == sizeof(int)");
+static_assert(sizeof(g_arrayForTestingSize) == sizeof(int), "g_arrayForTestingSize must have more than one elements");
 
 // 桁落ちを意図的に起こす
 void check_cancellation_digits(void) {
