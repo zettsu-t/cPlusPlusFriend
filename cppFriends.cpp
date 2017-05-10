@@ -1878,7 +1878,7 @@ namespace {
     }
 
     ProcessorClock getProcessorClockWithLoad() {
-        // 負荷を書ける
+        // 負荷を掛ける
         using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<50>>;
         g_expString += boost::math::constants::e<LongFloat>().str().at(0);
         return getProcessorClock();
@@ -1909,12 +1909,12 @@ namespace {
         // 出現確率が二項分布なら、標準偏差は sqrt(n*p*(1-p))になる
         // p=1/12なら、1σ = sqrt(n) * 0.28, 6σ = sqrt(n) * 1.66
         // n=120000なら、平均=10000, 6σ=575なので、9000回は出るはず
-        // 1000回に満たないのはおかしい
+        // 9000回に満たないのはおかしい
         bool foundBias = false;
         for(ProcessorClock i=0; i<mod; ++i) {
             auto count = clockMap[i];
             std::cout << count << ":";
-            foundBias |= (count < 1000);
+            foundBias |= (count < 9000);
         }
 
         EXPECT_TRUE(foundBias);
@@ -1941,6 +1941,54 @@ TEST_F(TestProcessorClock, Light) {
 TEST_F(TestProcessorClock, Heavy) {
     FuncGetClock f(getProcessorClockWithLoad);
     checkProcessorClock(f);
+}
+
+namespace {
+    using Log2Arg = unsigned int;
+    using Log2Result = int;
+    constexpr Log2Result Log2ResultInvalid = -1;
+
+    Log2Result log2Builtin(Log2Arg arg) {
+        return (arg) ? (31 - __builtin_clz(arg)) : Log2ResultInvalid;
+    }
+
+    Log2Result log2Asm(Log2Arg arg) {
+        Log2Result result = 0;
+        Log2Result invalid = Log2ResultInvalid;
+
+        asm volatile (
+            "bsr    %1, %0 \n\t"
+            "cmovz  %2, %0 \n\t"
+            :"=r"(result):"r"(arg),"r"(invalid):);
+
+        return result;
+    }
+
+    struct Log2TestCase {
+        Log2Arg arg;
+        Log2Result expected;
+    };
+
+    const Log2TestCase g_log2TestCaseSet [] = {
+        {0, Log2ResultInvalid},
+        {1,0}, {2,1}, {3,1}, {4,2}, {5,2}, {6,2}, {7,2},
+        {8,3}, {9,3}, {14,3}, {15,3}, {16,4}, {17,4}, {31,4},
+        {0x7fffffffu, 30}, {0x80000000u, 31}, {0xffffffffu, 31}
+    };
+}
+
+class TestLog2 : public ::testing::Test{};
+
+TEST_F(TestLog2, Builtin) {
+    for(auto& testcase : g_log2TestCaseSet) {
+        EXPECT_EQ(testcase.expected, log2Builtin(testcase.arg));
+    }
+}
+
+TEST_F(TestLog2, Asm) {
+    for(auto& testcase : g_log2TestCaseSet) {
+        EXPECT_EQ(testcase.expected, log2Asm(testcase.arg));
+    }
 }
 
 int main(int argc, char* argv[]) {
