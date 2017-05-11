@@ -1991,6 +1991,22 @@ TEST_F(TestLog2, Asm) {
     }
 }
 
+// 宣言と定義の型が違ったら困る例
+// そもそもここにexternを書くのが間違い。ヘッダファイルに書く。
+#if 0
+extern unsigned int* g_pointerOrArray;
+class TestODRviolation : public ::testing::Test{};
+
+TEST_F(TestODRviolation, All) {
+    // g_pointerOrArrayという配列の先頭ではなく、
+    // *(g_pointerOrArray)を読もうとするがg_pointerOrArrayの中身は、
+    // rax 0xe0000000f0000000 なので、
+    // mov (%rax),%eax でsegmentation faultが発生する
+    auto i = g_pointerOrArray[0];
+    std::cout << i;
+}
+#endif
+
 int main(int argc, char* argv[]) {
     std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
     std::cout << "." << (BOOST_VERSION % 100) << "\n";

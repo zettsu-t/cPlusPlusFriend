@@ -66,7 +66,7 @@ LIBPATH=
 LDFLAGS=
 LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex
 
-.PHONY: all test clean cprog force
+.PHONY: all test clean cprog force show
 .SUFFIXES: .o .cpp .cc
 
 all: $(TARGETS) force
@@ -88,9 +88,6 @@ $(TARGET_C_SJIS): $(SOURCE_C_SJIS)
 	-$(CPP) $(CFLAGS) -Werror -o $@ $<
 
 $(TARGET_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $(OUTPUT_ASM87_STORE_C)  $<
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $(OUTPUT_ASM64_C)  $<
 	$(CPP) $(CFLAGS) $(CASMFLAGS_87) -o $@ $<
 	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87) $(ECHO_END)
 	@./$@
@@ -101,6 +98,15 @@ $(TARGET_C): $(SOURCE_C)
 	@echo -e $(ECHO_START)Using x64 and SSE $(ECHO_END)
 	@./$@
 	-$(CXX) $(CPPFLAGS) -c $<
+
+$(OUTPUT_ASM87_C): $(SOURCE_C)
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
+
+$(OUTPUT_ASM87_STORE_C): $(SOURCE_C)
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $(OUTPUT_ASM87_STORE_C)  $<
+
+$(OUTPUT_ASM64_C): $(SOURCE_C)
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $(OUTPUT_ASM64_C)  $<
 
 $(OUTPUT_ASM_C_EXT1): $(SOURCE_C_EXT)
 	$(CPP) $(CFLAGS) $(CASMFLAGS) -o $@ $<
@@ -140,3 +146,6 @@ test: $(TARGET)
 
 clean:
 	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) ./*.o ./*.s
+
+show:
+	$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))

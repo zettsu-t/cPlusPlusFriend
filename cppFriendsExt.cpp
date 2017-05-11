@@ -34,6 +34,11 @@ int32_t ShiftForInt32(int32_t src, int32_t count) {
     return result;
 }
 
+// 宣言と定義の型が違ったら困る例
+// うろ覚えの情報で、int*だと思ってアクセスされると、
+// 0xf0000000 または 0xe0000000f0000000を指すポインタとして読まれてしまう
+unsigned int g_pointerOrArray[] = {0xf0000000u, 0xe0000000u};
+
 /*
 Local Variables:
 mode: c++
