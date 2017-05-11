@@ -2007,6 +2007,48 @@ TEST_F(TestODRviolation, All) {
 }
 #endif
 
+class TestMinMax : public ::testing::Test{};
+
+TEST_F(TestMinMax, Vector) {
+    std::vector<int> numbers = {1, -1, 2, -2, 3, -3};
+
+    auto iMin = std::min_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(-3, *iMin);
+    auto iMax = std::max_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(3, *iMax);
+
+    auto iMinMax = std::minmax_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(-3, *(iMinMax.first));
+    EXPECT_EQ(3,  *(iMinMax.second));
+
+    // 自作するが、要素が空でないときしか動作しない
+    int result = INT_MAX;
+    for(auto n : numbers) {
+        result = (result < n) ? result : n;
+    }
+    EXPECT_EQ(-3, result);
+}
+
+TEST_F(TestMinMax, Empty) {
+    std::vector<int> numbers;
+
+    auto iMin = std::min_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(numbers.end(), iMin);
+    auto iMax = std::max_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(numbers.end(), iMax);
+
+    auto iMinMax = std::minmax_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(numbers.end(), iMinMax.first);
+    EXPECT_EQ(numbers.end(), iMinMax.second);
+
+    // 自作するが、要素が空でないときしか動作しない
+    int result = INT_MAX;
+    for(auto n : numbers) {
+        result = (result < n) ? result : n;
+    }
+    EXPECT_EQ(INT_MAX, result);
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
     std::cout << "." << (BOOST_VERSION % 100) << "\n";
