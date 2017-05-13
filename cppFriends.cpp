@@ -13,10 +13,8 @@
 #include <boost/io/ios_state.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/type_traits/function_traits.hpp>
-#include <boost/version.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <windows.h>
 #include "cppFriends.hpp"
 #include "cFriendsCommon.h"
 
@@ -421,14 +419,6 @@ TEST_F(TestRandomNumber, List) {
     HardwareRand hr;
     CountRandomNumber(sr, std::cout);
     CountRandomNumber(hr, std::cout);
-}
-
-int main(int argc, char* argv[]) {
-    std::cout << "Run with Boost C++ Libraries " << (BOOST_VERSION / 100000) << "." << (BOOST_VERSION / 100 % 1000);
-    std::cout << "." << (BOOST_VERSION % 100) << "\n";
-
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }
 
 /*

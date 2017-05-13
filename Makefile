@@ -21,7 +21,8 @@ OUTPUT_ASM87_STORE_C=cFriends87-store.s
 OUTPUT_ASM64_C=cFriends64.s
 OUTPUT_ASM_C_EXT1=cFriendsNoSideEffect.s
 OUTPUT_ASM_C_EXT2=cFriendsSideEffect.s
-OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2)
+OUTPUT_ASM_CPP_CLANG=cppFriendsClang.s
+OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2) $(OUTPUT_ASM_CPP_CLANG)
 
 OUTPUT_FUNCLIST_TEMP1_H=__cFriends_nocr1__.h
 OUTPUT_FUNCLIST_TEMP1_C=__cFriends_nocr1__.c
@@ -41,7 +42,8 @@ CASMFLAGS_87=-mfpmath=387 -mno-sse
 CASMFLAGS_87_STORE=-mfpmath=387 -mno-sse -ffloat-store
 CASMFLAGS_64=
 
-SOURCE_MAIN=cppFriends.cpp
+SOURCE_MAIN=cppFriendsMain.cpp
+SOURCE_FRIENDS=cppFriends.cpp
 SOURCE_SAMPLE_1=cppFriendsSample1.cpp
 SOURCE_SAMPLE_2=cppFriendsSample2.cpp
 SOURCE_SAMPLE_ASM=cppFriendsSampleAsm.cpp
@@ -49,6 +51,7 @@ SOURCE_OPT=cppFriendsOpt.cpp
 SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
+SOURCE_CLANG=cppFriendsClang.cpp
 SOURCE_CPP98=cppFriends98.cpp
 
 SOURCE_C_SJIS=cFriendsShiftJis.c
@@ -58,7 +61,8 @@ SOURCE_ERROR=cppFriendsError.cpp
 INDENT_INPUT_SOURCE_H=cFriends.h
 INDENT_INPUT_SOURCE_C=cFriends.c
 
-OBJ_MAIN=cppFriends.o
+OBJ_MAIN=cppFriendsMain.o
+OBJ_FRIENDS=cppFriends.o
 OBJ_SAMPLE_1=cppFriendsSample1.o
 OBJ_SAMPLE_2=cppFriendsSample2.o
 OBJ_SAMPLE_ASM=cppFriendsSampleAsm.o
@@ -66,18 +70,21 @@ OBJ_OPT=cppFriendsOpt.o
 OBJ_EXT=cppFriendsExt.o
 OBJ_THREAD=cppFriendsThread.o
 OBJ_SPACE=cppFriendsSpace.o
+OBJ_CLANG=cppFriendsClang.o
 OBJ_CPP98=cppFriends98.o
 
 OBJ_NO_OPT=cppFriendsOpt_no_opt.o
 OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
 
-OBJS_COMMON=$(OBJ_MAIN) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM)
-OBJS=$(OBJS_COMMON) $(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_SPACE) $(OBJ_CPP98) $(GTEST_OBJ) $(GMOCK_OBJ)
-OBJS_NO_OPT=$(OBJS_COMMON) $(OBJ_NO_OPT) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS=$(OBJ_MAIN) $(OBJ_FRIENDS) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM)
+OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_SPACE) $(OBJ_CLANG) $(OBJ_CPP98)
+OBJS+=$(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS_NO_OPT=$(OBJ_MAIN) $(OBJ_NO_OPT) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
 CPP=gcc
 CXX=g++
+CLANGXX=clang++
 LD=g++
 CFLAGS=-std=gnu11 -O2 -Wall
 CPPFLAGS_CPPSPEC=-std=gnu++14
@@ -131,13 +138,13 @@ $(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
 	ctags -x --c-kinds=f --fields=+S $(OUTPUT_FUNCLIST_TEMP_SRCS) | sed -e 's/  */ /g' | cut -d' ' -f5- | tee $(OUTPUT_FUNCLIST)
 
 $(OUTPUT_ASM87_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $@ $<
 
 $(OUTPUT_ASM87_STORE_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $(OUTPUT_ASM87_STORE_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
 
 $(OUTPUT_ASM64_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $(OUTPUT_ASM64_C)  $<
+	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
 
 $(OUTPUT_ASM_C_EXT1): $(SOURCE_C_EXT)
 	$(CPP) $(CFLAGS) $(CASMFLAGS) -o $@ $<
@@ -145,10 +152,16 @@ $(OUTPUT_ASM_C_EXT1): $(SOURCE_C_EXT)
 $(OUTPUT_ASM_C_EXT2): $(SOURCE_C_EXT)
 	$(CPP) $(CFLAGS) $(CASMFLAGS) -DCPPFRIENDS_SIDE_EFFECT -o $@ $<
 
+$(OUTPUT_ASM_CPP_CLANG): $(SOURCE_CLANG)
+	$(CLANGXX) $(CPPFLAGS) $(CASMFLAGS) -o $@ $<
+
 force : $(SOURCE_ERROR)
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_FRIENDS): $(SOURCE_FRIENDS)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_SAMPLE_1): $(SOURCE_SAMPLE_1)
@@ -170,6 +183,9 @@ $(OBJ_THREAD): $(SOURCE_THREAD)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG): $(SOURCE_CLANG)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CPP98): $(SOURCE_CPP98)
