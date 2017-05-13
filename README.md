@@ -147,6 +147,8 @@ class Train {
 1. VLAがスタックに置かれるとは限らないのだ! ヒープに確保する[コンパイラ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0472k/chr1359124223721.html)もあるのだ! 割り込みハンドラからmallocは呼べないことを思い出して欲しいのだ!
 1. 割り込みハンドラで自動変数のオブジェクトを生成するとき、コンストラクタがnewするのは困るのだ! メンバ変数と他のメンバ関数についても確認するのだ!
 1. コメントに「このクラスのインスタンスはヒープに置かないでください」と書いて済ますのは嫌なのだ! operator newを=deleteして欲しいのだ!
+1. pthread_cond_waitを直接使うと、spurious wakeup対策が必要なのだ! std::condition_variable::waitを述語付きで使うのだ!
+1. 割り込みやシグナルやcondition variableは、それらの待ちに入る前に通知される場合に対処する必要があるのだ! そうでないと無限待ちになってしまうことがあるのだ!
 1. グローバル変数のコンストラクタから、別のグローバル変数のインスタンス関数を呼び出してはいけないのだ! グローバル変数の初期化順序はコンパイラが決めるから、呼び出し先は未初期化かもしれないのだ! Construct on first useイディオムが必要なのだ!
 1. static T& GetInstance(void) { static T instance; return instance; } はマルチスレッド環境ではシングルトンにならないことがあるのだ! シングルトンの実装方法をよく確認するのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!

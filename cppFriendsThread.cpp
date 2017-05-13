@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <future>
 #include <mutex>
 #include <thread>
@@ -60,7 +62,7 @@ protected:
         Producer(MODE mode, Count loopCount, DataSet& dataSet,
                  std::mutex& mx, Data& ready, Data& reader, Data& writer) :
             mode_(mode), loopCount_(loopCount), dataSet_(dataSet),
-            mx_(mx), ready_(ready), reader_(reader), writer_(writer) {
+            mutex_(mx), ready_(ready), reader_(reader), writer_(writer) {
         }
 
         virtual ~Producer(void) = default;
@@ -103,7 +105,7 @@ protected:
         MODE  mode_ {MODE::ASYNC};
         Count loopCount_ {0};
         DataSet& dataSet_;
-        std::mutex& mx_;
+        std::mutex& mutex_;
         Data& ready_;
         Data& reader_;
         Data& writer_;
@@ -140,7 +142,7 @@ protected:
         void runInMutex(void) {
             for(Count i = 0; i<loopCount_; ++i) {
                 // ブロックスコープ内を排他制御する。mfenceも行う。
-                std::lock_guard<std::mutex> lock{mx_};
+                std::lock_guard<std::mutex> lock{mutex_};
 
                 for(auto& d : dataSet_) {
                     ++d.element;
@@ -154,7 +156,7 @@ protected:
         Consumer(MODE mode, Count loopCount, DataSet& dataSet,
                  std::mutex& mx, Data& ready, Data& reader, Data& writer) :
             mode_(mode), loopCount_(loopCount), dataSet_(dataSet),
-            mx_(mx), ready_(ready), reader_(reader), writer_(writer) {
+            mutex_(mx), ready_(ready), reader_(reader), writer_(writer) {
         }
         virtual ~Consumer(void) = default;
 
@@ -203,7 +205,7 @@ protected:
         void runInMutex(void) {
             for(Count i = 0; i<loopCount_; ++i) {
                 // ブロックスコープ内を排他制御する
-                std::lock_guard<std::mutex> lock{mx_};
+                std::lock_guard<std::mutex> lock{mutex_};
                 checkConsistency();
             }
         }
@@ -226,7 +228,7 @@ protected:
         MODE  mode_ {MODE::ASYNC};
         Count loopCount_ {0};
         DataSet& dataSet_;
-        std::mutex& mx_;
+        std::mutex& mutex_;
         Data& ready_;
         Data& reader_;
         Data& writer_;
@@ -319,6 +321,152 @@ TEST_F(TestMemoryFence, Mutex) {
     EXPECT_FALSE(minCount);
     EXPECT_FALSE(maxCount);
     return;
+}
+
+namespace {
+    // 他のスレッドが起きるまで少し待つ
+    void Delay(bool valid) {
+        if (valid) {
+            std::chrono::milliseconds dur(10);
+            std::this_thread::sleep_for(dur);
+        }
+    }
+}
+
+// Condition variableを使って、スレッド間でハンドシェイクする
+class TestConditionVariable : public ::testing::Test {
+protected:
+    using SharedValue = int;
+    using SharedAtomic = std::atomic<SharedValue>;
+
+    // データを更新する
+    class Sender {
+    public:
+        Sender(SharedValue count, bool delayed, SharedAtomic& value, SharedAtomic& received,
+               std::mutex& mx, std::condition_variable& cvSent, std::condition_variable& cvReceived) :
+            count_(count), delayed_(delayed), value_(value), received_(received),
+            mutex_(mx), cvSent_(cvSent), cvReceived_(cvReceived) {
+            return;
+        }
+
+        virtual ~Sender(void) = default;
+
+        SharedValue Exec(void) {
+            // 指定されていれば、スレッドの開始を遅らせる
+            Delay(delayed_);
+            SharedValue count = 0;
+
+            for(SharedValue i=0; i<count_; ++i) {
+                std::unique_lock<std::mutex> lock(mutex_);
+                // ループの初回は受信済になっている
+                cvReceived_.wait(lock, [&](void) -> bool { return received_.load(); });
+                received_ = 0;
+
+                // 共有データを更新する
+                value_ += 1;
+                ++count;
+                // 更新したことを通知する
+                cvSent_.notify_all();
+            }
+
+            return count;
+        }
+
+    private:
+        SharedValue count_ {0};
+        bool delayed_ {false};
+        SharedAtomic& value_;
+        SharedAtomic& received_;
+        std::mutex& mutex_;
+        std::condition_variable& cvSent_;
+        std::condition_variable& cvReceived_;
+    };
+
+    // データを更新する
+    class Receiver {
+    public:
+        Receiver(SharedValue count, bool delayed, SharedAtomic& value, SharedAtomic& received,
+               std::mutex& mx, std::condition_variable& cvSent, std::condition_variable& cvReceived) :
+            count_(count), delayed_(delayed), value_(value), received_(received),
+            mutex_(mx), cvSent_(cvSent), cvReceived_(cvReceived) {
+            // 初期状態は受信済にする
+            received_ = 1;
+            previousValue_ = value_.load();
+            return;
+        }
+
+        virtual ~Receiver(void) = default;
+
+        SharedValue Exec(void) {
+            // 指定されていれば、スレッドの開始を遅らせる
+            Delay(delayed_);
+            SharedValue count = 0;
+
+            // カウンタいっぱいまで行ったら、送信完了とする
+            for(SharedValue i=0; i<count_; ++i) {
+                std::unique_lock<std::mutex> lock(mutex_);
+                // すでに更新されていたら待たない
+                // 更新しなければ、更新したことを通知されるまで待つ
+                // spurious wakeupでは起きない
+                cvSent_.wait(lock, [&](void) -> bool { return (value_.load() > previousValue_); });
+
+                // 共有データを受け取る
+                previousValue_ = value_.load();
+                ++count;
+                received_ = 1;
+                // 受信したことを通知する
+                cvReceived_.notify_all();
+            }
+
+            return count;
+        }
+
+    private:
+        SharedValue count_ {0};
+        bool delayed_ {false};
+        SharedAtomic& value_;
+        SharedAtomic& received_;
+        std::mutex& mutex_;
+        std::condition_variable& cvSent_;
+        std::condition_variable& cvReceived_;
+        SharedValue previousValue_ {0};
+    };
+
+    // テストを実行する
+    void exec(SharedValue count, bool senderDelayed, bool receiverDelayed) {
+        SharedAtomic value {0};     // 初期値を明示的に与える必要がある
+        SharedAtomic received {1};  // 初期状態は受信済
+        std::mutex mx;
+        std::condition_variable cvSent;
+        std::condition_variable cvReceived;
+        Sender sender(count, senderDelayed, value, received, mx, cvSent, cvReceived);
+        Receiver receiver(count, receiverDelayed, value, received, mx, cvSent, cvReceived);
+
+        std::future<SharedValue> futureSender = std::async(std::launch::async, [&](void) -> auto { return sender.Exec(); });
+        std::future<SharedValue> futureReceiver = std::async(std::launch::async, [&](void) -> auto { return receiver.Exec(); });
+        auto actualSender = futureSender.get();
+        auto actualReceiver = futureReceiver.get();
+        EXPECT_EQ(count, value.load());
+        EXPECT_EQ(count, actualSender);
+        EXPECT_EQ(count, actualReceiver);
+    }
+};
+
+TEST_F(TestConditionVariable, Short) {
+    // スレッドを起動-終了して、Delayで待つので(これが長い)、Cygwinだとループ30回で1秒少々掛かる
+    for(int i=0; i<30; ++i) {
+        exec(10, true, false);
+        exec(10, false, true);
+    }
+}
+
+TEST_F(TestConditionVariable, Long) {
+    for(int i=0; i<4; ++i) {
+        // カウント10000回、以下一組、1ループ当たり、Cygwinでは0.5秒少々掛かる
+        exec(10000, false, false);
+        exec(10000, true, false);
+        exec(10000, true, true);
+    }
 }
 
 /*
