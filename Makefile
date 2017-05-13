@@ -22,7 +22,16 @@ OUTPUT_ASM64_C=cFriends64.s
 OUTPUT_ASM_C_EXT1=cFriendsNoSideEffect.s
 OUTPUT_ASM_C_EXT2=cFriendsSideEffect.s
 OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2)
-TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(OUTPUT_ASMS)
+
+OUTPUT_FUNCLIST_TEMP1_H=__cFriends_nocr1__.h
+OUTPUT_FUNCLIST_TEMP1_C=__cFriends_nocr1__.c
+OUTPUT_FUNCLIST_TEMP2_H=__cFriends_nocr2__.h
+OUTPUT_FUNCLIST_TEMP2_C=__cFriends_nocr2__.c
+OUTPUT_FUNCLIST_TEMP_SRCS=$(OUTPUT_FUNCLIST_TEMP2_H) $(OUTPUT_FUNCLIST_TEMP2_C)
+OUTPUT_FUNCLIST_TEMPS=$(OUTPUT_FUNCLIST_TEMP1_H) $(OUTPUT_FUNCLIST_TEMP1_C) $(OUTPUT_FUNCLIST_TEMP_SRCS)
+OUTPUT_FUNCLIST=cFriends_func.txt
+
+TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST)
 
 # cppFriendsSpace.batで作るが、このMakefileで消去する
 EXTERNAL_TARGETS=cppFriendsSpace
@@ -41,6 +50,8 @@ SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_C_EXT=cFriendsExt.c
 SOURCE_ERROR=cppFriendsError.cpp
+INDENT_INPUT_SOURCE_H=cFriends.h
+INDENT_INPUT_SOURCE_C=cFriends.c
 
 OBJ_MAIN=cppFriends.o
 OBJ_THREAD=cppFriendsThread.o
@@ -65,6 +76,8 @@ CPPFLAGS_ERROR=-std=gnu++1z -Wall $(CPPFLAGS_COMMON) -O2
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex
+
+INDENT_OPTIONS=--line-length10000 --dont-format-comments --dont-break-function-decl-args --dont-break-procedure-type --dont-line-up-parentheses --no-space-after-parentheses
 
 .PHONY: all test clean cprog force show
 .SUFFIXES: .o .cpp .cc
@@ -97,7 +110,13 @@ $(TARGET_C): $(SOURCE_C)
 	$(CPP) $(CFLAGS) $(CASMFLAGS_64) -o $@ $<
 	@echo -e $(ECHO_START)Using x64 and SSE $(ECHO_END)
 	@./$@
-	-$(CXX) $(CPPFLAGS) -c $<
+
+$(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
+	cat $(INDENT_INPUT_SOURCE_H) | expand | tr -d '\r' > $(OUTPUT_FUNCLIST_TEMP1_H)
+	cat $(INDENT_INPUT_SOURCE_C) | expand | tr -d '\r' > $(OUTPUT_FUNCLIST_TEMP1_C)
+	indent $(INDENT_OPTIONS) -o $(OUTPUT_FUNCLIST_TEMP2_H) $(OUTPUT_FUNCLIST_TEMP1_H)
+	indent $(INDENT_OPTIONS) -o $(OUTPUT_FUNCLIST_TEMP2_C) $(OUTPUT_FUNCLIST_TEMP1_C)
+	ctags -x --c-kinds=f --fields=+S $(OUTPUT_FUNCLIST_TEMP_SRCS) | sed -e 's/  */ /g' | cut -d' ' -f5- | tee $(OUTPUT_FUNCLIST)
 
 $(OUTPUT_ASM87_C): $(SOURCE_C)
 	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $(OUTPUT_ASM87_C)  $<
@@ -145,7 +164,7 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) ./*.o ./*.s
+	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST) $(OUTPUT_FUNCLIST_TEMPS) ./*.o ./*.s
 
 show:
 	$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))
