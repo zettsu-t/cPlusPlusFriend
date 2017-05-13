@@ -7,8 +7,27 @@
 #include <time.h>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <windows.h>
 #include "cppFriends.hpp"
+
+// TLSを使わなくても、単にスレッド起動時の引数で渡せば済む
+class TestThreads : public ::testing::Test {};
+
+TEST_F(TestThreads, All) {
+    struct ThreadEnv {
+        int value;
+    };
+
+    ThreadEnv env1 {1};
+    ThreadEnv env2 {2};
+    {
+        std::thread thr1([&env1](void) { std::cout << env1.value; });
+        std::thread thr2([&env2](void) { std::cout << env2.value; });
+        thr1.join();
+        thr2.join();
+    }
+
+    std::cout << "\n";
+}
 
 // 排他制御が完全でないと何が起きるか確認する実験だが、
 // memory fenceがないと競合するケースが再現できていない
@@ -300,48 +319,6 @@ TEST_F(TestMemoryFence, Mutex) {
     EXPECT_FALSE(minCount);
     EXPECT_FALSE(maxCount);
     return;
-}
-
-namespace {
-    std::atomic<bool> g_breakPointHandled;
-
-    LONG CALLBACK MyVectoredHandler(PEXCEPTION_POINTERS pExceptionInfo) {
-        if (pExceptionInfo &&
-            pExceptionInfo->ContextRecord &&
-            pExceptionInfo->ExceptionRecord &&
-            pExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT) {
-            // 次の命令に移る
-#ifdef __x86_64__
-            pExceptionInfo->ContextRecord->Rip++;
-#else
-            pExceptionInfo->ContextRecord->Eip++;
-#endif
-            g_breakPointHandled = true;
-            return EXCEPTION_CONTINUE_EXECUTION;
-        }
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-}
-
-class TestDebuggerDetecter : public ::testing::Test {
-protected:
-    virtual void SetUp() override {
-        g_breakPointHandled = false;
-    }
-};
-
-TEST_F(TestDebuggerDetecter, All) {
-    EXPECT_FALSE(g_breakPointHandled.load());
-    // ハンドラを登録する。最後に呼ばれるようにする。
-    PVOID handler = ::AddVectoredExceptionHandler(0, MyVectoredHandler);
-    ASSERT_TRUE(handler);
-
-    // Int3を発生させる
-    ::DebugBreak();
-    // ハンドラを元に戻す
-    ::RemoveVectoredExceptionHandler(handler);
-    handler = 0;
-    EXPECT_TRUE(g_breakPointHandled.load());
 }
 
 /*
