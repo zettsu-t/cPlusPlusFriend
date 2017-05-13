@@ -11,8 +11,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <windows.h>
-#include "cppFriends.hpp"
 #include "cFriendsCommon.h"
+#include "cppFriends.hpp"
 
 class MyCounter {
 public:

@@ -1,4 +1,6 @@
 // やめるのだフェネックで学ぶC++の実証コード
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <algorithm>
 #include <functional>
 #include <iomanip>
@@ -12,8 +14,9 @@
 #include <boost/any.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "cppFriends.hpp"
 #include "cFriendsCommon.h"
+#include "cppFriends.hpp"
+#include "cppFriendsClang.hpp"
 
 // キャストが正しくできることを確認する
 namespace {
@@ -800,6 +803,42 @@ TEST_F(TestCommandPattern, All) {
 
     // (((1 * 2 + 5) * 3) - 1) ^ 2 - 1
     EXPECT_EQ(399, g_anGlobalVariable);
+}
+
+namespace SwitchCase {
+    double GetAreaOfCircle(double radius) {
+        return radius * radius * M_PI;
+    }
+
+    double GetAreaOfRectangular(double width, double height) {
+        return width * height;
+    }
+
+    // ヘロンの公式
+    double GetAreaOfTriangle(double edge1, double edge2, double edge3) {
+        double halfSum = edge1 + edge2 + edge3;
+        halfSum /= 2.0;
+        double product = halfSum * (halfSum - edge1) * (halfSum - edge2) * (halfSum - edge3);
+        return std::sqrt(product);
+    }
+}
+
+class TestSwitchCase : public ::testing::Test{};
+
+TEST_F(TestSwitchCase, LookUpTable) {
+    struct TestCase {
+        SwitchCase::Shape shape;
+        double expected;
+    };
+
+    const TestCase testSet[] = {{SwitchCase::Shape::UNKNOWN, 0.0},
+                                {SwitchCase::Shape::CIRCLE, 12.566370614359172},
+                                {SwitchCase::Shape::RECTANGULAR, 6.0},
+                                {SwitchCase::Shape::TRIANGLE, 24.0},
+                                {SwitchCase::Shape::SQUARE, 49.0}};
+    for(auto& test : testSet) {
+        EXPECT_DOUBLE_EQ(test.expected, GetFixedTestValue(test.shape));
+    }
 }
 
 /*

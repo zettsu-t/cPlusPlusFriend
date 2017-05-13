@@ -9,8 +9,8 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "cppFriends.hpp"
 #include "cFriendsCommon.h"
+#include "cppFriends.hpp"
 
 class TestSaturationArithmetic : public ::testing::Test{};
 

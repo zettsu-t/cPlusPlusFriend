@@ -15,8 +15,8 @@
 #include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "cppFriends.hpp"
 #include "cFriendsCommon.h"
+#include "cppFriends.hpp"
 
 namespace {
     void TrimAndExpand(std::string& str) {

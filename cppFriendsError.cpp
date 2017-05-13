@@ -1,3 +1,4 @@
+// やめるのだフェネックで学ぶC++の実証コード(意図的にコンパイルエラーを発生させる)
 #include <cstdio>
 #include <cstdint>
 #include <chrono>

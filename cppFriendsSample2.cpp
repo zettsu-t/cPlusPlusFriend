@@ -28,8 +28,8 @@
 #include <boost/regex.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "cppFriends.hpp"
 #include "cFriendsCommon.h"
+#include "cppFriends.hpp"
 
 // C++98では違う型、C++11は同じ型
 static_assert(std::is_same<boost::fusion::vector<int,int>, boost::fusion::vector2<int,int>>::value, "Different");
