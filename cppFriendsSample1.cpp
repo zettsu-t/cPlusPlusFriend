@@ -841,6 +841,47 @@ TEST_F(TestSwitchCase, LookUpTable) {
     }
 }
 
+// ビットフィールの定義
+struct TestingBitFields1 {
+    unsigned int version  : 2;
+    unsigned int protocol : 4;
+    unsigned int sender   : 4;
+    unsigned int receiver : 4;
+    unsigned int parameter1 : 8;
+    unsigned int parameter2 : 8;
+    unsigned int padding    : 2;
+    uint8_t body[4];
+};
+
+// パラメータが1bit 増えた
+struct TestingBitFields2 {
+    unsigned int version  : 2;
+    unsigned int protocol : 4;
+    unsigned int sender   : 4;
+    unsigned int receiver : 4;
+    unsigned int parameter1 : 8;
+    unsigned int parameter2 : 9; // 増やしてみた
+    unsigned int padding    : 2; // 減らし忘れた
+    uint8_t body[4];
+};
+
+// こうすればよい。intのサイズが決め打ちだが、そもそもビットフィールドに移植性はない。
+struct TestingBitFields3 {
+    unsigned int version  : 2;
+    unsigned int protocol : 4;
+    unsigned int sender   : 4;
+    unsigned int receiver : 4;
+    unsigned int parameter1 : 8;
+    unsigned int parameter2 : 9; // 増やしてみた
+    unsigned int : 0;  // アラインメント
+    uint8_t body[4];
+};
+
+// 併せてサイズを確認する
+static_assert(sizeof(TestingBitFields1) == 8, "Must be 8 bytes");
+static_assert(sizeof(TestingBitFields2) >  8, "Must be more than 8 bytes");
+static_assert(sizeof(TestingBitFields3) == 8, "Must be 8 bytes");
+
 /*
 Local Variables:
 mode: c++

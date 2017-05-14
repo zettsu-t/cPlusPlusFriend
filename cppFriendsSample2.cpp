@@ -130,7 +130,10 @@ namespace {
     static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
     static_assert(sizeof('a') == 1, "Expect sizeof(char) == 1");
     static_assert(sizeof(g_arrayForTestingSize) == 1, "g_arrayForTestingSize must have one element");
+    static_assert(sizeof(TestingOuterStruct1) > sizeof(TestingOuterStruct1::member), "Unexpected struct size");
+    static_assert(sizeof(TestingEmptyStruct) == 1, "Expect sizeof(empty struct) == 1");
     __attribute__((unused)) void funcTakesByte(uint8_t e) {}
+
     /* これら上とを同時には定義できない
     using BYTETYPE = uint8_t;
     void funcTakesByte(unsigned char e) {}

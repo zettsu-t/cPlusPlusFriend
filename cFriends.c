@@ -13,6 +13,7 @@ static_assert(sizeof(char) == 1, "Expect sizeof(char) == 1");
 // Cではこうなる。C++ではこうならない。
 static_assert(sizeof('a') == sizeof(int), "Expect sizeof('a') == sizeof(int)");
 static_assert(sizeof(g_arrayForTestingSize) == sizeof(int), "g_arrayForTestingSize must have more than one elements");
+static_assert(sizeof(TestingEmptyStruct) == 0, "Expect sizeof(empty struct) == 0");
 
 // 桁落ちを意図的に起こす
 void check_cancellation_digits(void) {
