@@ -2,6 +2,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -67,7 +68,6 @@ TEST_F(TestSaturationArithmetic, Sub) {
     EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
 }
 
-
 namespace {
     using ProcessorClock = uint64_t;
     using ProcessorClockSet = std::vector<ProcessorClock>;
@@ -75,7 +75,7 @@ namespace {
     std::string g_expString;
 
     ProcessorClock getProcessorClock() {
-        uint64_t clock = 0;
+        ProcessorClock clock = 0;
         auto pClock = &clock;
 
         // クロックだけ測る
@@ -131,6 +131,59 @@ namespace {
         std::cout << "\n";
         return;
     }
+
+    using NallowClock = uint32_t;
+    // コンテキストスイッチがなければ、これ以上の時刻差は観測されないはず
+    constexpr NallowClock ClockThreshold = 4000;
+    // Signedとみなして巨大な数なら時刻が逆転している
+    constexpr NallowClock MaxDiff = 2 + std::numeric_limits<NallowClock>::max() / 2;
+
+    // atomicにリアルタイムクロックを読まないと不適切な値が得られるという例
+    inline NallowClock getProcessorClockBad(ProcessorClock& clock) {
+        uint32_t mixed = 0;
+        auto pMixed = &mixed;
+        auto pClock = &clock;
+
+        asm volatile (
+            "rdtsc \n\t"  // 下位12bitを読む
+            "andl $0xfff, %%eax \n\t"
+            "movl %%eax,  %%ebx \n\t"
+            "rdtsc \n\t"  // 上位bitを読む
+            "movl %%eax, (%1)  \n\t"
+            "movl %%edx, 4(%1) \n\t"
+            "andl $0xfffff000, %%eax \n\t"
+            "orl  %%ebx, %%eax \n\t"
+            "movl %%eax, (%0)  \n\t"
+            ::"r"(pMixed),"r"(pClock):"eax","ebx","edx","memory");
+
+        return static_cast<NallowClock>(mixed);
+    }
+
+    NallowClock getProcessorClockGood(ProcessorClock& clock) {
+        uint32_t mixed = 0;
+        auto pMixed = &mixed;
+        auto pClock = &clock;
+
+        asm volatile (
+            "1: \n\t"
+            "rdtsc \n\t"  // 上位bitを読む
+            "andl $0xfffff000, %%eax \n\t"
+            "movl %%eax,  %%ecx \n\t"
+            "rdtsc \n\t"  // 下位12bitを読む
+            "andl $0xfff, %%eax \n\t"
+            "movl %%eax,  %%edi \n\t"
+            "rdtsc \n\t"  // もう一度上位bitを読む
+            "movl %%eax, (%1)  \n\t"
+            "movl %%edx, 4(%1) \n\t"
+            "andl $0xfffff000, %%eax \n\t"
+            "cmpl %%ecx,  %%eax \n\t"
+            "jne  1b \n\t"  // 読み直す
+            "orl  %%edi, %%eax \n\t"
+            "movl %%eax, (%0)  \n\t"
+            ::"r"(pMixed),"r"(pClock):"eax","ecx","edx","edi","memory");
+
+        return static_cast<NallowClock>(mixed);
+    }
 }
 
 class TestProcessorClock : public ::testing::Test{
@@ -151,6 +204,50 @@ TEST_F(TestProcessorClock, Light) {
 TEST_F(TestProcessorClock, Heavy) {
     FuncGetClock f(getProcessorClockWithLoad);
     checkProcessorClock(f);
+}
+
+TEST_F(TestProcessorClock, Bad) {
+    ProcessorClock previousClock = 0;
+    auto previous = getProcessorClockBad(previousClock);
+    bool found = false;
+
+    // 1秒くらい、十分たくさん行うが、失敗する可能性がないとは言えない
+    for(int i=0; i<0x4000000 && !found; ++i) {
+        ProcessorClock currentClock = 0;
+        auto current = getProcessorClockBad(currentClock);
+        // Wrap around
+        auto diff = current - previous;
+        ASSERT_TRUE(diff);
+
+        // クロックが大きく飛んだ時は、コンテキストスイッチが入ったとみなす
+        if (ClockThreshold > (currentClock - previousClock)) {
+            // 閾値より大きい差は、getProcessorClockで弾いているはず
+            found |= (MaxDiff <= diff);
+        }
+        previous = current;
+        previousClock = currentClock;
+    }
+
+    ASSERT_TRUE(found);
+}
+
+TEST_F(TestProcessorClock, Good) {
+    ProcessorClock previousClock = 0;
+    auto previous = getProcessorClockGood(previousClock);
+
+    for(int i=0; i<0x2000000; ++i) {
+        ProcessorClock currentClock = 0;
+        auto current = getProcessorClockGood(currentClock);
+        auto diff = current - previous;
+        ASSERT_TRUE(diff);
+
+        // クロックが大きく飛んだ時は、コンテキストスイッチが入ったとみなす
+        if (ClockThreshold > (currentClock - previousClock)) {
+            ASSERT_GT(MaxDiff, diff);
+        }
+        previous = current;
+        previousClock = currentClock;
+    }
 }
 
 namespace {
