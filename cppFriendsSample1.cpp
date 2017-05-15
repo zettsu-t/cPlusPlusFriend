@@ -138,6 +138,7 @@ namespace {
     };
 }
 
+static_assert(sizeof(char) == 1, "Unexpected char size");
 static_assert(offsetof(StandardLayoutObject, memberA_) == 0, "Not standard layout");
 static_assert(offsetof(StandardLayoutObject, memberB_) == 8, "Not standard layout");
 // 警告が出ることの確認
@@ -183,6 +184,11 @@ TEST_F(TestODRviolation, All) {
     std::cout << i;
 }
 #endif
+
+class TestExternVariable : public ::testing::Test{};
+TEST_F(TestExternVariable, ExternVariable) {
+    EXPECT_EQ(1, g_externIntValue);
+}
 
 // オブジェクトエイリアシングを考慮しないと、メンバが消失することがある
 class NaiveCopy {
@@ -881,6 +887,22 @@ struct TestingBitFields3 {
 static_assert(sizeof(TestingBitFields1) == 8, "Must be 8 bytes");
 static_assert(sizeof(TestingBitFields2) >  8, "Must be more than 8 bytes");
 static_assert(sizeof(TestingBitFields3) == 8, "Must be 8 bytes");
+
+class TestOperatorPrecedence : public ::testing::Test{};
+
+TEST_F(TestOperatorPrecedence, All) {
+    auto expr1 = [=](int expr) -> int { return expr ? 2 : 3 + 4; };   // expr ? 2 : (3 + 4)
+    auto expr2 = [=](int expr) -> int { return 4 +  expr ? 2 : 3; };  // (4 + expr) ? 2 : 3
+    auto expr3 = [=](int expr) -> int { return 4 + (expr ? 2 : 3); };
+
+    EXPECT_EQ(2, expr1(1));
+    EXPECT_EQ(7, expr1(0));
+    EXPECT_EQ(2, expr2(1));
+    EXPECT_EQ(2, expr2(0));
+    EXPECT_EQ(3, expr2(-4));
+    EXPECT_EQ(6, expr3(1));
+    EXPECT_EQ(7, expr3(0));
+}
 
 /*
 Local Variables:

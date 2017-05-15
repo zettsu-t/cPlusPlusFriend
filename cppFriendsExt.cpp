@@ -39,6 +39,9 @@ int32_t ShiftForInt32(int32_t src, int32_t count) {
 // 0xf0000000 または 0xe0000000f0000000を指すポインタとして読まれてしまう
 unsigned int g_pointerOrArray[] = {0xf0000000u, 0xe0000000u};
 
+// 他の.cppから参照される
+const int g_externIntValue = 1;
+
 /*
 Local Variables:
 mode: c++

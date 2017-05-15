@@ -1,4 +1,6 @@
 /* gccとclangを比較する */
+#include <cstdint>
+#include <cstring>
 #include "cppFriendsClang.hpp"
 
 namespace SwitchCase {
@@ -24,6 +26,19 @@ namespace SwitchCase {
         }
 
         return actual;
+    }
+
+    uint32_t g_shortBuffer[2];
+    uint32_t g_largeBuffer[1024];
+
+    void FillByZeroShort(void) {
+        // mov qword ptr [rax], 0
+        ::memset(g_shortBuffer, 0, sizeof(g_shortBuffer));
+    }
+
+    void FillByZeroLarge(void) {
+        // rex64 jmp memset # TAILCALL
+        ::memset(g_largeBuffer, 0, sizeof(g_largeBuffer));
     }
 }
 

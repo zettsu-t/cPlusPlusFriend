@@ -17,6 +17,11 @@ extern int32_t Shift35ForInt32(int32_t src);
 // シフト回数を実行時に与える
 extern int32_t ShiftForInt32(int32_t src, int32_t count);
 
+// 定義した.cppとは別の.cppから参照される
+// ヘッダで定義すると定数伝搬できるが、定数を変えた時に、
+// インクルードしている.cppをすべてビルドしなければならない
+extern const int g_externIntValue;
+
 namespace {
     // ある.cppでは使うが、他の.cppでは使わないインライン関数
     inline int MyPopCount(short src) {
