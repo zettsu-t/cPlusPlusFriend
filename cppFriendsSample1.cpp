@@ -1,10 +1,10 @@
 // やめるのだフェネックで学ぶC++の実証コード
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <functional>
 #include <iomanip>
-#include <iostream>
 #include <memory>
 #include <regex>
 #include <sstream>
@@ -547,7 +547,7 @@ protected:
     };
 };
 
-TEST_F(TestZeroInitialize, All) {
+TEST_F(TestZeroInitialize, Templates) {
     std::string expected;
 
     short primitive = 1;
@@ -662,6 +662,45 @@ TEST_F(TestZeroInitialize, All) {
         EXPECT_EQ(expected, os_.str());
     }
 }
+
+namespace {
+    struct StandardLayoutObjectMemFunc {
+        uint64_t memberA_;
+        uint64_t memberB_;
+        void Clear() {
+            memset(this, 0, sizeof(*this));
+        }
+    };
+}
+
+static_assert(std::is_standard_layout<StandardLayoutObjectMemFunc>::value, "Not standard layout");
+TEST_F(TestZeroInitialize, StandardLayout) {
+    StandardLayoutObjectMemFunc obj {2,3};
+    EXPECT_EQ(2, obj.memberA_);
+    EXPECT_EQ(3, obj.memberB_);
+    obj.Clear();
+    EXPECT_FALSE(obj.memberA_);
+    EXPECT_FALSE(obj.memberB_);
+    obj.Clear();
+}
+
+#if 0
+static_assert(!std::is_standard_layout<DynamicObjectMemFunc>::value, "Must not be standard layout");
+TEST_F(TestZeroInitialize, NonStandardLayout) {
+    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc);
+    pObj->memberA_ = 2;
+    pObj->memberB_ = 3;
+
+    // この呼び出しは、メンバだけでなくvtableへのポインタもクリアしてしまう
+    pObj->Clear();
+    EXPECT_FALSE(pObj->memberA_);
+    EXPECT_FALSE(pObj->memberB_);
+
+    // vtableへのポインタがクリアされているので、異常終了する
+    std::ostringstream os;
+    pObj->Print(os);
+}
+#endif
 
 // strをosoutとoserrの両方に書き出す
 #define ILL_DEBUG_PRINT(osout, oserr, str) \

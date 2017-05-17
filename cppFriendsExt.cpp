@@ -1,3 +1,4 @@
+#include <cstring>
 #include "cppFriends.hpp"
 
 // インライン展開されると結果が変わる関数をここに書く
@@ -41,6 +42,14 @@ unsigned int g_pointerOrArray[] = {0xf0000000u, 0xe0000000u};
 
 // 他の.cppから参照される
 const int g_externIntValue = 1;
+
+// クラスにこのようなことをすると、vtableへのポインタもクリアしてしまう
+void SubDynamicObjectMemFunc::Clear(void) {
+    memset(this, 0, sizeof(*this));
+}
+void SubDynamicObjectMemFunc::Print(std::ostream& os) {
+    os << memberA_ << memberB_;
+}
 
 /*
 Local Variables:

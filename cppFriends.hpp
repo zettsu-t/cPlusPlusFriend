@@ -2,6 +2,7 @@
 #define CPPFRIENDS_CPPFRIENDS_HPP
 
 #include <cstdint>
+#include <iostream>
 #include <type_traits>
 #include <boost/type_traits/function_traits.hpp>
 
@@ -42,6 +43,26 @@ enum class FriendType : int;
 struct FriendTypeBox {
     FriendType type_;  // underlying typeがあればメンバは知らなくてよい
     // 他に必要なメンバを追加する
+};
+
+class DynamicObjectMemFunc {
+public:
+    virtual ~DynamicObjectMemFunc() = default;
+    virtual void Clear(void) = 0;
+    virtual void Print(std::ostream& os) = 0;
+    // テスト用に敢えて公開している
+    uint64_t memberA_;
+    uint64_t memberB_;
+};
+
+class SubDynamicObjectMemFunc : public DynamicObjectMemFunc {
+public:
+    virtual ~SubDynamicObjectMemFunc() = default;
+    virtual void Clear(void);
+    virtual void Print(std::ostream& os);
+    // テスト用に敢えて公開している
+    uint64_t memberA_;
+    uint64_t memberB_;
 };
 
 #endif // CPPFRIENDS_CPPFRIENDS_HPP
