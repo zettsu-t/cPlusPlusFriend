@@ -58,8 +58,8 @@ public:
 class SubDynamicObjectMemFunc : public DynamicObjectMemFunc {
 public:
     virtual ~SubDynamicObjectMemFunc() = default;
-    virtual void Clear(void);
-    virtual void Print(std::ostream& os);
+    virtual void Clear(void) override;
+    virtual void Print(std::ostream& os) override;
     // テスト用に敢えて公開している
     uint64_t memberA_;
     uint64_t memberB_;

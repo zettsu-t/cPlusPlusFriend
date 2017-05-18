@@ -943,6 +943,21 @@ TEST_F(TestOperatorPrecedence, All) {
     EXPECT_EQ(7, expr3(0));
 }
 
+// Devirtualizationによって結果は変わらないが、コードは変わるので.sを確認する
+class TestDevirtualization : public ::testing::Test{};
+
+TEST_F(TestDevirtualization, Inline) {
+    auto actual = Devirtualization::GetStringInline();
+    std::string expected = "BaseInlineDerivedInline";
+    EXPECT_EQ(expected, actual);
+}
+
+TEST_F(TestDevirtualization, Outline) {
+    auto actual = Devirtualization::GetStringOutline();
+    std::string expected = "BaseOutlineDerivedOutline";
+    EXPECT_EQ(expected, actual);
+}
+
 /*
 Local Variables:
 mode: c++

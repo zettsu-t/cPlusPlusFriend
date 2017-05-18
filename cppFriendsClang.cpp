@@ -99,6 +99,42 @@ namespace MemoryOperation {
 #endif
 }
 
+namespace Devirtualization {
+    std::string GetStringInline(void) {
+        std::ostringstream os;
+        BaseInline baseObj;
+        DerivedInline derivedObj;
+
+        // オブジェクトの型が分かっているので、vtableを観ずに直接呼び出す
+        // 定義が見えているのでインライン展開も行う
+        // L.str:
+        // .asciz  "BaseInline"
+        // movabs  rdx, L.str
+        // mov  r8d, 10
+        // mov  rcx, rdi
+        // call  ...ostream_insert...
+        baseObj.Print(os);
+        derivedObj.Print(os);
+        std::string str = os.str();
+        return str;
+    }
+
+    std::string GetStringOutline(void) {
+        std::ostringstream os;
+        auto pBase = CreateBaseOutline();
+        auto pDerived = CreateDerivedOutline();
+
+        // オブジェクトの型が分かっていないので、vtableを経由して直接呼び出す
+        // mov  rcx, qword ptr [rsp + 48]
+        // mov  rax, qword ptr [rcx]
+        // call qword ptr [rax + 8]
+        pBase->Print(os);
+        pDerived->Print(os);
+        std::string str = os.str();
+        return str;
+    }
+}
+
 /*
 Local Variables:
 mode: c++
