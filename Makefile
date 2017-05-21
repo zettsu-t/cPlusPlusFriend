@@ -134,6 +134,8 @@ LLVM_LINK=llvm-link
 LLVM_OPT=opt
 LD=g++
 STRIP=strip
+GREP?=grep
+WC?=wc
 
 CFLAGS=-std=gnu11 -O2 -Wall
 CPPFLAGS_CPPSPEC=-std=gnu++14
@@ -174,6 +176,7 @@ cprog: $(TARGET_C_SJIS) $(TARGET_C)
 $(TARGET_C_SJIS): $(SOURCE_C_SJIS)
 	$(CPP) -o $@ $<
 	@./$@
+	@./$@ | $(WC) | $(GREP) "  1  "
 	-$(CPP) $(CFLAGS) -Werror -o $@ $<
 
 $(TARGET_C): $(SOURCE_C)

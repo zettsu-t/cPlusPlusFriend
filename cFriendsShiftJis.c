@@ -2,16 +2,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// gcc, clangã§ã¯ã€Œè¤‡æ•°è¡Œã®ã‚³ãƒ¡ãƒ³ãƒˆã€è­¦å‘ŠãŒå‡ºã‚‹
+// gcc, clang‚Å‚Íu•¡”s‚ÌƒRƒƒ“ƒgvŒx‚ªo‚é
 
 int main(int argc, char* argv[]) {
-    // Shift_JISã§ã“ã®ã‚³ãƒ¡ãƒ³ãƒˆã¯ã¾ãšã„ã§ã‚²ã‚½
+    // Shift_JIS‚Å‚±‚ÌƒRƒƒ“ƒg‚Í‚Ü‚¸‚¢‚ÅƒQƒ\
     printf("First line\n");
 
-    // -Wallãªã—ã€ã¤ã¾ã‚Šã§è­¦å‘Šãªã—ã§ã“ã®å•é¡Œã‚’è¦‹æŠœãã®ã¯ä¸å¯èƒ½
+    // -Wall‚È‚µA‚Â‚Ü‚è‚ÅŒx‚È‚µ‚Å‚±‚Ì–â‘è‚ğŒ©”²‚­‚Ì‚Í•s‰Â”\
     printf("Second line\n");
 
-    // ã§ã¯ãªã„ã¨æ€ã„ã¾ã™ãŒã€-Wall -Werror ã‚’ã¤ã‘ã‚‹ã¹ãã ã¨æ€ã†ã®ã§ã™
+    // ‚Å‚Í‚È‚¢‚Æv‚¢‚Ü‚·‚ªA-Wall -Werror ‚ğ‚Â‚¯‚é‚×‚«‚¾‚Æv‚¤‚Ì‚Å‚·
     printf("Third line\n");
     return 0;
 }
@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 /*
 Local Variables:
 mode: c
-coding: utf-8-dos
+coding: shift_jis-dos
 tab-width: nil
 c-file-style: "stroustrup"
 End:
