@@ -14,7 +14,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
 

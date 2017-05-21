@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include <windows.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"

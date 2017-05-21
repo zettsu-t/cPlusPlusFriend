@@ -18,7 +18,6 @@
 // このディレクトリ全体ではなく、このcppだけで実行するexeを作成するときは不要
 #ifndef CPPFRIENDS_REGEX_BUILD_STAND_ALONE
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #endif
 
 // 元記事

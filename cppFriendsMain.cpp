@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include <boost/version.hpp>
 
 int main(int argc, char* argv[]) {

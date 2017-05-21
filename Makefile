@@ -9,8 +9,11 @@ GMOCK_TOP_DIR=$(GTEST_GMOCK_TOP_DIR)/googlemock
 GTEST_GMOCK_INCLUDE=$(addprefix -isystem, $(GTEST_TOP_DIR)/include $(GTEST_TOP_DIR) $(GMOCK_TOP_DIR)/include $(GMOCK_TOP_DIR))
 GTEST_SOURCE=$(GTEST_TOP_DIR)/src/gtest-all.cc
 GMOCK_SOURCE=$(GMOCK_TOP_DIR)/src/gmock-all.cc
+
 GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
-GMOCK_OBJ=$(patsubst %.cc, %.o, $(notdir $(GMOCK_SOURCE)))
+GTEST_OBJ_LTO=$(patsubst %.cc, %_lto.o, $(notdir $(GTEST_SOURCE)))
+GTEST_BC=$(patsubst %.cc, %.bc, $(notdir $(GTEST_SOURCE)))
+GTEST_BC_LTO=$(patsubst %.cc, %_lto.bc, $(notdir $(GTEST_SOURCE)))
 
 TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
@@ -54,11 +57,11 @@ SOURCE_SAMPLE_ASM=cppFriendsSampleAsm.cpp
 SOURCE_OPT=cppFriendsOpt.cpp
 SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_THREAD=cppFriendsThread.cpp
+SOURCE_CPP98=cppFriends98.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
 SOURCE_CLANG=cppFriendsClang.cpp
 SOURCE_CLANG_EXT=cppFriendsClangExt.cpp
-SOURCE_CLANG_MAIN=cppFriendsClangMain.cpp
-SOURCE_CPP98=cppFriends98.cpp
+SOURCE_CLANG_TEST=cppFriendsClangTest.cpp
 
 SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
@@ -75,38 +78,51 @@ OBJ_SAMPLE_ASM=cppFriendsSampleAsm.o
 OBJ_OPT=cppFriendsOpt.o
 OBJ_EXT=cppFriendsExt.o
 OBJ_THREAD=cppFriendsThread.o
-OBJ_SPACE=cppFriendsSpace.o
 OBJ_CPP98=cppFriends98.o
-OBJ_NO_OPT=cppFriendsOpt_no_opt.o
-OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
-
+OBJ_SPACE=cppFriendsSpace.o
 OBJ_CLANG=cppFriendsClang.o
 OBJ_CLANG_EXT=cppFriendsClangExt.o
-OBJ_CLANG_MAIN=cppFriendsClangMain.o
+OBJ_CLANG_TEST=cppFriendsClangTest.o
+
+OBJ_NO_OPT=cppFriendsOpt_no_opt.o
+OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
+OBJ_MAIN_GCC_LTO=cppFriendsMain_gcc_lto.o
 OBJ_CLANG_GCC_LTO=cppFriendsClang_gcc_lto.o
 OBJ_CLANG_EXT_GCC_LTO=cppFriendsClangExt_gcc_lto.o
-OBJ_CLANG_MAIN_GCC_LTO=cppFriendsClangMain_gcc_lto.o
+OBJ_CLANG_TEST_GCC_LTO=cppFriendsClangTest_gcc_lto.o
 
 OBJS=$(OBJ_MAIN) $(OBJ_FRIENDS) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM)
-OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_SPACE) $(OBJ_CLANG) $(OBJ_CLANG_EXT) $(OBJ_CPP98)
-OBJS+=$(GTEST_OBJ) $(GMOCK_OBJ)
-OBJS_NO_OPT=$(OBJ_MAIN) $(OBJ_NO_OPT) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
-OBJS_GCC_LTO=$(OBJ_CLANG_GCC_LTO) $(OBJ_CLANG_EXT_GCC_LTO) $(OBJ_CLANG_MAIN_GCC_LTO)
-OBJ_NO_LTO=cppFriendsClang_no_lto.o
-OBJ_LTO=cppFriendsClang_lto.o
+OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_CPP98) $(OBJ_SPACE)
+OBJS+=$(OBJ_CLANG) $(OBJ_CLANG_EXT) $(OBJ_CLANG_TEST)
+OBJS+=$(GTEST_OBJ)
+
+OBJS_NO_OPT=$(OBJ_MAIN) $(OBJ_NO_OPT) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ)
+OBJS_GCC_LTO=$(OBJ_MAIN_GCC_LTO) $(OBJ_CLANG_GCC_LTO) $(OBJ_CLANG_EXT_GCC_LTO) $(OBJ_CLANG_TEST_GCC_LTO)
+OBJS_GCC_LTO+=$(GTEST_OBJ_LTO)
+
+# BC -> .o -> .exeの途中
+OBJ_ALL_IN_ONE_NO_LTO=cppFriendsClangAll_no_lto.o
+OBJ_ALL_IN_ONE_LTO=cppFriendsClangAll_lto.o
+
 BC_ALL=cppFriendsClangAll.bc
 BC_ALL_LTO=cppFriendsClangAll_lto.bc
 BC_OPT_LTO=cppFriendsClangOpt_lto.bc
 
+BC_MAIN=cppFriendsMain.bc
 BC_CLANG=cppFriendsClang.bc
 BC_CLANG_EXT=cppFriendsClangExt.bc
-BC_CLANG_MAIN=cppFriendsClangMain.bc
-BCS_CLANG=$(BC_CLANG) $(BC_CLANG_EXT) $(BC_CLANG_MAIN)
+BC_CLANG_TEST=cppFriendsClangTest.bc
+BCS_CLANG=$(BC_MAIN) $(BC_CLANG) $(BC_CLANG_EXT) $(BC_CLANG_TEST) $(GTEST_BC)
+
+BC_MAIN_LTO=cppFriendsMain_lto.bc
 BC_CLANG_LTO=cppFriendsClang_lto.bc
 BC_CLANG_EXT_LTO=cppFriendsClangExt_lto.bc
-BC_CLANG_MAIN_LTO=cppFriendsClangMain_lto.bc
-BCS_CLANG_LTO=$(BC_CLANG_LTO) $(BC_CLANG_EXT_LTO) $(BC_CLANG_MAIN_LTO)
-BCS_OBJS=$(OBJ_NO_LTO) $(OBJ_LTO) $(BC_ALL) $(BC_ALL_LTO) $(BC_OPT_LTO) $(BCS_CLANG) $(BCS_CLANG_LTO)
+BC_CLANG_TEST_LTO=cppFriendsClangTest_lto.bc
+BCS_CLANG_LTO=$(BC_MAIN_LTO) $(BC_CLANG_LTO) $(BC_CLANG_EXT_LTO) $(BC_CLANG_TEST_LTO) $(GTEST_BC_LTO)
+
+BCS_OBJS=$(OBJ_ALL_IN_ONE_NO_LTO) $(OBJ_ALL_IN_ONE_LTO)
+BCS_OBJS+=$(BC_ALL) $(BC_ALL_LTO) $(BC_OPT_LTO) $(BCS_CLANG) $(BCS_CLANG_LTO)
+BCS_OBJS+=$(GTEST_BC) $(GTEST_BC_LTO)
 
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
@@ -126,7 +142,8 @@ CPPFLAGS=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -O2
 CPPFLAGS_NO_OPT=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -g -O0 -DCPPFRIENDS_NO_OPTIMIZATION
 CPPFLAGS_ERROR=-std=gnu++1z -Wall $(CPPFLAGS_COMMON) -O2
 
-CPPFLAGS_LTO=-flto
+CPPFLAGS_LTO=-flto -DCPPFRIENDS_ENABLE_LTO
+LDFLAGS_LTO=-Wno-attributes
 CLANGXXFLAGS=-S -emit-llvm
 CLANGXXFLAGS_LTO=$(CPPFLAGS_LTO) $(CLANGXXFLAGS)
 LLCFLAGS=-filetype=obj
@@ -171,16 +188,18 @@ $(TARGET_C): $(SOURCE_C)
 	@./$@
 
 $(TARGET_GCC_LTO): $(OBJS_GCC_LTO)
-	$(LD) $(CPPFLAGS_LTO) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(LD) $(CPPFLAGS_LTO) $(LDFLAGS_LTO) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	./$@
 
-$(TARGET_CLANG): $(OBJ_NO_LTO)
+$(TARGET_CLANG): $(OBJ_ALL_IN_ONE_NO_LTO)
 	$(CXX) -o $@ $<
 	$(STRIP) $@
+	./$@
 
-$(TARGET_CLANG_LTO): $(OBJ_LTO)
+$(TARGET_CLANG_LTO): $(OBJ_ALL_IN_ONE_LTO)
 	$(CXX) $(CPPFLAGS_LTO) -o $@ $<
 	$(STRIP) $@
+	./$@
 
 $(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
 	cat $(INDENT_INPUT_SOURCE_H) | expand | tr -d '\r' > $(OUTPUT_FUNCLIST_TEMP1_H)
@@ -234,17 +253,11 @@ $(OBJ_EXT): $(SOURCE_EXT)
 $(OBJ_THREAD): $(SOURCE_THREAD)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_SPACE): $(SOURCE_SPACE)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
-
 $(OBJ_CPP98): $(SOURCE_CPP98)
 	$(CXX) $(CPPFLAGS_COMMON) -O2 -o $@ -c $<
 
-$(OBJ_NO_OPT): $(SOURCE_OPT)
-	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
-
-$(OBJ_NO_OPT_EXT): $(SOURCE_EXT)
-	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+$(OBJ_SPACE): $(SOURCE_SPACE)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG): $(SOURCE_CLANG)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
@@ -252,35 +265,50 @@ $(OBJ_CLANG): $(SOURCE_CLANG)
 $(OBJ_CLANG_EXT): $(SOURCE_CLANG_EXT)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_CLANG_MAIN): $(SOURCE_CLANG_MAIN)
+$(OBJ_CLANG_TEST): $(SOURCE_CLANG_TEST)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_NO_OPT): $(SOURCE_OPT)
+	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+
+$(OBJ_NO_OPT_EXT): $(SOURCE_EXT)
+	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+
+$(OBJ_MAIN_GCC_LTO): $(SOURCE_MAIN)
+	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG_GCC_LTO): $(SOURCE_CLANG)
 	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG_EXT_GCC_LTO): $(SOURCE_CLANG_EXT)
-	$(CXX) $(CPPFLAGS_LTO)  $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_CLANG_MAIN_GCC_LTO): $(SOURCE_CLANG_MAIN)
-	$(CXX) $(CPPFLAGS_LTO)  $(CPPFLAGS) -o $@ -c $<
+$(OBJ_CLANG_TEST_GCC_LTO): $(SOURCE_CLANG_TEST)
+	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_DIR)/%.o: %.cc
+$(GTEST_OBJ): $(GTEST_SOURCE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_NO_LTO) : $(BC_ALL)
+$(GTEST_OBJ_LTO): $(GTEST_SOURCE)
+	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_ALL_IN_ONE_NO_LTO) : $(BC_ALL)
 	$(LLC) $(LLCFLAGS) -o $@ $<
 
-$(OBJ_LTO) : $(BC_OPT_LTO)
+$(OBJ_ALL_IN_ONE_LTO) : $(BC_OPT_LTO)
 	$(LLC) $(LLCFLAGS) -o $@ $<
 
 $(BC_ALL): $(BCS_CLANG)
 	$(LLVM_LINK) -o $@ $^
 
+$(BC_ALL_LTO): $(BCS_CLANG_LTO)
+	$(LLVM_LINK) -o $@ $^
+
 $(BC_OPT_LTO): $(BC_ALL_LTO)
 	$(LLVM_OPT) $(LLVM_OPT_FLAGS) -o $@ $<
 
-$(BC_ALL_LTO): $(BCS_CLANG_LTO)
-	$(LLVM_LINK) -o $@ $^
+$(BC_MAIN): $(SOURCE_MAIN)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
 
 $(BC_CLANG): $(SOURCE_CLANG)
 	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
@@ -288,8 +316,11 @@ $(BC_CLANG): $(SOURCE_CLANG)
 $(BC_CLANG_EXT): $(SOURCE_CLANG_EXT)
 	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
 
-$(BC_CLANG_MAIN): $(SOURCE_CLANG_MAIN)
+$(BC_CLANG_TEST): $(SOURCE_CLANG_TEST)
 	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(BC_MAIN_LTO): $(SOURCE_MAIN)
+	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
 
 $(BC_CLANG_LTO): $(SOURCE_CLANG)
 	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
@@ -297,7 +328,13 @@ $(BC_CLANG_LTO): $(SOURCE_CLANG)
 $(BC_CLANG_EXT_LTO): $(SOURCE_CLANG_EXT)
 	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
 
-$(BC_CLANG_MAIN_LTO): $(SOURCE_CLANG_MAIN)
+$(BC_CLANG_TEST_LTO): $(SOURCE_CLANG_TEST)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(GTEST_BC): $(GTEST_SOURCE)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(GTEST_BC_LTO): $(GTEST_SOURCE)
 	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
 
 test: $(TARGET)

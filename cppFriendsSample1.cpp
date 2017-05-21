@@ -1,4 +1,5 @@
 // やめるのだフェネックで学ぶC++の実証コード
+#include <climits>
 #include <cstring>
 #include <algorithm>
 #include <functional>
@@ -11,7 +12,6 @@
 #include <vector>
 #include <boost/any.hpp>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
 #include "cppFriendsClang.hpp"
@@ -848,24 +848,6 @@ TEST_F(TestCommandPattern, All) {
     EXPECT_EQ(399, g_anGlobalVariable);
 }
 
-class TestSwitchCase : public ::testing::Test{};
-
-TEST_F(TestSwitchCase, LookUpTable) {
-    struct TestCase {
-        SwitchCase::Shape shape;
-        double expected;
-    };
-
-    const TestCase testSet[] = {{SwitchCase::Shape::UNKNOWN, 0.0},
-                                {SwitchCase::Shape::CIRCLE, 12.566370614359172},
-                                {SwitchCase::Shape::RECTANGULAR, 6.0},
-                                {SwitchCase::Shape::TRIANGLE, 24.0},
-                                {SwitchCase::Shape::SQUARE, 49.0}};
-    for(auto& test : testSet) {
-        EXPECT_DOUBLE_EQ(test.expected, GetFixedTestValue(test.shape));
-    }
-}
-
 // ビットフィールの定義
 struct TestingBitFields1 {
     unsigned int version  : 2;
@@ -921,21 +903,6 @@ TEST_F(TestOperatorPrecedence, All) {
     EXPECT_EQ(3, expr2(-4));
     EXPECT_EQ(6, expr3(1));
     EXPECT_EQ(7, expr3(0));
-}
-
-// Devirtualizationによって結果は変わらないが、コードは変わるので.sを確認する
-class TestDevirtualization : public ::testing::Test{};
-
-TEST_F(TestDevirtualization, Inline) {
-    auto actual = Devirtualization::GetStringInline();
-    std::string expected = "BaseInlineDerivedInline";
-    EXPECT_EQ(expected, actual);
-}
-
-TEST_F(TestDevirtualization, Outline) {
-    auto actual = Devirtualization::GetStringOutline();
-    std::string expected = "BaseOutlineDerivedOutline";
-    EXPECT_EQ(expected, actual);
 }
 
 /*

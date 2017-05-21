@@ -27,7 +27,6 @@
 #include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
 

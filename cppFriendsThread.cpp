@@ -8,7 +8,6 @@
 #include <tuple>
 #include <time.h>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "cppFriends.hpp"
 
 // TLSを使わなくても、単にスレッド起動時の引数で渡せば済む

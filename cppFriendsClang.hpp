@@ -2,6 +2,7 @@
 #ifndef CPPFRIENDS_CPPFRIENDS_CLANG_HPP
 #define CPPFRIENDS_CPPFRIENDS_CLANG_HPP
 
+#include <cstdint>
 #include <memory>
 #include <sstream>
 
@@ -62,6 +63,9 @@ namespace Devirtualization {
     extern std::string GetStringInline(void);
     extern std::string GetStringOutline(void);
 }
+
+// LTOの有無で動作が変わる
+extern uint32_t ShiftManyFor1(uint32_t src);
 
 #endif // CPPFRIENDS_CPPFRIENDS_CLANG_HPP
 

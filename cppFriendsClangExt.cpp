@@ -46,6 +46,12 @@ int UnusedFunction(void) {
     return 0;
 }
 
+// LTOだと動作が変わる。未定義動作だから仕方ない。
+uint32_t ShiftManyFor1(uint32_t src) {
+    uint32_t i = 1;
+    return (i << src);
+}
+
 /*
 Local Variables:
 mode: c++
