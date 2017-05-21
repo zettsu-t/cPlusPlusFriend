@@ -254,6 +254,23 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 * gcc (5.4.0)
 * Boost C++ Libraries (1.60.0)
 
+### LTO(Link Time Optimization)
+
+上記の通りmakeを実行すると、LTOを有効にした実行ファイルと、そうでないものを生成します。実行ファイルのシンボルテーブルを確認すると、UnusedFunctionの定義が以下の通りになります。
+
+```bash
+$ objdump -x cppFriends_gcc_lto | grep UnusedFunction
+[780](sec -1)(fl 0x00)(ty   0)(scl   2) (nx 0) 0x0000000000000000 _Z14UnusedFunctionv
+
+$ objdump -x cppFriends | grep UnusedFunction
+[15586](sec  1)(fl 0x00)(ty  20)(scl   2) (nx 0) 0x000000000001d230 _Z14UnusedFunctionv
+
+$ objdump -d cppFriends | less
+000000010041e230 <_Z14UnusedFunctionv>:
+   10041e230:   31 c0  xor    %eax,%eax
+   10041e232:   c3     retq
+```
+
 ### MinGWで何種類の空白文字を認識するか確認する
 
 くいなちゃんによると、Unicodeの空白文字は17種類あるそうです。[ここに](https://twitter.com/kuina_ch/status/816977065480069121)あるものは、サーバで変換されて14種類になっているので、U+00A0を加えた15種類を空白文字として扱うかどうかを、[cppFriendsSpace.cpp](cppFriendsSpace.cpp)で調べます。

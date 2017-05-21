@@ -41,6 +41,7 @@ namespace Devirtualization {
     }
 }
 
+// LTOで削除する
 int UnusedFunction(void) {
     return 0;
 }
