@@ -16,6 +16,9 @@ TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
 TARGET_C_SJIS=cFriendsShiftJis
 TARGET_C=cFriends
+TARGET_GCC_LTO=cppFriends_gcc_lto
+TARGET_CLANG=cppFriendsClang
+TARGET_CLANG_LTO=cppFriendsClang_lto
 OUTPUT_ASM87_C=cFriends87.s
 OUTPUT_ASM87_STORE_C=cFriends87-store.s
 OUTPUT_ASM64_C=cFriends64.s
@@ -32,7 +35,8 @@ OUTPUT_FUNCLIST_TEMP_SRCS=$(OUTPUT_FUNCLIST_TEMP2_H) $(OUTPUT_FUNCLIST_TEMP2_C)
 OUTPUT_FUNCLIST_TEMPS=$(OUTPUT_FUNCLIST_TEMP1_H) $(OUTPUT_FUNCLIST_TEMP1_C) $(OUTPUT_FUNCLIST_TEMP_SRCS)
 OUTPUT_FUNCLIST=cFriends_func.txt
 
-TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST)
+TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(TARGET_GCC_LTO) $(TARGET_CLANG) $(TARGET_CLANG_LTO)
+TARGETS+=$(OUTPUT_ASMS) $(OUTPUT_FUNCLIST)
 
 # cppFriendsSpace.batで作るが、このMakefileで消去する
 EXTERNAL_TARGETS=cppFriendsSpace
@@ -53,6 +57,7 @@ SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
 SOURCE_CLANG=cppFriendsClang.cpp
 SOURCE_CLANG_EXT=cppFriendsClangExt.cpp
+SOURCE_CLANG_MAIN=cppFriendsClangMain.cpp
 SOURCE_CPP98=cppFriends98.cpp
 
 SOURCE_C_SJIS=cFriendsShiftJis.c
@@ -71,29 +76,62 @@ OBJ_OPT=cppFriendsOpt.o
 OBJ_EXT=cppFriendsExt.o
 OBJ_THREAD=cppFriendsThread.o
 OBJ_SPACE=cppFriendsSpace.o
-OBJ_CLANG=cppFriendsClang.o
-OBJ_CLANG_EXT=cppFriendsClangExt.o
 OBJ_CPP98=cppFriends98.o
-
 OBJ_NO_OPT=cppFriendsOpt_no_opt.o
 OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
+
+OBJ_CLANG=cppFriendsClang.o
+OBJ_CLANG_EXT=cppFriendsClangExt.o
+OBJ_CLANG_MAIN=cppFriendsClangMain.o
+OBJ_CLANG_GCC_LTO=cppFriendsClang_gcc_lto.o
+OBJ_CLANG_EXT_GCC_LTO=cppFriendsClangExt_gcc_lto.o
+OBJ_CLANG_MAIN_GCC_LTO=cppFriendsClangMain_gcc_lto.o
 
 OBJS=$(OBJ_MAIN) $(OBJ_FRIENDS) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM)
 OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_SPACE) $(OBJ_CLANG) $(OBJ_CLANG_EXT) $(OBJ_CPP98)
 OBJS+=$(GTEST_OBJ) $(GMOCK_OBJ)
 OBJS_NO_OPT=$(OBJ_MAIN) $(OBJ_NO_OPT) $(OBJ_NO_OPT_EXT) $(GTEST_OBJ) $(GMOCK_OBJ)
+OBJS_GCC_LTO=$(OBJ_CLANG_GCC_LTO) $(OBJ_CLANG_EXT_GCC_LTO) $(OBJ_CLANG_MAIN_GCC_LTO)
+OBJ_NO_LTO=cppFriendsClang_no_lto.o
+OBJ_LTO=cppFriendsClang_lto.o
+BC_ALL=cppFriendsClangAll.bc
+BC_ALL_LTO=cppFriendsClangAll_lto.bc
+BC_OPT_LTO=cppFriendsClangOpt_lto.bc
+
+BC_CLANG=cppFriendsClang.bc
+BC_CLANG_EXT=cppFriendsClangExt.bc
+BC_CLANG_MAIN=cppFriendsClangMain.bc
+BCS_CLANG=$(BC_CLANG) $(BC_CLANG_EXT) $(BC_CLANG_MAIN)
+BC_CLANG_LTO=cppFriendsClang_lto.bc
+BC_CLANG_EXT_LTO=cppFriendsClangExt_lto.bc
+BC_CLANG_MAIN_LTO=cppFriendsClangMain_lto.bc
+BCS_CLANG_LTO=$(BC_CLANG_LTO) $(BC_CLANG_EXT_LTO) $(BC_CLANG_MAIN_LTO)
+BCS_OBJS=$(OBJ_NO_LTO) $(OBJ_LTO) $(BC_ALL) $(BC_ALL_LTO) $(BC_OPT_LTO) $(BCS_CLANG) $(BCS_CLANG_LTO)
+
 VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 
 CPP=gcc
 CXX=g++
 CLANGXX=clang++
+LLC=llc
+LLVM_LINK=llvm-link
+LLVM_OPT=opt
 LD=g++
+STRIP=strip
+
 CFLAGS=-std=gnu11 -O2 -Wall
 CPPFLAGS_CPPSPEC=-std=gnu++14
 CPPFLAGS_COMMON=-Wall $(GTEST_GMOCK_INCLUDE)
 CPPFLAGS=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -O2
 CPPFLAGS_NO_OPT=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -g -O0 -DCPPFRIENDS_NO_OPTIMIZATION
 CPPFLAGS_ERROR=-std=gnu++1z -Wall $(CPPFLAGS_COMMON) -O2
+
+CPPFLAGS_LTO=-flto
+CLANGXXFLAGS=-S -emit-llvm
+CLANGXXFLAGS_LTO=$(CPPFLAGS_LTO) $(CLANGXXFLAGS)
+LLCFLAGS=-filetype=obj
+LLVM_OPT_FLAGS=-internalize -internalize-public-api-list=main,WinMain -O2
+
 LIBPATH=
 LDFLAGS=
 LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex
@@ -131,6 +169,18 @@ $(TARGET_C): $(SOURCE_C)
 	$(CPP) $(CFLAGS) $(CASMFLAGS_64) -o $@ $<
 	@echo -e $(ECHO_START)Using x64 and SSE $(ECHO_END)
 	@./$@
+
+$(TARGET_GCC_LTO): $(OBJS_GCC_LTO)
+	$(LD) $(CPPFLAGS_LTO) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	./$@
+
+$(TARGET_CLANG): $(OBJ_NO_LTO)
+	$(CXX) -o $@ $<
+	$(STRIP) $@
+
+$(TARGET_CLANG_LTO): $(OBJ_LTO)
+	$(CXX) $(CPPFLAGS_LTO) -o $@ $<
+	$(STRIP) $@
 
 $(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
 	cat $(INDENT_INPUT_SOURCE_H) | expand | tr -d '\r' > $(OUTPUT_FUNCLIST_TEMP1_H)
@@ -187,12 +237,6 @@ $(OBJ_THREAD): $(SOURCE_THREAD)
 $(OBJ_SPACE): $(SOURCE_SPACE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(OBJ_CLANG): $(SOURCE_CLANG)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
-
-$(OBJ_CLANG_EXT): $(SOURCE_CLANG_EXT)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
-
 $(OBJ_CPP98): $(SOURCE_CPP98)
 	$(CXX) $(CPPFLAGS_COMMON) -O2 -o $@ -c $<
 
@@ -202,14 +246,65 @@ $(OBJ_NO_OPT): $(SOURCE_OPT)
 $(OBJ_NO_OPT_EXT): $(SOURCE_EXT)
 	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
 
+$(OBJ_CLANG): $(SOURCE_CLANG)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG_EXT): $(SOURCE_CLANG_EXT)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG_MAIN): $(SOURCE_CLANG_MAIN)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG_GCC_LTO): $(SOURCE_CLANG)
+	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG_EXT_GCC_LTO): $(SOURCE_CLANG_EXT)
+	$(CXX) $(CPPFLAGS_LTO)  $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_CLANG_MAIN_GCC_LTO): $(SOURCE_CLANG_MAIN)
+	$(CXX) $(CPPFLAGS_LTO)  $(CPPFLAGS) -o $@ -c $<
+
 $(OBJ_DIR)/%.o: %.cc
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_NO_LTO) : $(BC_ALL)
+	$(LLC) $(LLCFLAGS) -o $@ $<
+
+$(OBJ_LTO) : $(BC_OPT_LTO)
+	$(LLC) $(LLCFLAGS) -o $@ $<
+
+$(BC_ALL): $(BCS_CLANG)
+	$(LLVM_LINK) -o $@ $^
+
+$(BC_OPT_LTO): $(BC_ALL_LTO)
+	$(LLVM_OPT) $(LLVM_OPT_FLAGS) -o $@ $<
+
+$(BC_ALL_LTO): $(BCS_CLANG_LTO)
+	$(LLVM_LINK) -o $@ $^
+
+$(BC_CLANG): $(SOURCE_CLANG)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(BC_CLANG_EXT): $(SOURCE_CLANG_EXT)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(BC_CLANG_MAIN): $(SOURCE_CLANG_MAIN)
+	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(BC_CLANG_LTO): $(SOURCE_CLANG)
+	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+
+$(BC_CLANG_EXT_LTO): $(SOURCE_CLANG_EXT)
+	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+
+$(BC_CLANG_MAIN_LTO): $(SOURCE_CLANG_MAIN)
+	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
 
 test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST) $(OUTPUT_FUNCLIST_TEMPS) ./*.o ./*.s
+	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OBJS_GCC_LTO) $(BCS_OBJS) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST) $(OUTPUT_FUNCLIST_TEMPS) ./*.o ./*.bc ./*.s
 
 show:
 	$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))

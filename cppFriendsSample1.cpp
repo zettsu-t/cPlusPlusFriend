@@ -1,6 +1,4 @@
 // やめるのだフェネックで学ぶC++の実証コード
-#define _USE_MATH_DEFINES
-#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <functional>
@@ -848,24 +846,6 @@ TEST_F(TestCommandPattern, All) {
 
     // (((1 * 2 + 5) * 3) - 1) ^ 2 - 1
     EXPECT_EQ(399, g_anGlobalVariable);
-}
-
-namespace SwitchCase {
-    double GetAreaOfCircle(double radius) {
-        return radius * radius * M_PI;
-    }
-
-    double GetAreaOfRectangular(double width, double height) {
-        return width * height;
-    }
-
-    // ヘロンの公式
-    double GetAreaOfTriangle(double edge1, double edge2, double edge3) {
-        double halfSum = edge1 + edge2 + edge3;
-        halfSum /= 2.0;
-        double product = halfSum * (halfSum - edge1) * (halfSum - edge2) * (halfSum - edge3);
-        return std::sqrt(product);
-    }
 }
 
 class TestSwitchCase : public ::testing::Test{};
