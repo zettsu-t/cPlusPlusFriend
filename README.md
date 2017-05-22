@@ -66,6 +66,7 @@ class Train {
 1. 命令の依存関係は、レジスタだけでなくフラグにもあるのだ! INCよりADDを使う理由とか、SHLXをとか調べるのだ!
 1. XOR r,rは単にレジスタrを0にするだけじゃないんだ! レジスタrとフラグの依存関係を絶って、実行効率を改善するためのイディオム(dependency breaking idiom)なのだ! フラグを変えたくなければMOV r,0にするのだ!
 1. 非PODのオブジェクトをmemcpyしてはいけないのだ! memmoveもダメだ! vtableへのポインタもコピーされてしまうのだ! 派生クラスのメンバが切り捨てられて不定値に置き換わってしまうのだ! clang++ 4.0.0は警告してくれるが、g++ 6.3.0は警告しないのだ!
+1. vtableを実行時に書き換えて「オープンクラス」みたいにはできないのだ! vtableはread-onlyセクションに置かれているのだ! 書き換えようとするとSegmentation faultで落ちてしまうのだ!
 1. クラスにoffsetofを取ると警告が出るのだ! Non standard layout型に対してoffsetofを取る意味があるのか考えるのだ!
 1. メンバ変数を一括クリアするのに、memset(this, 0, sizeof(*this))はまずいのだ! vtableへのポインタもクリアしてしまうのだ! せめてstatic_assert(std::is_standard_layout)で調べてからにして欲しいのだ!
 1. 仮想関数呼び出しが常にvtableアクセスを伴うとは限らないのだ! 具象型がコンパイル時に分かるときはそのメンバ関数を直接呼び出すのだ(devirtualization)!

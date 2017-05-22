@@ -284,6 +284,51 @@ TEST_F(TestDebuggerDetecter, Trap) {
     EXPECT_TRUE(g_breakPointHandled.load());
 }
 
+class TestOverwriteVtable : public ::testing::Test {};
+
+TEST_F(TestOverwriteVtable, Standard) {
+    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc(2,3));
+    std::ostringstream os;
+    pObj->Print(os);
+    EXPECT_EQ("23", os.str());
+
+    ExtraMemFunc ex;
+    ex.Print(os);
+    EXPECT_EQ("23Extra", os.str());
+}
+
+#if 0
+TEST_F(TestOverwriteVtable, Overwrite) {
+    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc(2,3));
+    std::ostringstream os;
+    pObj->Print(os);
+
+    auto pBase = reinterpret_cast<size_t**>(pObj.get());
+    auto pVtable = *pBase;
+    // 本当はC++では、unionを使ったキャストはできない
+    union FuncPtr{
+        size_t addr;
+        decltype(&ExtraMemFunc::Print) f;
+    };
+
+    // (gdb) info address ExtraMemFunc::Print
+    // アドレスはコンパイルすると変わる
+    // &ExtraMemFunc::Printを代入するととても小さい数字(25)が入る
+    FuncPtr fptr = {0x1004038b2ull};
+
+    // 0:デストラクタ, 1:Clear, 2:Print
+    pVtable[1] = fptr.addr;
+    // というようには、残念ながら書き換えることはできない
+    // (gdb) x/4gx pBase
+    // (gdb) x/4xg pVtable
+    // (gdb) maintenance info sections
+    // [2] 0x100433000->0x100438f34 at 0x00030e00: .rdata ALLOC LOAD READONLY DATA HAS_CONTENTS
+    // つまりvtableは書き換えられない
+    pObj->Print(os);
+    EXPECT_EQ("23Extra", os.str());
+}
+#endif
+
 /*
 Local Variables:
 mode: c++

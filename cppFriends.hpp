@@ -47,22 +47,32 @@ struct FriendTypeBox {
 
 class DynamicObjectMemFunc {
 public:
+    DynamicObjectMemFunc(void) = default;
     virtual ~DynamicObjectMemFunc() = default;
     virtual void Clear(void) = 0;
     virtual void Print(std::ostream& os) = 0;
     // テスト用に敢えて公開している
-    uint64_t memberA_;
-    uint64_t memberB_;
+    uint64_t memberA_ {0};
+    uint64_t memberB_ {0};
 };
 
 class SubDynamicObjectMemFunc : public DynamicObjectMemFunc {
 public:
+    SubDynamicObjectMemFunc(void) = default;
+    SubDynamicObjectMemFunc(uint64_t a, uint64_t b) : memberA_(a), memberB_(b) {}
     virtual ~SubDynamicObjectMemFunc() = default;
     virtual void Clear(void) override;
     virtual void Print(std::ostream& os) override;
     // テスト用に敢えて公開している
-    uint64_t memberA_;
-    uint64_t memberB_;
+    uint64_t memberA_ {0};
+    uint64_t memberB_ {0};
+};
+
+// .cppで定義した場合、どこかでインスタンス化しないと、vtableが作られないかもしれない
+class ExtraMemFunc : public SubDynamicObjectMemFunc {
+public:
+    virtual ~ExtraMemFunc() = default;
+    virtual void Print(std::ostream& os) override;
 };
 
 #endif // CPPFRIENDS_CPPFRIENDS_HPP

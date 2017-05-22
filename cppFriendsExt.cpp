@@ -47,8 +47,13 @@ const int g_externIntValue = 1;
 void SubDynamicObjectMemFunc::Clear(void) {
     memset(this, 0, sizeof(*this));
 }
+
 void SubDynamicObjectMemFunc::Print(std::ostream& os) {
     os << memberA_ << memberB_;
+}
+
+void ExtraMemFunc::Print(std::ostream& os) {
+    os << "Extra";
 }
 
 /*
