@@ -476,6 +476,14 @@ TEST_F(TestCtorOnFirstUse, GetName) {
 class TestZeroInitialize : public ::testing::Test {
 protected:
     virtual void SetUp() override {
+        clear();
+    }
+
+    virtual void TearDown() override {
+        clear();
+    }
+
+    void clear() {
         // リセット
         decltype(os_) os;
         os_.swap(os);
@@ -904,6 +912,75 @@ TEST_F(TestOperatorPrecedence, All) {
     EXPECT_EQ(6, expr3(1));
     EXPECT_EQ(7, expr3(0));
 }
+
+namespace {
+    // std::cout的なもの
+    std::ostringstream g_globalLogStream;
+
+    void FreeFuncWriteNothing(const std::string& message) {
+        return;
+    }
+
+    void FreeFuncWriteLog(const std::string& message) {
+        g_globalLogStream << message;
+        return;
+    }
+
+    class MyFunctionHolder {
+    public:
+        // typedefより分かりやすい
+        using Func = void(*)(const std::string& message);
+
+        MyFunctionHolder(void) = default;
+        MyFunctionHolder(Func f) : f_(f ? f : &FreeFuncWriteNothing) {}
+        virtual ~MyFunctionHolder() = default;
+
+        void Write(const std::string& message) {
+            // null検査は不要
+            f_(message);
+            return;
+        }
+    private:
+        Func f_ {&FreeFuncWriteNothing};
+    };
+}
+
+class TestNullFuncPtr : public ::testing::Test {
+    virtual void SetUp() override {
+        clear();
+    }
+
+    virtual void TearDown() override {
+        clear();
+    }
+
+    void clear() {
+        // リセット
+        decltype(g_globalLogStream) os;
+        g_globalLogStream.swap(os);
+    }
+};
+
+TEST_F(TestNullFuncPtr, Default) {
+    MyFunctionHolder holder;
+    const std::string message = "Message";
+    holder.Write("");
+    EXPECT_TRUE(g_globalLogStream.str().empty());
+
+    holder.Write(message);
+    EXPECT_TRUE(g_globalLogStream.str().empty());
+
+    MyFunctionHolder holderNull;
+    holderNull.Write(message);
+    EXPECT_TRUE(g_globalLogStream.str().empty());
+};
+
+TEST_F(TestNullFuncPtr, Write) {
+    MyFunctionHolder holder(FreeFuncWriteLog);
+    const std::string message = "Message";
+    holder.Write(message);
+    EXPECT_EQ(message, g_globalLogStream.str());
+};
 
 /*
 Local Variables:
