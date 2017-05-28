@@ -328,6 +328,34 @@ constexpr int MyNumericLimits(void) {
 static_assert(MyNumericLimits<uint64_t>() == 19, "");
 static_assert(MyNumericLimits<int64_t>() == 18, "");
 
+// #define MY_MACRO_POW(base, exp) ((exp) ? (base * MY_MACRO_POW(base, exp - 1)) : 1)
+
+// 桁あふれは考慮していない
+template <typename T>
+constexpr T MyIntegerPow(T base, T exp) {
+    return (exp) ? (base * MyIntegerPow(base, exp - 1)) : 1;
+}
+
+class TestRecursiveMacro : public ::testing::Test {};
+
+TEST_F(TestRecursiveMacro, All) {
+    using Data = unsigned int;
+    Data base = 2;
+    for(Data i=0; i<10; ++i) {
+        EXPECT_EQ(1 << i, MyIntegerPow(base, i));
+    }
+
+    base = 3;
+    Data expected = 1;
+    for(Data i=0; i<5; ++i) {
+        EXPECT_EQ(expected, MyIntegerPow(base, i));
+        expected *= 3;
+    }
+
+    // こうは書けない
+    // std::cout << MY_MACRO_POW(2,0);
+}
+
 class TestPrimalityTesting : public ::testing::Test{};
 
 TEST_F(TestPrimalityTesting, MersenneNumber) {
