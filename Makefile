@@ -59,6 +59,7 @@ SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_CPP98=cppFriends98.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
+SOURCE_NET=cppFriendsNet.cpp
 SOURCE_CLANG=cppFriendsClang.cpp
 SOURCE_CLANG_EXT=cppFriendsClangExt.cpp
 SOURCE_CLANG_TEST=cppFriendsClangTest.cpp
@@ -80,6 +81,7 @@ OBJ_EXT=cppFriendsExt.o
 OBJ_THREAD=cppFriendsThread.o
 OBJ_CPP98=cppFriends98.o
 OBJ_SPACE=cppFriendsSpace.o
+OBJ_NET=cppFriendsNet.o
 OBJ_CLANG=cppFriendsClang.o
 OBJ_CLANG_EXT=cppFriendsClangExt.o
 OBJ_CLANG_TEST=cppFriendsClangTest.o
@@ -93,6 +95,7 @@ OBJ_CLANG_TEST_GCC_LTO=cppFriendsClangTest_gcc_lto.o
 
 OBJS=$(OBJ_MAIN) $(OBJ_FRIENDS) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM)
 OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_THREAD) $(OBJ_CPP98) $(OBJ_SPACE)
+OBJS+=$(OBJ_NET)
 OBJS+=$(OBJ_CLANG) $(OBJ_CLANG_EXT) $(OBJ_CLANG_TEST)
 OBJS+=$(GTEST_OBJ)
 
@@ -153,7 +156,7 @@ LLVM_OPT_FLAGS=-internalize -internalize-public-api-list=main,WinMain -O2
 
 LIBPATH=
 LDFLAGS=
-LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex
+LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex -lboost_system
 
 INDENT_OPTIONS=--line-length10000 --dont-format-comments --dont-break-function-decl-args --dont-break-procedure-type --dont-line-up-parentheses --no-space-after-parentheses
 
@@ -260,6 +263,9 @@ $(OBJ_CPP98): $(SOURCE_CPP98)
 	$(CXX) $(CPPFLAGS_COMMON) -O2 -o $@ -c $<
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(OBJ_NET): $(SOURCE_NET)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG): $(SOURCE_CLANG)

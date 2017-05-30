@@ -11,6 +11,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -26,6 +27,7 @@
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
+#include <boost/type_traits/function_traits.hpp>
 #include <gtest/gtest.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
@@ -328,6 +330,29 @@ constexpr int MyNumericLimits(void) {
 static_assert(MyNumericLimits<uint64_t>() == 19, "");
 static_assert(MyNumericLimits<int64_t>() == 18, "");
 
+constexpr int MyIntMinExplicit(int l, int r) {
+    return (l < r) ? l : r;
+}
+
+template <typename T>
+constexpr T MyMin(T l, T r) {
+    return (l < r) ? l : r;
+}
+// typedefは使えない
+auto const MyIntMinAlias = &MyMin<int>;
+
+// Cではこうするが、C++ではfunction traitsが使えない
+#define CPPFRIENDS_MY_MACRO_MIN(l, r) ((l < r) ? l : r)
+
+static_assert(std::is_same<int, decltype(MyIntMinExplicit(0,0))>::value, "");
+static_assert(std::is_same<int, decltype(MyIntMinAlias(0,0))>::value, "");
+static_assert(std::is_same<int, boost::function_traits<decltype(MyIntMinExplicit)>::arg1_type>::value, "");
+static_assert(std::is_same<int, boost::function_traits<decltype(*MyIntMinExplicit)>::arg1_type>::value, "");
+static_assert(std::is_same<int, boost::function_traits<decltype(*MyIntMinAlias)>::arg1_type>::value, "");
+// こうは書けない
+// static_assert(std::is_same<int, boost::function_traits<decltype(MyIntMinAlias)>::arg1_type>::value, "");
+// static_assert(std::is_same<int, boost::function_traits<decltype(CPPFRIENDS_MY_MACRO_MIN)>::arg1_type>::value, "");
+
 // #define MY_MACRO_POW(base, exp) ((exp) ? (base * MY_MACRO_POW(base, exp - 1)) : 1)
 
 // 桁あふれは考慮していない
@@ -336,9 +361,18 @@ constexpr T MyIntegerPow(T base, T exp) {
     return (exp) ? (base * MyIntegerPow(base, exp - 1)) : 1;
 }
 
-class TestRecursiveMacro : public ::testing::Test {};
+class TestCppMacro : public ::testing::Test {};
 
-TEST_F(TestRecursiveMacro, All) {
+TEST_F(TestCppMacro, Plain) {
+    EXPECT_EQ(-1, MyIntMinExplicit(-1, 0));
+    EXPECT_EQ(-1, MyIntMinExplicit(0, -1));
+    EXPECT_EQ(-1, MyIntMinAlias(-1, 0));
+    EXPECT_EQ(-1, MyIntMinAlias(0, -1));
+    EXPECT_EQ(-1, CPPFRIENDS_MY_MACRO_MIN(-1, 0));
+    EXPECT_EQ(-1, CPPFRIENDS_MY_MACRO_MIN(0, -1));
+}
+
+TEST_F(TestCppMacro, Recursive) {
     using Data = unsigned int;
     Data base = 2;
     for(Data i=0; i<10; ++i) {
