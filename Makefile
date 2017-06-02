@@ -149,7 +149,7 @@ CPPFLAGS_ERROR=-std=gnu++1z -Wall $(CPPFLAGS_COMMON) -O2
 
 CPPFLAGS_LTO=-flto -DCPPFRIENDS_ENABLE_LTO
 LDFLAGS_LTO=-Wno-attributes
-CLANGXXFLAGS=-S -emit-llvm
+CLANGXXFLAGS=-S -emit-llvm -D__STRICT_ANSI__
 CLANGXXFLAGS_LTO=$(CPPFLAGS_LTO) $(CLANGXXFLAGS)
 LLCFLAGS=-filetype=obj
 LLVM_OPT_FLAGS=-internalize -internalize-public-api-list=main,WinMain -O2

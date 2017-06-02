@@ -143,11 +143,13 @@ int main(int argc, char* argv[]) {
 
     // MinGW GCC 6.3.0は、Cygwin GCC 5.4.0と異なり、U+00a0, U+2007. U+202fも空白と扱う
     PrintCodePoints(SpaceSet, std::cout);
-    ScanSpaces(SpaceSet, PosixSpacePattern, std::cout);
-    std::cout << "\n";
+    auto patternSet = {PosixSpacePattern, MetaSpacePattern};
+    for(auto& pattern : patternSet) {
+        ScanSpaces(SpaceSet, pattern, std::cout);
+        std::cout << "\n";
+    }
 
     // 空白でなければ一致しないことを確認する
-    auto patternSet = {PosixSpacePattern, MetaSpacePattern};
     for(auto& pattern : patternSet) {
         std::ostringstream os;
         auto size = ScanSpaces(NonSpaceSet, pattern, os);
