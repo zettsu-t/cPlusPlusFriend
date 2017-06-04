@@ -297,11 +297,94 @@ TEST_F(TestLog2, Asm) {
     }
 }
 
+class TestDivideBy2 : public ::testing::Test{};
+
 /*
-Local Variables:
-mode: c++
-coding: utf-8-dos
-tab-width: nil
-c-file-style: "stroustrup"
-End:
+負の数に対する除算に対して、コンパイラがどんなコードを出力するか確認する
+Cで書くとこうなる
+  int divide_by_2(int src) {
+      return src / 2;
+  }
+
+以下はGCCの出力である
+  mov  eax, ecx
+  shr  eax, 31
+  add  eax, ecx
+  sar  eax
+
+以下はclang-LLVMの出力である
+  mov  eax, ecx
+  shr  eax, 31
+  lea  eax, [rax + rcx]
+  sar  eax
+
+http://www.microhowto.info/howto/round_towards_minus_infinity_when_dividing_integers_in_c_or_c++.html
+によると、割る数または割られる数の少なくとも一方が負の場合の丸めは実装依存である。
+*/
+
+TEST_F(TestDivideBy2, RoundToZero) {
+    // 負の数を2で割るときに、単にsar 1回ではうまくいかない
+    // -1を2で割っても-1になってしまう
+    // 負の数で小数点以下切り捨て(round to 0)なら1足してからシフトする必要がある
+    // -8 : 1000b <+1> 1001b <sar> 1100b (-4)
+    // -7 : 1001b <+1> 1010b <sar> 1101b (-3)
+    // -2 : 1110b <+1> 1111b <sar> 1111b (-1)
+    // -1 : 1111b <+1> 0 <sar> 0
+    // 正の数には1足さないので、単にシフトしてLSBを捨てるだけである
+
+    struct TestCase {
+        int32_t arg;
+        int32_t expected;
+    };
+
+    const TestCase testCaseSet[] = {
+        {0, 0},
+        {1, 0},
+        {2, 1},
+        {3, 1},
+        {4, 2},
+        {7, 3},
+        {8, 4},
+        {9, 4},
+        {2147483645, 1073741822},
+        {2147483646, 1073741823},
+        {2147483647, 1073741823},
+        {-2147483648, -1073741824},
+        {-2147483647, -1073741823},
+        {-2147483646, -1073741823},
+        {-9, -4},
+        {-8, -4},
+        {-7, -3},
+        {-4, -2},
+        {-3, -1},
+        {-2, -1},
+        {-1, 0}
+    };
+
+    static_assert(std::numeric_limits<int32_t>::min() == -2147483648, "");
+    static_assert(std::numeric_limits<int32_t>::max() == 2147483647, "");
+
+    for(const auto& testCase : testCaseSet) {
+        auto arg = testCase.arg;
+        decltype(arg) actual = 0;
+
+        // 最近のCPUなら、3オペレータシフト命令を使える
+        asm volatile (
+            "movl  %%ecx, %%eax \n\t"  // 第一引数 = ecx
+            "shrl  $31,   %%eax \n\t"  // 第一引数が非負なら0, 負なら1
+            "addl  %%ecx, %%eax \n\t"  // 第一引数が非負ならそのまま, 負なら1足したものを
+            "sarl  %%eax        \n\t"  // 符号を保ったままシフトする
+            :"=a"(actual):"c"(arg):);
+
+        EXPECT_EQ(testCase.expected, actual);
+    }
+}
+
+/*
+  Local Variables:
+  mode: c++
+  coding: utf-8-dos
+  tab-width: nil
+  c-file-style: "stroustrup"
+  End:
 */

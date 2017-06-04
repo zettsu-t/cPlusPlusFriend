@@ -122,6 +122,11 @@ void exec_io_with_definition(void) {
     return;
 }
 
+// 負の数に対する除算に対して、コンパイラがどんなコードを出力するか確認する
+int divide_by_2(int src) {
+    return src / 2;
+}
+
 int main(int argc, char* argv[]) {
     exec_my_memcpy();
     exec_snprintf();

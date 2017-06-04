@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 #include <boost/any.hpp>
+#include <boost/io/ios_state.hpp>
 #include <gtest/gtest.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
@@ -981,6 +982,14 @@ TEST_F(TestNullFuncPtr, Write) {
     holder.Write(message);
     EXPECT_EQ(message, g_globalLogStream.str());
 };
+
+class TestMaxSize : public ::testing::Test{};
+
+TEST_F(TestMaxSize, Print) {
+    boost::io::ios_flags_saver saver(std::cerr);
+    std::cerr << std::hex << "SIZE_MAX = 0x" << SIZE_MAX << "\n";
+    std::cerr << std::hex << "SSIZE_MAX = 0x" << SSIZE_MAX << "\n";
+}
 
 /*
 Local Variables:
