@@ -474,6 +474,88 @@ TEST_F(TestCtorOnFirstUse, GetName) {
     }
 }
 
+// RAIIのもうすこし簡潔な例
+template <size_t Address, uint32_t Maskbit>
+class ScopedInterruptMask final {
+    FRIEND_TEST(TestScopedInterruptMask, MaskAll);
+    FRIEND_TEST(TestScopedInterruptMask, Partial);
+public:
+    // 本当はもっと厳密に作る
+    ScopedInterruptMask(void) {
+        reg_ |= Maskbit;
+    }
+
+    ~ScopedInterruptMask(void) {
+        reg_ &= ~Maskbit;
+    }
+
+private:
+    // 本当はAddressに置きたい
+    static volatile uint32_t reg_;
+};
+
+template <size_t Address, uint32_t Maskbit>
+volatile uint32_t ScopedInterruptMask<Address, Maskbit>::reg_;
+
+class TestScopedInterruptMask : public ::testing::Test {};
+
+TEST_F(TestScopedInterruptMask, MaskAll) {
+    using RegA1 = ScopedInterruptMask<0xa000, 1>;
+    using RegB1 = ScopedInterruptMask<0xb000, 1>;  // アドレスが異なるので別物
+    using RegC6 = ScopedInterruptMask<0xc000, 6>;
+    RegA1::reg_ = 0;
+    RegB1::reg_ = 0;
+    RegC6::reg_ = 0;
+    {
+        RegA1 mask;
+        EXPECT_EQ(1, RegA1::reg_);
+        EXPECT_EQ(0, RegB1::reg_);
+        EXPECT_EQ(0, RegC6::reg_);
+        {
+            RegB1 mask;
+            EXPECT_EQ(1, RegA1::reg_);
+            EXPECT_EQ(1, RegB1::reg_);
+            EXPECT_EQ(0, RegC6::reg_);
+            {
+                RegC6 mask;
+                EXPECT_EQ(1, RegA1::reg_);
+                EXPECT_EQ(1, RegB1::reg_);
+                EXPECT_EQ(6, RegC6::reg_);
+            }
+            EXPECT_EQ(1, RegA1::reg_);
+            EXPECT_EQ(1, RegB1::reg_);
+            EXPECT_EQ(0, RegC6::reg_);
+        }
+        EXPECT_EQ(1, RegA1::reg_);
+        EXPECT_EQ(0, RegB1::reg_);
+        EXPECT_EQ(0, RegC6::reg_);
+    }
+    EXPECT_EQ(0, RegA1::reg_);
+    EXPECT_EQ(0, RegB1::reg_);
+    EXPECT_EQ(0, RegC6::reg_);
+}
+
+TEST_F(TestScopedInterruptMask, Partial) {
+    using RegEven = ScopedInterruptMask<0xc000, 0xaaaa0000u>;
+    using RegOdd  = ScopedInterruptMask<0xd000, 0x5555u>;
+    RegEven::reg_ = 0xffffu;
+    RegOdd::reg_  = 0xffff0000u;
+    {
+        RegEven mask;
+        EXPECT_EQ(0xaaaaffffu, RegEven::reg_);
+        EXPECT_EQ(0xffff0000u, RegOdd::reg_);
+        {
+            RegOdd mask;
+            EXPECT_EQ(0xaaaaffffu, RegEven::reg_);
+            EXPECT_EQ(0xffff5555u, RegOdd::reg_);
+        }
+        EXPECT_EQ(0xaaaaffffu, RegEven::reg_);
+        EXPECT_EQ(0xffff0000u, RegOdd::reg_);
+    }
+    EXPECT_EQ(0xffffu, RegEven::reg_);
+    EXPECT_EQ(0xffff0000u, RegOdd::reg_);
+}
+
 class TestZeroInitialize : public ::testing::Test {
 protected:
     virtual void SetUp() override {
