@@ -489,6 +489,9 @@ public:
         reg_ &= ~Maskbit;
     }
 
+    // ヒープにはおかない
+    static void* operator new(std::size_t) = delete;
+    static void* operator new[](std::size_t) = delete;
 private:
     // 本当はAddressに置きたい
     static volatile uint32_t reg_;
