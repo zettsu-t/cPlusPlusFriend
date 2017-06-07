@@ -492,6 +492,11 @@ public:
     // ヒープにはおかない
     static void* operator new(std::size_t) = delete;
     static void* operator new[](std::size_t) = delete;
+    // スコープを超えない
+    ScopedInterruptMask(const ScopedInterruptMask&) = delete;
+    ScopedInterruptMask& operator=(const ScopedInterruptMask&) = delete;
+    ScopedInterruptMask(ScopedInterruptMask&&) = delete;
+    ScopedInterruptMask& operator=(ScopedInterruptMask&&) = delete;
 private:
     // 本当はAddressに置きたい
     static volatile uint32_t reg_;
