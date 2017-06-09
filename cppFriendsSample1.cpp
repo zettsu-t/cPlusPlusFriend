@@ -98,10 +98,13 @@ namespace {
     class TypeIdAssigner {
     public:
         virtual ~TypeIdAssigner() = default;
+        virtual int GetValue(void) = 0;
     };
 
     class SubTypeIdAssigner : public TypeIdAssigner {
+    public:
         virtual ~SubTypeIdAssigner() = default;
+        virtual int GetValue(void) override { return 3; }
     };
 }
 
@@ -111,6 +114,18 @@ TEST_F(TestTypeId, Compare) {
     EXPECT_EQ(typeid(TypeIdAssigner), typeid(TypeIdAssigner));
     EXPECT_EQ(typeid(const TypeIdAssigner), typeid(TypeIdAssigner));
     EXPECT_NE(typeid(SubTypeIdAssigner), typeid(TypeIdAssigner));
+}
+
+TEST_F(TestTypeId, SharedPtr) {
+    std::shared_ptr<TypeIdAssigner> pBase = std::make_shared<SubTypeIdAssigner>();
+    EXPECT_EQ(1, pBase.use_count());
+    auto pSub = std::dynamic_pointer_cast<SubTypeIdAssigner>(pBase);
+    EXPECT_EQ(2, pBase.use_count());
+    EXPECT_EQ(2, pSub.use_count());
+
+    ASSERT_TRUE(pSub.get() != nullptr);
+    EXPECT_EQ(3, pBase->GetValue());
+    EXPECT_EQ(3, pSub->GetValue());
 }
 
 namespace {
