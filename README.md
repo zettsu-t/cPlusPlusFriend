@@ -272,7 +272,7 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 
 当方の実行環境は以下の通りです。Google Test / Mockは$HOME直下にあると仮定していますので、それ以外の場合はMakefileを変更してください。
 
-* Windows 10 Anniversary Update 64bit Edition
+* Windows 10 Creators Update 64bit Edition
 * Cygwin 64bit version (2.8.0)
 * Google Test / Mock (1.7.0)
 * gcc (5.4.0)
