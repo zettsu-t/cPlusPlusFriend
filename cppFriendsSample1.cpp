@@ -8,6 +8,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 #include <boost/any.hpp>
@@ -128,8 +129,10 @@ TEST_F(TestTypeId, Compare) {
 
     bool foundBase = false;
     bool foundDerived = false;
-    auto& tidBase = typeid(objBase);
-    if (tidBase == typeid(Base)) {
+    auto& tid = typeid(objBase);
+//  switch(tid) {
+//  case typeid(Base):
+    if (tid == typeid(Base)) {
         foundBase = true;
     }
     EXPECT_TRUE(foundBase);
