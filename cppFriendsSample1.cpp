@@ -98,13 +98,13 @@ namespace {
     class TypeIdAssigner {
     public:
         virtual ~TypeIdAssigner() = default;
-        virtual int GetValue(void) = 0;
+        virtual int GetValue(void) { return 3; }
     };
 
     class SubTypeIdAssigner : public TypeIdAssigner {
     public:
         virtual ~SubTypeIdAssigner() = default;
-        virtual int GetValue(void) override { return 3; }
+        virtual int GetValue(void) override { return 4; }
     };
 }
 
@@ -114,6 +114,31 @@ TEST_F(TestTypeId, Compare) {
     EXPECT_EQ(typeid(TypeIdAssigner), typeid(TypeIdAssigner));
     EXPECT_EQ(typeid(const TypeIdAssigner), typeid(TypeIdAssigner));
     EXPECT_NE(typeid(SubTypeIdAssigner), typeid(TypeIdAssigner));
+
+    using Base = TypeIdAssigner;
+    using Derived = SubTypeIdAssigner;
+
+    // ポリモーフィズムを無視してtypeidで場合分けする
+    Base objBase;
+    Derived objDerived;
+    Base& refBase = objBase;
+    Base& refDerived = objDerived;
+    EXPECT_EQ(typeid(Base), typeid(refBase));
+    EXPECT_EQ(typeid(Derived), typeid(refDerived));
+
+    bool foundBase = false;
+    bool foundDerived = false;
+    auto& tidBase = typeid(objBase);
+    if (tidBase == typeid(Base)) {
+        foundBase = true;
+    }
+    EXPECT_TRUE(foundBase);
+
+    auto& tidDerived = typeid(objDerived);
+    if (tidDerived == typeid(Derived)) {
+        foundDerived = true;
+    }
+    EXPECT_TRUE(foundDerived);
 }
 
 TEST_F(TestTypeId, SharedPtr) {
@@ -124,8 +149,8 @@ TEST_F(TestTypeId, SharedPtr) {
     EXPECT_EQ(2, pSub.use_count());
 
     ASSERT_TRUE(pSub.get() != nullptr);
-    EXPECT_EQ(3, pBase->GetValue());
-    EXPECT_EQ(3, pSub->GetValue());
+    EXPECT_EQ(4, pBase->GetValue());
+    EXPECT_EQ(4, pSub->GetValue());
 }
 
 namespace {
