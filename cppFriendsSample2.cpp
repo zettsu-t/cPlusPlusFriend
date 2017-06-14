@@ -13,6 +13,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <boost/any.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
@@ -494,6 +495,213 @@ TEST_F(TestDateFormat, RepeatTime) {
     EXPECT_EQ("2017-Oct-29 00:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 BST+1", "en_GB.UTF-8"));
     EXPECT_EQ("2017-Oct-29 01:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 GMT+0", "en_GB.UTF-8"));
     EXPECT_EQ("2017-Oct-28 16:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 JST+9", "ja_JP.UTF-8"));
+}
+
+namespace JapariPark {
+    class Animal {
+    public:
+        Animal(void) {
+            setLine("animal");
+        }
+        virtual ~Animal(void) = default;
+
+        const std::string& IntroduceSelf(void) const {
+            return line_;
+        }
+
+    protected:
+        Animal(const std::string& name) {
+            setLine(name);
+        }
+
+    private:
+        void setLine(const std::string& name) {
+            line_ = "I'm ";
+            // 本当はこれらの文字で始まっても母音でないこともあるし(uniqueなど)
+            // これ以外の文字で始まっても母音のこともある(euroなど)
+            line_ += (name.find_first_of("aeiou") == 0) ? "an" : "a";
+            line_ += " ";
+            line_ += name;
+        }
+        std::string line_;
+    };
+
+    class Cat : public Animal {
+    public:
+        Cat(void) : Animal("cat") {}
+        virtual ~Cat(void) = default;
+    protected:
+        Cat(const std::string& name) : Animal(name) {}
+    };
+
+    class Serval : public Cat {
+    public:
+        Serval(void) : Cat("serval") {}
+        virtual ~Serval(void) = default;
+    };
+
+    template <typename T>
+    const std::string FindByKonoha(const T& obj) {
+        std::string line;
+
+        auto& tid = typeid(obj);
+        if (tid == typeid(Animal)) {
+            line = "She is an animal";
+        } else if (tid == typeid(Cat)) {
+            line = "She is a cat";
+        } else if (tid == typeid(Serval)) {
+            line = "She is a serval";
+        } else {
+            line = "Give me a second helping, please";
+        }
+        return line;
+    }
+
+    template <typename T>
+    const std::string FindByKonohaHashCode(const T& obj) {
+        std::string line;
+
+        auto tcode = typeid(obj).hash_code();
+        if (tcode == typeid(Animal).hash_code()) {
+            line = "She is an animal.";
+        } else if (tcode == typeid(Cat).hash_code()) {
+            line = "She is a cat.";
+        } else if (tcode == typeid(Serval).hash_code()) {
+            line = "She is a serval.";
+        } else {
+            line = "Give me a second helping, please.";
+        }
+        return line;
+    }
+
+    template <typename T>
+    const std::string FindByKonohaSwitchCase(const T& obj) {
+        std::string line;
+#if 0
+        // typeid()が整数でないのでコンパイルできない
+        switch(typeid(obj)) {
+        case typeid(Animal):
+            line = "She is an animal.";
+            break;
+        default:
+            line = "Give me a second helping, please.";
+            break;
+        }
+
+        switch(typeid(obj).hash_code()) {
+        // caseがnon-constexprなのでコンパイルできない
+        case typeid(Animal).hash_code():
+            line = "She is an animal.";
+            break;
+        default:
+            line = "Give me a second helping, please.";
+            break;
+        }
+#endif
+        return line;
+    }
+
+    const std::string FindByKonohaAny(const boost::any& obj) {
+        std::string line;
+
+        // constの有無はtypeidに影響しない
+        if (obj.type() == typeid(Animal)) {
+            line = "She is an animal!";
+        } else if (obj.type() == typeid(Cat)) {
+            line = "She is a cat!";
+        } else if (obj.type() == typeid(Serval)) {
+            line = "She is a serval!";
+        } else {
+            line = "Give me a second helping, please!";
+        }
+        return line;
+    }
+
+    time_t g_currentTimestamp;
+    class ConstMemFn {
+    public:
+        virtual ~ConstMemFn(void) = default;
+        void MakeSideEffect(void) const {
+            g_currentTimestamp = ::time(nullptr);
+            if (g_currentTimestamp) {
+                throw std::runtime_error("Non zero timestamp");
+            }
+            return;
+        }
+    };
+}
+
+class TestSwitchCase : public ::testing::Test {};
+
+TEST_F(TestSwitchCase, Polymorphism) {
+    JapariPark::Animal animal;
+    EXPECT_EQ("I'm an animal", animal.IntroduceSelf());
+    JapariPark::Cat cat;
+    EXPECT_EQ("I'm a cat", cat.IntroduceSelf());
+    JapariPark::Serval serval;
+    EXPECT_EQ("I'm a serval", serval.IntroduceSelf());
+}
+
+TEST_F(TestSwitchCase, Procedural) {
+    JapariPark::Animal animal;
+    EXPECT_EQ("She is an animal", JapariPark::FindByKonoha(animal));
+    JapariPark::Cat cat;
+    EXPECT_EQ("She is a cat", JapariPark::FindByKonoha(cat));
+    JapariPark::Serval serval;
+    EXPECT_EQ("She is a serval", JapariPark::FindByKonoha(serval));
+    std::string str;
+    EXPECT_EQ("Give me a second helping, please", JapariPark::FindByKonoha(str));
+}
+
+TEST_F(TestSwitchCase, HashCode) {
+    JapariPark::Animal animal;
+    EXPECT_EQ("She is an animal.", JapariPark::FindByKonohaHashCode(animal));
+    JapariPark::Cat cat;
+    EXPECT_EQ("She is a cat.", JapariPark::FindByKonohaHashCode(cat));
+    JapariPark::Serval serval;
+    EXPECT_EQ("She is a serval.", JapariPark::FindByKonohaHashCode(serval));
+    std::string str;
+    EXPECT_EQ("Give me a second helping, please.", JapariPark::FindByKonohaHashCode(str));
+}
+
+TEST_F(TestSwitchCase, SwitchCase) {
+    std::string str;
+    EXPECT_EQ("", JapariPark::FindByKonohaSwitchCase(str));
+}
+
+TEST_F(TestSwitchCase, Any) {
+    JapariPark::Animal animal;
+    const JapariPark::Animal animalC;
+
+    boost::any obj = animal;
+    EXPECT_EQ("She is an animal!", JapariPark::FindByKonohaAny(obj));
+    obj = animalC;
+    EXPECT_EQ("She is an animal!", JapariPark::FindByKonohaAny(obj));
+
+    JapariPark::Cat cat;
+    const JapariPark::Cat catC;
+    obj = cat;
+    EXPECT_EQ("She is a cat!", JapariPark::FindByKonohaAny(obj));
+    obj = catC;
+    EXPECT_EQ("She is a cat!", JapariPark::FindByKonohaAny(obj));
+
+    JapariPark::Serval serval;
+    const JapariPark::Serval servalC;
+    obj = serval;
+    EXPECT_EQ("She is a serval!", JapariPark::FindByKonohaAny(obj));
+    obj = servalC;
+    EXPECT_EQ("She is a serval!", JapariPark::FindByKonohaAny(obj));
+
+    std::string str;
+    obj = str;
+    EXPECT_EQ("Give me a second helping, please!", JapariPark::FindByKonohaAny(obj));
+}
+
+TEST_F(TestSwitchCase, ConstMemFn) {
+    JapariPark::g_currentTimestamp = 0;
+    JapariPark::ConstMemFn obj;
+    ASSERT_ANY_THROW(obj.MakeSideEffect());
+    EXPECT_TRUE(JapariPark::g_currentTimestamp);
 }
 
 /*

@@ -64,6 +64,7 @@ class Train {
 1. putcというメンバ関数を作るのはダメなのだ! putcは関数ではなくマクロで実装されていることがあるから、そのときは意味不明なエラーメッセージが出るのだ!
 1. コンパイラの最適化を甘く見てはいけないのだ! Tail recursionをiterationにできるなら、tail callもjmpにできるのだ! 自作のassemblyよりかしこいのだ!
 1. switch-caseがいつも多段if-elsifになるとは限らないのだ! clangはcaseが多いときにルックアップテーブルを作ってジャンプするのだ!
+1. switchに書けるのは整数だけで、switchのcaseに書けるのは整数定数だけなのだ! オブジェクトが==で比較できても書けないのだ! 多段if-elseではないし、Rubyのcase-whenとも違うのだ!
 1. memsetが常にmemset関数呼び出しになるとは限らないのだ! clangは短い固定長領域については、mov命令で済ませることがあるのだ!
 1. 条件演算子 (expr) ? t : f よりif-elseの方が分かりやすいとか言わないで欲しいのだ! それはconditional move命令に変換することで、分岐予測が外れるペナルティを避ける必要があったのだ! 歴史的経緯には相応の理由があることを分かって欲しいのだ!
 1. 命令の依存関係は、レジスタだけでなくフラグにもあるのだ! INCよりADDを使う理由とか、SHLXをとか調べるのだ!
@@ -315,6 +316,10 @@ cppFriendsSpace.bat
 * Boost C++ Libraries (1.63.0)
 
 MinGWでは、Boost.Regexの空白文字(\sと[:space:])は、15文字すべてを空白とみなしました。しかしCygwinでは12文字しか空白とみなしませんでした。
+
+### switch-caseは整数しか振り分けられない
+
+[こちら](switchCase.md)に説明を書きました。Rubyのcase-whenは便利ですね。
 
 ## ライセンス
 

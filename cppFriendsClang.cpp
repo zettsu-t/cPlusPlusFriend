@@ -1,6 +1,8 @@
 /* gccとclangを比較する */
 #include <cstdint>
 #include <cstring>
+#include <ctime>
+#include <random>
 #include "cppFriendsClang.hpp"
 
 namespace SwitchCase {
@@ -132,6 +134,18 @@ namespace Devirtualization {
         pDerived->Print(os);
         std::string str = os.str();
         return str;
+    }
+}
+
+namespace ConditionalMove {
+    void condMove(uint_fast32_t seed, bool expr, uint_fast32_t& fst, uint_fast32_t& snd) {
+        std::mt19937 gen(seed);
+        uint_fast32_t n = gen();
+        // これはconditional moveで済む
+        fst = (expr) ? 1 : n;
+        // これはどちらを呼び出すかどうか分けなければならない
+        snd = (expr) ? gen() : static_cast<uint_fast32_t>(::time(nullptr));
+        return;
     }
 }
 

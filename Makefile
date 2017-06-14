@@ -72,6 +72,8 @@ SOURCE_ERROR=cppFriendsError.cpp
 INDENT_INPUT_SOURCE_H=cFriends.h
 INDENT_INPUT_SOURCE_C=cFriends.c
 
+SOURCE_RUBY_CASEWHEN=caseWhen.rb
+
 OBJ_MAIN=cppFriendsMain.o
 OBJ_FRIENDS=cppFriends.o
 OBJ_SAMPLE_1=cppFriendsSample1.o
@@ -141,6 +143,7 @@ LD=g++
 STRIP=strip
 GREP?=grep
 WC?=wc
+RUBY?=ruby
 
 CFLAGS=-std=gnu11 -O2 -Wall
 CPPFLAGS_CPPSPEC=-std=gnu++14
@@ -239,6 +242,7 @@ $(OUTPUT_ASM_CPP_CLANG): $(SOURCE_CLANG)
 	$(CLANGXX) $(CLANGXX_COMMON_FLAGS) $(CPPFLAGS) $(CASMFLAGS) -o $@ $<
 
 force : $(SOURCE_ERROR)
+	$(RUBY) $(SOURCE_RUBY_CASEWHEN)
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
