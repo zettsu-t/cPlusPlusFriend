@@ -297,6 +297,19 @@ TEST_F(TestLog2, Asm) {
     }
 }
 
+TEST_F(TestLog2, LongLong) {
+    int count = 0;
+    unsigned long long big = 5000000000000000ull;  // 5000兆
+
+    // unsignedなのでいつかは全ビット0になって終わる
+    while(big) {
+        ++count;
+        big /= 2;
+    }
+
+    EXPECT_EQ(53, count);
+}
+
 class TestDivideBy2 : public ::testing::Test{};
 
 /*

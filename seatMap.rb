@@ -6,7 +6,7 @@ require 'test/unit'
 
 # 同じ数は二度判定しない
 class PrimeSet
-  def initialize(maxNumber)
+  def initialize
     @map = {}
   end
 
@@ -16,8 +16,7 @@ class PrimeSet
   end
 end
 
-# これ以上大きな数はこなさそうな番号
-PRIME_SET = PrimeSet.new(0x17000)
+PRIME_SET = PrimeSet.new
 MARK_PRIME = "O".freeze           # 左から右に連結した16進数が素数
 MARK_PRIME_REVERSED = "o".freeze  # 右から左に連結した16進数が素数
 MARK_PRIME_ANY = ".".freeze       # 16進数で桁を並べ替えたもののいずれかが素数
