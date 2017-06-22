@@ -75,6 +75,8 @@ INDENT_INPUT_SOURCE_C=cFriends.c
 SOURCE_RUBY_CASEWHEN=caseWhen.rb
 SOURCE_RUBY_SEATMAP=seatMap.rb
 
+LICENSE_FILE=LICENSE.txt
+
 OBJ_MAIN=cppFriendsMain.o
 OBJ_FRIENDS=cppFriends.o
 OBJ_SAMPLE_1=cppFriendsSample1.o
@@ -145,6 +147,7 @@ STRIP=strip
 GREP?=grep
 WC?=wc
 RUBY?=ruby
+DETERMINE_FILE_TYPE=file
 
 CFLAGS=-std=gnu11 -O2 -Wall
 CPPFLAGS_CPPSPEC=-std=gnu++14
@@ -166,6 +169,8 @@ LDFLAGS=
 LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex -lboost_system
 
 INDENT_OPTIONS=--line-length10000 --dont-format-comments --dont-break-function-decl-args --dont-break-procedure-type --dont-line-up-parentheses --no-space-after-parentheses
+
+RUBY_ONELINER_ASCII_ONLY='$$_.ascii_only? ? 0 : (puts $$. , $$_ ; abort)'
 
 .PHONY: all test clean cprog force show
 .SUFFIXES: .o .cpp .cc
@@ -244,7 +249,13 @@ $(OUTPUT_ASM_CPP_CLANG): $(SOURCE_CLANG)
 
 force : $(SOURCE_ERROR)
 	$(RUBY) $(SOURCE_RUBY_CASEWHEN)
-	$(RUBY) $(SOURCE_RUBY_SEATMAP) | grep -i passed
+	$(RUBY) $(SOURCE_RUBY_SEATMAP) | grep -i "100% passed"
+	$(RUBY) -ne $(RUBY_ONELINER_ASCII_ONLY) $(LICENSE_FILE)
+	$(RUBY) -ne $(RUBY_ONELINER_ASCII_ONLY) $(SOURCE_FRIENDS) ; test $$? -ne 0
+	$(DETERMINE_FILE_TYPE) $(LICENSE_FILE) | $(GREP) -i "ASCII text"
+	$(DETERMINE_FILE_TYPE) $(SOURCE_FRIENDS) | $(GREP) -i "UTF-8 Unicode text"
+	$(DETERMINE_FILE_TYPE) $(SOURCE_C_SJIS)| $(GREP) -i "Non-ISO extended-ASCII"
+
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
