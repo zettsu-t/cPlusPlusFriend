@@ -1,4 +1,6 @@
 #include <iostream>
+#include <limits>
+#include <boost/lexical_cast.hpp>
 #include <gtest/gtest.h>
 #include "cppFriendsClang.hpp"
 
@@ -45,6 +47,30 @@ TEST_F(TestShiftTooManyLto, All) {
 #else
     EXPECT_EQ(8, ShiftManyFor1(35));
 #endif
+}
+
+class TestNarrowingCast : public ::testing::Test{};
+
+TEST_F(TestNarrowingCast, LongLongToDouble) {
+    // 0x7fffffffffff00ff
+    const std::string base = "9223372036854710527";
+    long long int llNumber = boost::lexical_cast<decltype(llNumber)>(base);
+    // g++もclang++も警告を出さないが、64-bitを仮数部52-bitに入れるので精度が失われる
+    double d = llNumber;
+
+    std::ostringstream os;
+    // 整数部と.の分だけ多く精度を取る
+    os << std::setprecision(3 + std::numeric_limits<decltype(llNumber)>::digits10) << d;
+    const std::string actual = os.str();
+
+    // 下位の桁は保存されない
+    EXPECT_TRUE(std::numeric_limits<decltype(d)>::is_iec559);
+    EXPECT_NE(base, actual);
+
+    // 上位の桁は保存される
+    std::string expected = base;
+    expected.substr(0, base.size() - 3);
+    EXPECT_EQ(0, actual.find_first_of(expected));
 }
 
 /*
