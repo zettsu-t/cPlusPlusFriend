@@ -238,6 +238,7 @@ class Train {
 1. /usr/binのツールが古かったり、/usr/libのライブラリが足りなかったりすると、新しいGCCをビルドできないのだ! 服を買いに行く服がないのは困るのだ!
 1. LLVMをビルドするのに、もうconfigureは使えないのだ! cmakeの使い方を覚えるのだ!
 1. 成果物のビルドはmake一発でできて欲しいのだ! それより複雑な手順は、間違った成果物をリリースする元凶なのだ! スモークテストも併せて実行して、結果を報告して欲しいのだ!
+1. make cleanするときに、.dを作ってすぐ消すのは時間の無駄なのだ! ifneq ($(MAKECMDGOALS),clean) で囲って、.dを作らないようにするのだ! [参考](https://www.gnu.org/software/make/manual/html_node/Goals.html)
 1. Makefileはデバッグ不能と諦めないのだ! ```make --dry-run```を実行するとか、Makefileに```$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))```を書いてmake showで表示するとかするのだ!
 1. ビルド中のエラーメッセージを英語で出したいからといって、シェルで```export LC_ALL=C```とすると、svnで日本語ファイル名が扱えなくてエラーになるのだ! LC_ALLはMakefileの中で設定するのだ!
 1. コレクションの最大要素と最小要素を別々に求めるのは二度手間なのだ! std::minmax_elementを使うのだ!
@@ -278,8 +279,10 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 * Windows 10 Creators Update 64bit Edition
 * Cygwin 64bit version (2.8.0)
 * Google Test / Mock (1.7.0)
-* gcc (5.4.0)
 * Boost C++ Libraries (1.60.0)
+* gcc (5.4.0)
+* clang (3.9.1)
+* Ruby (2.3.3p222)
 
 ### LTO(Link Time Optimization)
 
