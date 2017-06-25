@@ -842,60 +842,6 @@ TEST_F(TestZeroInitialize, NonStandardLayout) {
 }
 #endif
 
-// strをosoutとoserrの両方に書き出す
-#define ILL_DEBUG_PRINT(osout, oserr, str) \
-    osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
-    oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
-
-#define WELL_DEBUG_PRINT(osout, oserr, str) \
-    do { \
-        osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
-        oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
-    } while(0) \
-
-class TestMacroExpansion : public ::testing::Test {};
-
-TEST_F(TestMacroExpansion, Ill) {
-    std::ostringstream out;
-    std::ostringstream err;
-
-    std::string message {"Event"};
-    std::string log = message;
-    log += "@";
-    log += __PRETTY_FUNCTION__;
-    log += ":";
-
-    EXPECT_FALSE(out.tellp());
-    ILL_DEBUG_PRINT(out, err, message);
-    EXPECT_EQ(log, out.str());
-    EXPECT_EQ(log, err.str());
-
-    // outには書いたので、条件はfalse
-    if (!out.tellp()) ILL_DEBUG_PRINT(out, err, message);
-    // outにはログが書かれないが、errには書かれてしまう
-    EXPECT_EQ(log, out.str());
-    EXPECT_NE(log, err.str());
-}
-
-TEST_F(TestMacroExpansion, Well) {
-    std::ostringstream out;
-    std::ostringstream err;
-
-    std::string message {"Event"};
-    std::string log = message;
-    log += "@";
-    log += __PRETTY_FUNCTION__;
-    log += ":";
-
-    WELL_DEBUG_PRINT(out, err, message);
-    EXPECT_EQ(log, out.str());
-    EXPECT_EQ(log, err.str());
-
-    if (!out.tellp()) WELL_DEBUG_PRINT(out, err, message);
-    EXPECT_EQ(log, out.str());
-    EXPECT_EQ(log, err.str());
-}
-
 // std::functionなどを遅延実行するオブジェクトをコンテナに入れるための
 // 処理に共通なクラス
 class BaseCommand {

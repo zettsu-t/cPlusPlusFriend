@@ -338,6 +338,10 @@ $ ruby -ne '$_.ascii_only? ? 0 : (puts "#{$.} : #{$_}" ; abort)' cppFriends.cpp 
 
 [こちら](switchCase.md)に説明を書きました。Rubyのcase-whenは便利ですね。
 
+### 複数行のマクロを安全に展開する
+
+Compound statementがあることを教えて頂きました。[こちら](expandMacro.md)に説明を書きました。
+
 ## ライセンス
 
 本レポジトリのライセンスは、[MITライセンス](LICENSE.txt)です。

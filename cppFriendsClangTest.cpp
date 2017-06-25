@@ -73,6 +73,159 @@ TEST_F(TestNarrowingCast, LongLongToDouble) {
     EXPECT_EQ(0, actual.find_first_of(expected));
 }
 
+// 敢えてdo-whileで囲まない
+#define DEBUG_PRINT_COUT(osout, str) osout << str << "@" << __PRETTY_FUNCTION__ << "in " << __FILE__ << " : " << __LINE__;
+
+// strをosoutとoserrの両方に書き出す
+#define ILL_DEBUG_PRINT(osout, oserr, str) \
+    osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+    oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+
+
+#define WELL_DEBUG_PRINT(osout, oserr, str) \
+    do { \
+        osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+        oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+    } while(0)
+
+// ;が余計
+#define BAD_DEBUG_PRINT1(osout, oserr, str) \
+    do { \
+        osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+        oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+    } while(0);                                            \
+
+#define BAD_DEBUG_PRINT2(osout, oserr, str) \
+    { \
+        osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+        oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+    }
+
+class TestMacroExpansion : public ::testing::Test {};
+
+TEST_F(TestMacroExpansion, SingleStatement) {
+    std::ostringstream out;
+
+    std::string message {"Event"};
+    std::string log = message;
+    log += "@";
+    log += __PRETTY_FUNCTION__;
+    log += "in cppFriendsClangTest.cpp : 116";
+
+    bool cond = !out.tellp();
+    if (cond) DEBUG_PRINT_COUT(out, message);
+    EXPECT_EQ(log, out.str());
+}
+
+TEST_F(TestMacroExpansion, Ill) {
+    std::ostringstream out;
+    std::ostringstream err;
+
+    std::string message {"Event"};
+    std::string log = message;
+    log += "@";
+    log += __PRETTY_FUNCTION__;
+    log += ":";
+
+    EXPECT_FALSE(out.tellp());
+    ILL_DEBUG_PRINT(out, err, message);
+    EXPECT_EQ(log, out.str());
+    EXPECT_EQ(log, err.str());
+
+    // outには書いたので、条件はfalse
+    bool cond = !out.tellp();
+    if (cond) ILL_DEBUG_PRINT(out, err, message);
+    // outにはログが書かれないが、errには書かれてしまう
+    EXPECT_EQ(log, out.str());
+    EXPECT_NE(log, err.str());
+}
+
+TEST_F(TestMacroExpansion, Well) {
+    std::ostringstream out;
+    std::ostringstream err;
+
+    std::string message {"Event"};
+    std::string log = message;
+    log += "@";
+    log += __PRETTY_FUNCTION__;
+    log += ":";
+
+    WELL_DEBUG_PRINT(out, err, message);
+    EXPECT_EQ(log, out.str());
+    EXPECT_EQ(log, err.str());
+
+    bool cond = !out.tellp();
+    if (cond) WELL_DEBUG_PRINT(out, err, message);
+    EXPECT_EQ(log, out.str());
+    EXPECT_EQ(log, err.str());
+
+#ifdef ONLY_PREPROCESSING
+    if (cond) BAD_DEBUG_PRINT1(out, err, message); else {}
+
+    if (cond) BAD_DEBUG_PRINT2(out, err, message); else {}
+#endif
+}
+
+// https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+// で規定されるGCC拡張
+// fprintfはintを返す
+#define FUNC_DEBUG_PRINTF(fdout, fderr, str) \
+    ({ \
+        fprintf(fdout, "%s@%s", str, __PRETTY_FUNCTION__ ); \
+        fprintf(fderr, "%s@%s", str, __PRETTY_FUNCTION__ ); \
+    }) \
+
+// oserrで終わると、oserrをコピーできないというコンパイルエラーが出るので
+// 何か返す
+#define FUNC_DEBUG_COUT(osout, oserr, str) \
+    ({ \
+        osout << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+        oserr << str << "@" << __PRETTY_FUNCTION__ << ":"; \
+        0; \
+    }) \
+
+// Makefileからgrepで調べる
+class TestCompoundStatement : public ::testing::Test{};
+
+TEST_F(TestCompoundStatement, Printf) {
+    if (true) FUNC_DEBUG_PRINTF(stdout, stderr, "Printf in compound statements");
+}
+
+TEST_F(TestCompoundStatement, Cout) {
+    std::ostringstream out;
+    std::ostringstream err;
+
+    std::string message {"Cout in compound statements"};
+    std::string log = message;
+    log += "@";
+    log += __PRETTY_FUNCTION__;
+    log += ":";
+
+    bool cond = !out.tellp();
+    if (cond) FUNC_DEBUG_COUT(out, err, message);
+    EXPECT_EQ(log, out.str());
+    EXPECT_EQ(log, err.str());
+}
+
+TEST_F(TestCompoundStatement, Loop) {
+    std::ostringstream out;
+    std::ostringstream err;
+
+    std::string message;
+    std::string expected;
+    for(int i=1; i<=2; ++i, FUNC_DEBUG_COUT(out, err, message)) {
+        message = boost::lexical_cast<decltype(message)>(i);
+        std::string log = message;
+        log += "@";
+        log += __PRETTY_FUNCTION__;
+        log += ":";
+        expected += log;
+    };
+
+    EXPECT_EQ(expected, out.str());
+    EXPECT_EQ(expected, err.str());
+}
+
 /*
 Local Variables:
 mode: c++

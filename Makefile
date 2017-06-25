@@ -15,6 +15,8 @@ GTEST_OBJ_LTO=$(patsubst %.cc, %_lto.o, $(notdir $(GTEST_SOURCE)))
 GTEST_BC=$(patsubst %.cc, %.bc, $(notdir $(GTEST_SOURCE)))
 GTEST_BC_LTO=$(patsubst %.cc, %_lto.bc, $(notdir $(GTEST_SOURCE)))
 
+PREPROCESSED_CLANG_TEST=cppFriendsClangTest.processed
+
 TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
 TARGET_C_SJIS=cFriendsShiftJis
@@ -31,6 +33,10 @@ OUTPUT_ASM_C_EXT2=cFriendsSideEffect.s
 OUTPUT_ASM_CPP_CLANG=cppFriendsClang.s
 OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM64_CLANG) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2) $(OUTPUT_ASM_CPP_CLANG)
 
+OUTPUT_LOG_STDOUT=__stdout_log.txt
+OUTPUT_LOG_STDERR=__stderr_log.txt
+OUTPUT_LOGS=$(OUTPUT_LOG_STDOUT) $(OUTPUT_LOG_STDERR)
+
 OUTPUT_FUNCLIST_TEMP1_H=__cFriends_nocr1__.h
 OUTPUT_FUNCLIST_TEMP1_C=__cFriends_nocr1__.c
 OUTPUT_FUNCLIST_TEMP2_H=__cFriends_nocr2__.h
@@ -39,7 +45,8 @@ OUTPUT_FUNCLIST_TEMP_SRCS=$(OUTPUT_FUNCLIST_TEMP2_H) $(OUTPUT_FUNCLIST_TEMP2_C)
 OUTPUT_FUNCLIST_TEMPS=$(OUTPUT_FUNCLIST_TEMP1_H) $(OUTPUT_FUNCLIST_TEMP1_C) $(OUTPUT_FUNCLIST_TEMP_SRCS)
 OUTPUT_FUNCLIST=cFriends_func.txt
 
-TARGETS=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(TARGET_GCC_LTO) $(TARGET_CLANG) $(TARGET_CLANG_LTO)
+TARGETS=$(PREPROCESSED_CLANG_TEST)
+TARGETS+=$(TARGET) $(TARGET_NO_OPT) $(TARGET_C_SJIS) $(TARGET_C) $(TARGET_GCC_LTO) $(TARGET_CLANG) $(TARGET_CLANG_LTO)
 TARGETS+=$(OUTPUT_ASMS) $(OUTPUT_FUNCLIST)
 
 # cppFriendsSpace.batで作るが、このMakefileで消去する
@@ -177,10 +184,17 @@ RUBY_ONELINER_ASCII_ONLY='$$_.ascii_only? ? 0 : (puts $$. , $$_ ; abort)'
 
 all: $(TARGETS) force
 
+$(PREPROCESSED_CLANG_TEST): $(SOURCE_CLANG_TEST)
+	$(CXX) $(CPPFLAGS) -E -C -DONLY_PREPROCESSING -o $@ $<
+
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	-find . -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cpp" | etags --language-force=C++ -L -
 	./$@
+	$(RM) $(OUTPUT_LOGS)
+	./$@ --gtest_filter="TestCompoundStatement*" 1>$(OUTPUT_LOG_STDOUT) 2>$(OUTPUT_LOG_STDERR)
+	grep -i "Printf in compound statements" $(OUTPUT_LOG_STDOUT)
+	grep -i "Printf in compound statements" $(OUTPUT_LOG_STDERR)
 
 $(TARGET_NO_OPT): $(OBJS_NO_OPT)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
@@ -255,7 +269,6 @@ force : $(SOURCE_ERROR)
 	$(DETERMINE_FILE_TYPE) $(LICENSE_FILE) | $(GREP) -i "ASCII text"
 	$(DETERMINE_FILE_TYPE) $(SOURCE_FRIENDS) | $(GREP) -i "UTF-8 Unicode text"
 	$(DETERMINE_FILE_TYPE) $(SOURCE_C_SJIS)| $(GREP) -i "Non-ISO extended-ASCII"
-
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
@@ -373,7 +386,7 @@ test: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OBJS_GCC_LTO) $(BCS_OBJS) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST) $(OUTPUT_FUNCLIST_TEMPS) ./*.o ./*.bc ./*.s
+	$(RM) $(TARGETS) $(EXTERNAL_TARGETS) $(OBJS) $(OBJS_NO_OPT) $(OBJS_GCC_LTO) $(BCS_OBJS) $(OUTPUT_ASMS) $(OUTPUT_FUNCLIST) $(OUTPUT_FUNCLIST_TEMPS) $(OUTPUT_LOGS) ./*.o ./*.bc ./*.s
 
 show:
 	$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))
