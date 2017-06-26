@@ -147,6 +147,10 @@ namespace ConditionalMove {
         snd = (expr) ? gen() : static_cast<uint_fast32_t>(::time(nullptr));
         return;
     }
+
+    int32_t may_divide_by_zero(int32_t dividend, int32_t divisor, int32_t special) {
+        return (divisor) ? (dividend / divisor) : special;
+    }
 }
 
 /*

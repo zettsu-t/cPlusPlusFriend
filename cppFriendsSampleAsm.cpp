@@ -401,6 +401,69 @@ TEST_F(TestDivideBy2, RoundToZero) {
     }
 }
 
+namespace {
+    int32_t divideByZeroUnsafe(int32_t dividend, int32_t divisor, int32_t special) {
+        int32_t result = dividend;
+        asm volatile (
+            "cdq    \n\t"
+            "idiv   %%ebx \n\t"
+            "or     %%ebx, %%ebx \n\t"
+            "cmovz  %%esi, %%eax \n\t"
+            :"+a"(result):"b"(divisor),"S"(special):"edx");
+
+        return result;
+    }
+
+    int32_t divideByZeroMuchSafe(int32_t dividend, int32_t divisor, int32_t special) {
+        // clangの出力を元に作る
+        int32_t result = dividend;
+        asm volatile (
+            "or    %%ebx, %%ebx \n\t"
+            "cmovz %%esi, %%eax \n\t"
+            "jz    1f \n\t"
+            "cdq   \n\t"
+            "idiv  %%ebx \n\t"
+            "1:"
+            :"+a"(result):"b"(divisor),"S"(special):"edx");
+
+        return result;
+    }
+
+    int32_t divideByZero(int32_t dividend, int32_t divisor, int32_t special) {
+        return (divisor) ? (dividend / divisor) : special;
+    }
+}
+
+class TestDivideByZero : public ::testing::Test{};
+
+TEST_F(TestDivideByZero, Unsafe) {
+    EXPECT_EQ(3,  divideByZeroUnsafe(15, 4, -1));
+#if 0
+    // 実行すると0除算エラーになる
+    EXPECT_EQ(-1, divideByZeroUnsafe(15, 0, -1));
+#endif
+}
+
+TEST_F(TestDivideByZero, MuchSafe) {
+    EXPECT_EQ(3,  divideByZeroMuchSafe(15, 4, -1));
+    EXPECT_EQ(-1, divideByZeroMuchSafe(15, 0, -1));
+#if 0
+    // int32_tの範囲で解を表現できないのでCPU例外が発生する
+    constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
+    EXPECT_EQ(intMin, divideByZeroMuchSafe(intMin, -1, 0));
+#endif
+}
+
+TEST_F(TestDivideByZero, Cpp) {
+    EXPECT_EQ(3,  divideByZero(15, 4, -1));
+    EXPECT_EQ(-1, divideByZero(15, 0, -1));
+#if 0
+    // int32_tの範囲で解を表現できないのでCPU例外が発生するはずだが...
+    constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
+    EXPECT_EQ(intMin, divideByZero(intMin, -1, 0));
+#endif
+}
+
 /*
   Local Variables:
   mode: c++
