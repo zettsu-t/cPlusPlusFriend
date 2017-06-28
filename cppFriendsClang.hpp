@@ -64,6 +64,11 @@ namespace Devirtualization {
     extern std::string GetStringOutline(void);
 }
 
+namespace ProcessorException {
+    extern int32_t may_divide_by_zero(int32_t dividend, int32_t divisor, int32_t special);
+    extern int abs_int(int src);
+}
+
 // LTOの有無で動作が変わる
 extern uint32_t ShiftManyFor1(uint32_t src);
 

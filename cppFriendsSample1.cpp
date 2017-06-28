@@ -1070,6 +1070,28 @@ TEST_F(TestMaxSize, Print) {
     std::cerr << std::hex << "SSIZE_MAX = 0x" << SSIZE_MAX << "\n";
 }
 
+class TestClearStream : public ::testing::Test{};
+
+TEST_F(TestClearStream, SwapAndMove) {
+    std::ostringstream emptyOs;
+    std::ostringstream os;
+    os << "ABC";
+
+    EXPECT_TRUE(emptyOs.str().empty());
+    EXPECT_FALSE(os.str().empty());
+
+    os.swap(emptyOs);
+    EXPECT_FALSE(emptyOs.str().empty());
+    EXPECT_TRUE(os.str().empty());
+
+    std::swap(os, emptyOs);
+    EXPECT_TRUE(emptyOs.str().empty());
+    EXPECT_FALSE(os.str().empty());
+
+    os = std::ostringstream();
+    EXPECT_TRUE(os.str().empty());
+}
+
 /*
 Local Variables:
 mode: c++

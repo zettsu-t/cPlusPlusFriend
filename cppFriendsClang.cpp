@@ -1,5 +1,6 @@
 /* gccとclangを比較する */
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <random>
@@ -147,9 +148,17 @@ namespace ConditionalMove {
         snd = (expr) ? gen() : static_cast<uint_fast32_t>(::time(nullptr));
         return;
     }
+}
 
+namespace ProcessorException {
+    // 0で割れないのは有名だが、負で絶対値が最大の数を-1で割っても正の整数の範囲には収まらない
     int32_t may_divide_by_zero(int32_t dividend, int32_t divisor, int32_t special) {
         return (divisor) ? (dividend / divisor) : special;
+    }
+
+    // 負で絶対値が最大の数は、正の整数の範囲には収まらない
+    int abs_int(int src) {
+        return std::abs(src);
     }
 }
 

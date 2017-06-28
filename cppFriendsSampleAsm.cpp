@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include "cFriendsCommon.h"
 #include "cppFriends.hpp"
+#include "cppFriendsClang.hpp"
 
 class TestSaturationArithmetic : public ::testing::Test{};
 
@@ -438,30 +439,54 @@ class TestDivideByZero : public ::testing::Test{};
 
 TEST_F(TestDivideByZero, Unsafe) {
     EXPECT_EQ(3,  divideByZeroUnsafe(15, 4, -1));
-#if 0
-    // 実行すると0除算エラーになる
-    EXPECT_EQ(-1, divideByZeroUnsafe(15, 0, -1));
-#endif
 }
 
 TEST_F(TestDivideByZero, MuchSafe) {
     EXPECT_EQ(3,  divideByZeroMuchSafe(15, 4, -1));
     EXPECT_EQ(-1, divideByZeroMuchSafe(15, 0, -1));
-#if 0
-    // int32_tの範囲で解を表現できないのでCPU例外が発生する
-    constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
-    EXPECT_EQ(intMin, divideByZeroMuchSafe(intMin, -1, 0));
-#endif
 }
 
 TEST_F(TestDivideByZero, Cpp) {
     EXPECT_EQ(3,  divideByZero(15, 4, -1));
     EXPECT_EQ(-1, divideByZero(15, 0, -1));
 #if 0
-    // int32_tの範囲で解を表現できないのでCPU例外が発生するはずだが...
+    // int32_tの範囲で解を表現できないのでCPU例外が発生するはずだが
+    // 定数式としてコンパイラが値を求めた場合は実行時例外にならない
     constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
     EXPECT_EQ(intMin, divideByZero(intMin, -1, 0));
 #endif
+}
+
+class TestProcessorExceptionDeathTest : public ::testing::Test{};
+
+TEST_F(TestProcessorExceptionDeathTest, Unsafe) {
+    // 実行すると0除算エラーになる
+    ASSERT_DEATH(divideByZeroUnsafe(15, 0, -1), "");
+}
+
+TEST_F(TestProcessorExceptionDeathTest, MuchSafe) {
+    // int32_tの範囲で解を表現できないのでCPU例外が発生する
+    constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
+    ASSERT_DEATH(divideByZeroMuchSafe(intMin, -1, 0), "");
+}
+
+TEST_F(TestProcessorExceptionDeathTest, TooLarge) {
+    EXPECT_EQ(3,  ProcessorException::may_divide_by_zero(15, 4, -1));
+    EXPECT_EQ(-1, ProcessorException::may_divide_by_zero(15, 0, -1));
+    // int32_tの範囲で解を表現できないのでCPU例外が発生する
+    constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
+    ASSERT_DEATH(ProcessorException::may_divide_by_zero(intMin, -1, 0), "");
+}
+
+TEST_F(TestProcessorExceptionDeathTest, Abs) {
+    EXPECT_EQ(0,  ProcessorException::abs_int(0));
+    EXPECT_EQ(1,  ProcessorException::abs_int(1));
+    EXPECT_EQ(1,  ProcessorException::abs_int(-1));
+
+    constexpr int intMax = std::numeric_limits<int>::max();
+    constexpr int intMin = std::numeric_limits<int>::min();
+    EXPECT_EQ(intMax, ProcessorException::abs_int(intMax));
+    EXPECT_EQ(intMin, ProcessorException::abs_int(intMin));
 }
 
 /*

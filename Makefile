@@ -191,7 +191,8 @@ $(PREPROCESSED_CLANG_TEST): $(SOURCE_CLANG_TEST)
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	-find . -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cpp" | etags --language-force=C++ -L -
-	./$@
+	./$@ --gtest_filter="-*DeathTest*"
+	./$@ --gtest_filter="*DeathTest*"
 	$(RM) $(OUTPUT_LOGS)
 	./$@ --gtest_filter="TestCompoundStatement*" 1>$(OUTPUT_LOG_STDOUT) 2>$(OUTPUT_LOG_STDERR)
 	grep -i "Printf in compound statements" $(OUTPUT_LOG_STDOUT)
