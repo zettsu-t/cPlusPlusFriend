@@ -1,4 +1,5 @@
 // やめるのだフェネックで学ぶC++の実証コード(インラインアセンブリ)
+#include <climits>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -487,6 +488,13 @@ TEST_F(TestProcessorExceptionDeathTest, Abs) {
     constexpr int intMin = std::numeric_limits<int>::min();
     EXPECT_EQ(intMax, ProcessorException::abs_int(intMax));
     EXPECT_EQ(intMin, ProcessorException::abs_int(intMin));
+}
+
+TEST_F(TestProcessorExceptionDeathTest, IntMaxMin) {
+    if ((sizeof(int32_t) == sizeof(int)) && (std::numeric_limits<int32_t>::min() == INT_MIN)) {
+        EXPECT_EQ(INT_MIN, ProcessorException::abs_int(INT_MIN));
+    }
+    ASSERT_DEATH(ProcessorException::may_divide_by_zero(INT_MIN, -1, 0), "");
 }
 
 /*
