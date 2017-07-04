@@ -104,6 +104,25 @@ void exec_snprintf(void) {
     return;
 }
 
+void exec_snprintf_twice(void) {
+    // 文字数を測る
+    const char src[8] = "0123456";    // 転送元
+    char buf[10]      = "ABCDEFGHI";  // 壊れているかどうか後で調べる
+
+    // 最初の引数にNULLを渡しても大丈夫か?
+//  int size = snprintf(NULL, 0, "%s", src);
+    int size = snprintf(buf, 0, "%s", src);
+    // このsizeにNUL終端は含まない
+    assert((size + 1) == sizeof(src));
+    assert(buf[sizeof(src)-2] == 'G');
+
+    snprintf(buf, size + 1, "%s", src);
+    assert(buf[sizeof(src)-2] == '6');
+    assert(buf[sizeof(src)-1] == '\0');
+    assert(buf[sizeof(buf)-2] == 'I');
+    printf("%s\n", buf);
+}
+
 void exec_io_with_definition(void) {
     static volatile int memoryMappedClock;
     static int nonVolatileClock;
@@ -130,6 +149,7 @@ int divide_by_2(int src) {
 int main(int argc, char* argv[]) {
     exec_my_memcpy();
     exec_snprintf();
+    exec_snprintf_twice();
     print_infinity();
     return 0;
 }
