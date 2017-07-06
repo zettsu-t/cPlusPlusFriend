@@ -56,7 +56,7 @@ TEST_F(TestNarrowingCast, LongLongToDouble) {
     const std::string base = "9223372036854710527";
     long long int llNumber = boost::lexical_cast<decltype(llNumber)>(base);
     // g++もclang++も警告を出さないが、64-bitを仮数部52-bitに入れるので精度が失われる
-    double d = llNumber;
+    double d = llNumber;  // ビット数が減るので警告が出るが意図的
 
     std::ostringstream os;
     // 整数部と.の分だけ多く精度を取る

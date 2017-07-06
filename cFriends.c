@@ -31,7 +31,7 @@ void check_cancellation_digits(void) {
         diff /= 3.1;
     }
 
-    const char* pResult = (narrow == volatileNarrow) ? "equal to" : "different from";
+    const char* pResult = (narrow == volatileNarrow) ? "equal to" : "different from";  // 浮動小数の比較は警告が出る
     printf("The non-volatile double value is %s the volatile\n", pResult);
 }
 
@@ -91,7 +91,7 @@ void exec_snprintf(void) {
     if (diff < 0) {
         diff = buffer - dst;
     }
-    diff -= sizeof(dst);
+    diff -= (ptrdiff_t)(sizeof(dst));  // 符号が取れるのでキャストがないと警告が出る
     printf("gap for dst:%td bytes\n", diff);
 
     snprintf(dst, sizeof(dst), "%s", src);
@@ -116,7 +116,8 @@ void exec_snprintf_twice(void) {
     assert((size + 1) == sizeof(src));
     assert(buf[sizeof(src)-2] == 'G');
 
-    snprintf(buf, size + 1, "%s", src);
+    size_t requiredSize = (size_t)(size + 1);  // 符号が取れるのでキャストがないと警告が出る
+    snprintf(buf, requiredSize, "%s", src);
     assert(buf[sizeof(src)-2] == '6');
     assert(buf[sizeof(src)-1] == '\0');
     assert(buf[sizeof(buf)-2] == 'I');

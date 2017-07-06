@@ -77,7 +77,7 @@ TEST_F(TestTypeCast, EnumCast) {
                   int>::value,"not int");
     static_assert(std::is_same<boost::function_traits<decltype(__builtin_popcount)>::arg1_type,
                   unsigned int>::value, "not unsigned int");
-    EXPECT_EQ(32, __builtin_popcount(llEnum));
+    EXPECT_EQ(32, __builtin_popcount(llEnum));  // ビット数が減るので警告が出るが意図的
     EXPECT_EQ(63, __builtin_popcountll(llEnum));
 
     std::ostringstream os;

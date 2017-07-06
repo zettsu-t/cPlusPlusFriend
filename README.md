@@ -284,7 +284,7 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 * Google Test / Mock (1.7.0)
 * Boost C++ Libraries (1.60.0)
 * gcc (5.4.0)
-* clang (3.9.1)
+* clang (4.0.1)
 * Ruby (2.3.3p222)
 
 ### LTO(Link Time Optimization)
