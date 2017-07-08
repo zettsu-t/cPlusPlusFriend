@@ -473,7 +473,7 @@ TEST_F(TestBitManipulation, BitMask) {
     for(auto src : TestSet) {
         IntType expected = 0;
 
-        for(IntType i = 0; i <= bitCount; ++i) {
+        for(IntType i = 0; i <= bitCount*3; ++i) {
             IntType actualCpp = src;
             IntType mask = 1;
             if (i < bitCount) {
