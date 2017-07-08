@@ -458,6 +458,86 @@ TEST_F(TestDivideByZero, Cpp) {
 #endif
 }
 
+class TestBitManipulation : public ::testing::Test{
+protected:
+    using IntType = uint32_t;
+    static constexpr IntType bitCount = static_cast<IntType>(sizeof(IntType) * 8);
+    static const IntType TestSet[2];
+};
+
+const TestBitManipulation::IntType TestBitManipulation::TestSet[2] = {0xffffffffu, 0xaaaaaaaau};
+
+#ifdef CPPFRIENDS_AVX2
+// iビット目以上を0にする
+TEST_F(TestBitManipulation, BitMask) {
+    for(auto src : TestSet) {
+        IntType expected = 0;
+
+        for(IntType i = 0; i <= bitCount; ++i) {
+            IntType actualCpp = src;
+            IntType mask = 1;
+            if (i < bitCount) {
+                mask <<= i;  // 多すぎるシフトに対する動作は未定義
+            } else {
+                mask = 0;
+            }
+            --mask;
+            actualCpp = src & mask;
+            EXPECT_EQ(expected, actualCpp);
+
+            // ビット位置はmod 32/64ではなくsaturated
+            IntType actualAsm = src;
+            asm volatile (
+                "bzhi  %2, %1, %0 \n\t"
+                :"=r"(actualAsm):"r"(src),"r"(i):);
+            EXPECT_EQ(expected, actualAsm);
+
+            if (src & 1) {
+                expected <<= 1;
+                ++expected;
+            } else {
+                if (i & 1) {
+                    expected <<= 2;
+                    expected |= 2;
+                }
+            }
+        }
+    }
+}
+
+// 整数を2^n * 奇数で表現できるときの2^nを求める
+TEST_F(TestBitManipulation, PowerOf2) {
+    for(auto original : TestSet) {
+        IntType src = original;
+        IntType expected = (original & 1) ? 1 : 2;
+
+        for(IntType index = 0; index <= bitCount; ++index) {
+            IntType actualCpp = src & -src;
+            EXPECT_EQ(expected, actualCpp);
+
+            IntType actualAsm = src;
+            // 0には0を返す
+            asm volatile (
+                "blsi  %1, %0 \n\t"
+                :"=r"(actualAsm):"r"(src):);
+            EXPECT_EQ(expected, actualAsm);
+
+            if (original & 1) {
+                expected <<= 1;
+            } else {
+                if (index & 1) {
+                    expected <<= 2;
+                }
+            }
+
+            IntType mask = 1;
+            mask <<= index;
+            src &= ~mask;
+        }
+    }
+}
+#endif
+
 class TestProcessorExceptionDeathTest : public ::testing::Test{};
 
 TEST_F(TestProcessorExceptionDeathTest, Unsafe) {
