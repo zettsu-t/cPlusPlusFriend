@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <iostream>
+#include <list>
+#include <string>
 #include <type_traits>
 #include <boost/type_traits/function_traits.hpp>
 
@@ -73,6 +75,17 @@ class ExtraMemFunc : public SubDynamicObjectMemFunc {
 public:
     virtual ~ExtraMemFunc() = default;
     virtual void Print(std::ostream& os) override;
+};
+
+class MyStringList {
+public:
+    MyStringList(size_t n);
+    virtual ~MyStringList() = default;
+    virtual void Print(std::ostream& os) const;
+    virtual void Pop(void);
+    virtual void Clear(void);
+    // 本来メンバ変数を見せるものではないが、悪い見本として
+    std::list<std::string> dataSet_;
 };
 
 #endif // CPPFRIENDS_CPPFRIENDS_HPP

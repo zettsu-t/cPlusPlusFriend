@@ -56,6 +56,26 @@ void ExtraMemFunc::Print(std::ostream& os) {
     os << "Extra";
 }
 
+MyStringList::MyStringList(size_t n) {
+    for(decltype(n) i=0; i<n; ++i) {
+        dataSet_.push_back("12345678901234567890123456789012345678901234567890123456789012345");
+    }
+}
+
+void MyStringList::Print(std::ostream& os) const {
+    for(auto& s : dataSet_) {
+        os << s;
+    }
+}
+
+void MyStringList::Pop(void) {
+    dataSet_.pop_front();
+}
+
+void MyStringList::Clear(void) {
+    dataSet_.clear();
+}
+
 /*
 Local Variables:
 mode: c++

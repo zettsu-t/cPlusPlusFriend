@@ -1092,6 +1092,38 @@ TEST_F(TestClearStream, SwapAndMove) {
     EXPECT_TRUE(os.str().empty());
 }
 
+class TestDanglingIterator : public ::testing::Test{};
+
+TEST_F(TestDanglingIterator, Clear) {
+    constexpr size_t n = 1000;
+    MyStringList strList(n);
+
+    std::ostringstream os;
+    strList.Print(os);
+    EXPECT_FALSE(os.str().empty());
+
+    for(const auto& str : strList.dataSet_) {
+        EXPECT_FALSE(str.empty());
+#if 0
+        // 要素を消すと無効イテレータにアクセスして落ちる
+        strList.Clear();
+#endif
+    }
+}
+
+TEST_F(TestDanglingIterator, Pop) {
+    constexpr size_t n = 1000;
+    MyStringList strList(n);
+
+    for(const auto& str : strList.dataSet_) {
+        EXPECT_FALSE(str.empty());
+#if 0
+        // 要素を消すと無効イテレータにアクセスして落ちる
+        strList.Pop();
+#endif
+    }
+}
+
 /*
 Local Variables:
 mode: c++

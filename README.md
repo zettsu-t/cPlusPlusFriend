@@ -50,6 +50,7 @@ class Train {
 1. 「どんな型の関数へのポインタでも入る物」として、void*を使うのはやめるのだ! データへのポインタとコードへのポインタは互換ではないのだ!  [(参考)](http://stackoverflow.com/questions/5579835/c-function-pointer-casting-to-void-pointer) (boost::anyなら [Value typeの要件](http://www.boost.org/doc/libs/1_63_0/doc/html/any/reference.html#any.ValueType) は満たしているはずですが)
 1. 関数への参照は、&をつけるのとつけないのと使い分けるのだ! テンプレートマッチングに失敗することがあるのだ!
 1. 参照とポインタは「どっちも間接アドレッシング」ではないのだ。ポインタはnullable(optional)とかiteratorとか、もっと多義的なのだ!
+1. コンテナの中身をfor文でなめているときに、呼び出し先の関数でコンテナの中身を増減したらイテレータが無効になることがあるのだ! 無効なイテレータにアクセスするのはまずいのだ! プロセスの危機なのだ! [参考](https://stackoverflow.com/questions/6438086/iterator-invalidation-rules)
 1. 演算子の優先度を覚えるのは無理なのだ! ```expr ? 2 : 3 + 4;``` ```4 + expr ? 2 : 3;``` ```4 + (expr ? 2 : 3);``` は違うのだ! 括弧をつけるのだ!
 1. 同じx86 CPUだからって、64ビットアプリと32ビットアプリで、浮動小数が同じ計算結果を返すと仮定してはだめなのだ! SSEは内部64ビットだが、x87は内部80ビットで計算しているのだ! [(参考)](http://blog.practical-scheme.net/shiro/20110112-floating-point-pitfall) 数の比較結果が前者は==で後者が!=になることがあるのだ! [(例)](cFriends.c)
 1. 浮動小数をprintf("%.0e")して7文字(-1e-308)で収まると、決め打ちするのはやめるのだ! -infinityと表示するときは9文字なのだ!
