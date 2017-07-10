@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
+#include <vector>
 #include <windows.h>
 
 std::chrono::time_point<std::chrono::steady_clock> get_current_time(void) {
@@ -21,6 +22,12 @@ int main(int argc, char* argv[]) {
     printf("%lu\n", s);
     checkPacket();
     return 0;
+}
+
+// サイズという同じデータ構造に、異なる型を割り当てるのはよくない
+using ExternalSizeType = int;
+bool checkSize(const std::vector<int>& v, ExternalSizeType maxSize) {
+    return (v.size() <= maxSize);
 }
 
 // 不完全型
