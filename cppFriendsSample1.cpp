@@ -993,6 +993,25 @@ TEST_F(TestOperatorPrecedence, All) {
     EXPECT_EQ(7, expr3(0));
 }
 
+// http://qiita.com/Nabetani/items/9d0fa9e750310d1be24e
+// を確認する
+// https://stackoverflow.com/questions/42454016/ternary-conditional-operator-on-the-left-of-assignment-operator
+TEST_F(TestOperatorPrecedence, LeftTernaryOperator) {
+    int a = 0;
+    int b = 0;
+    for(int i=0; i<2; ++i) {
+        ((i) ? a : b) = 1;
+        ((!i) ? a : b) = 2;
+        if (i == 0) {
+            EXPECT_EQ(2, a);
+            EXPECT_EQ(1, b);
+        } else {
+            EXPECT_EQ(1, a);
+            EXPECT_EQ(2, b);
+        }
+    }
+}
+
 namespace {
     // std::cout的なもの
     std::ostringstream g_globalLogStream;

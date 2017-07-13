@@ -704,6 +704,117 @@ TEST_F(TestSwitchCase, ConstMemFn) {
     EXPECT_TRUE(JapariPark::g_currentTimestamp);
 }
 
+// ものすごくコンパイルが遅い
+template <typename Result>
+class BaseDelayedFunction {
+public:
+    virtual ~BaseDelayedFunction(void) = default;
+    virtual Result Exec(void) = 0;
+    virtual const std::string& GetName(void) = 0;
+    virtual const std::string& GetPrettyName(void) = 0;
+};
+
+template <typename Result, typename Enable = void, typename ... ArgTypes>
+class DelayedFunction;
+
+template <typename Result, typename ... ArgTypes>
+class DelayedFunction<Result,
+                      typename std::enable_if_t<std::is_pod<Result>::value, void>, ArgTypes...>
+    : public BaseDelayedFunction<Result> {
+public:
+    using Function = Result(&)(ArgTypes...);
+    DelayedFunction(const Function f, ArgTypes... args) : func_(std::bind(f, args...)) {}
+    virtual ~DelayedFunction(void) = default;
+    virtual Result Exec(void) override { return func_(); }
+    virtual const std::string& GetName(void) override {
+        name_ = __FUNCTION__;
+        return name_;
+    }
+    virtual const std::string& GetPrettyName(void) override {
+        prettyName_ = __PRETTY_FUNCTION__;
+        return prettyName_;
+    }
+private:
+    std::function<Result()> func_;
+    std::string name_;
+    std::string prettyName_;
+};
+
+template <typename Result, typename ... ArgTypes>
+class DelayedFunction<Result,
+                      typename std::enable_if_t<!std::is_pod<Result>::value, void>, ArgTypes...>
+    : public BaseDelayedFunction<Result> {
+public:
+    using Function = Result(&)(ArgTypes...);
+    DelayedFunction(const Function f, ArgTypes... args) : func_(std::bind(f, args...)) {}
+    virtual ~DelayedFunction(void) = default;
+    virtual Result Exec(void) override { return func_(); }
+    virtual const std::string& GetName(void) override {
+        name_ = __FUNCTION__;
+        return name_;
+    }
+    virtual const std::string& GetPrettyName(void) override {
+        prettyName_ = __PRETTY_FUNCTION__;
+        return prettyName_;
+    }
+private:
+    std::function<Result()> func_;
+    std::string name_;
+    std::string prettyName_;
+};
+
+// && 対応は別途
+namespace {
+    template <typename Result, typename ... ArgTypes>
+    auto CreateDelayedFunction(Result(&f)(ArgTypes...), ArgTypes... args) {
+        std::unique_ptr<BaseDelayedFunction<Result>> func(new DelayedFunction<Result, void, ArgTypes...>(f, args...));
+        return func;
+    }
+
+    int intSum3(int a, int b, int c) {
+        return a + b + c;
+    }
+
+    int intProduce5(int a, int b, int c, int d, int e) {
+        return a * b * c * d * e;
+    }
+
+    using ClassInteger = boost::multiprecision::int1024_t;
+    ClassInteger intNegate(ClassInteger a) {
+        return -a;
+    }
+}
+
+class TestFunctionName : public ::testing::Test {};
+
+TEST_F(TestFunctionName, IntSum) {
+    int a = 2;
+    int b = 5;
+    int c = 7;
+    auto f = CreateDelayedFunction(intSum3, a, b, c);
+    EXPECT_EQ(14, f->Exec());
+    // GetName
+    // const string& DelayedFunction<Result, typename std::enable_if<std::is_pod<_Tp>::value, void>::type, ArgTypes ...>::GetPrettyName() [with Result = int; ArgTypes = {int, int, int}; typename std::enable_if<std::is_pod<_Tp>::value, void>::type = void; std::string = std::basic_string<char>]
+    std::cout << f->GetName() << "\n" << f->GetPrettyName()<< "\n";
+}
+
+TEST_F(TestFunctionName, IntProduct) {
+    auto f = CreateDelayedFunction(intProduce5, 2, 3, 5, 7, 11);
+    EXPECT_EQ(2310, f->Exec());
+    // GetName
+    // const string& DelayedFunction<Result, typename std::enable_if<std::is_pod<_Tp>::value, void>::type, ArgTypes ...>::GetPrettyName() [with Result = int; ArgTypes = {int, int, int, int, int}; typename std::enable_if<std::is_pod<_Tp>::value, void>::type = void; std::string = std::basic_string<char>]
+    std::cout << f->GetName() << "\n" << f->GetPrettyName()<< "\n";
+}
+
+TEST_F(TestFunctionName, CppInt) {
+    ClassInteger c = -1;
+    auto f = CreateDelayedFunction(intNegate, c);
+    EXPECT_EQ(1, f->Exec());
+    // GetName
+    // const string& DelayedFunction<Result, typename std::enable_if<(! std::is_pod<_Tp>::value), void>::type, ArgTypes ...>::GetPrettyName() [with Result = boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<1024u, 1024u, (boost::multiprecision::cpp_integer_type)1u, (boost::multiprecision::cpp_int_check_type)0u, void> >; ArgTypes = {boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<1024u, 1024u, (boost::multiprecision::cpp_integer_type)1u, (boost::multiprecision::cpp_int_check_type)0u, void>, (boost::multiprecision::expression_template_option)0u>}; typename std::enable_if<(! std::is_pod<_Tp>::value), void>::type = void; std::string = std::basic_string<char>]
+    std::cout << f->GetName() << "\n" << f->GetPrettyName()<< "\n";
+}
+
 /*
 Local Variables:
 mode: c++
