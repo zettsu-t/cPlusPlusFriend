@@ -3,9 +3,9 @@
 
 require 'test/unit'
 
-def parseHourString(str)
-# str.sub(/(\D*)(\d+)/){ t=$2.to_i; ( t + ((!$1.include?("午後") || (t > 12)) ? 0 : 12)).to_s }.to_i
-  str.sub(/(\D*)(\d+)/){t=$2.to_i;(t+((!$1.include?("午後")||(t>12))?0:12)).to_s}.to_i
+def parseHourString(timestamp)
+# timestamp.sub(/(\D*)(\d+)/){ t=$2.to_i; ( t + ((!$1.include?("午後") || (t > 12)) ? 0 : 12)).to_s }.to_i
+  timestamp.sub(/(\D*)(\d+)/){t=$2.to_i;(t+((!$1.include?("午後")||(t>12))?0:12)).to_s}.to_i
 end
 
 class TestSeatMap < Test::Unit::TestCase
