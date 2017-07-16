@@ -815,6 +815,241 @@ TEST_F(TestFunctionName, CppInt) {
     std::cout << f->GetName() << "\n" << f->GetPrettyName()<< "\n";
 }
 
+namespace {
+    struct MyConstBoolObject {
+        constexpr MyConstBoolObject(bool b) : b_{b} {}
+        operator bool() const { return b_; }
+        const bool b_ {false};
+    };
+
+    bool g_assertFlag = false;
+
+    void SetAssertFlag(void) {
+        g_assertFlag = true;
+    }
+
+    bool SetAndClearAssertFlag(void) {
+        bool flag = false;
+        std::swap(flag, g_assertFlag);
+        return flag;
+    }
+
+    void MyAssertImpl(void) {
+        SetAssertFlag();
+    }
+
+    template <typename T>
+    void MyAssert(T&& cond) {
+        if (cond) {
+            return;
+        }
+        MyAssertImpl();
+    }
+}
+
+class TestTemplateAssert : public ::testing::Test {
+    virtual void SetUp() override {
+        SetAndClearAssertFlag();
+    }
+};
+
+TEST_F(TestTemplateAssert, TemplateTrue) {
+    // lvalue
+    bool b = true;
+    MyAssert(b);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    int c = 1;
+    MyAssert(c);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyConstBoolObject obj(true);
+    MyAssert(obj);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    auto p = &c;
+    MyAssert(p);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // rvalue
+    MyAssert(2);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyAssert(MyConstBoolObject(true));
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyAssert(&c);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // 式
+    MyAssert(MyConstBoolObject(c < 2));
+    EXPECT_FALSE(SetAndClearAssertFlag());
+}
+
+TEST_F(TestTemplateAssert, ConstTrue) {
+    const bool b = true;
+    MyAssert(b);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    const int c = 1;
+    MyAssert(c);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    const MyConstBoolObject obj(true);
+    MyAssert(obj);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+}
+
+TEST_F(TestTemplateAssert, TemplateFalse) {
+    bool b = false;
+    MyAssert(b);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    int c = 0;
+    MyAssert(c);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyConstBoolObject obj(false);
+    MyAssert(obj);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    void* p = nullptr;
+    MyAssert(p);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyAssert(0);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyAssert(MyConstBoolObject(false));
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyAssert(nullptr);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    // 式
+    MyAssert(MyConstBoolObject(c > 0));
+    EXPECT_TRUE(SetAndClearAssertFlag());
+}
+
+TEST_F(TestTemplateAssert, ConstFalse) {
+    const bool b = false;
+    MyAssert(b);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    const int c = 0;
+    MyAssert(c);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    const MyConstBoolObject obj(false);
+    MyAssert(obj);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+}
+
+namespace {
+    void MyAssertByBool(bool cond) {
+        if (cond) {
+            return;
+        }
+        MyAssertImpl();
+    }
+}
+
+TEST_F(TestTemplateAssert, BoolTrue) {
+    // lvalue
+    bool b = true;
+    MyAssertByBool(b);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    int c = 1;
+    MyAssertByBool(c);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyConstBoolObject obj(true);
+    MyAssertByBool(obj);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    auto p = &c;
+    MyAssertByBool(p);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // rvalue
+    MyAssertByBool(2);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyAssertByBool(MyConstBoolObject(true));
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // &vが常にtrueと評価されると警告が出る
+    // MyAssertByBool(&c);
+    // EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // 式
+    MyAssert(MyConstBoolObject(c < 2));
+    EXPECT_FALSE(SetAndClearAssertFlag());
+}
+
+TEST_F(TestTemplateAssert, BoolFalse) {
+    bool b = false;
+    MyAssertByBool(b);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    int c = 0;
+    MyAssertByBool(c);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyConstBoolObject obj(false);
+    MyAssertByBool(obj);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    // boolに変換できる
+    void* p = nullptr;
+    MyAssertByBool(p);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyAssertByBool(0);
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    MyAssertByBool(MyConstBoolObject(false));
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    // nullptrをboolに変換できないのでエラーになる
+    // MyAssertByBool(nullptr);
+
+    // 式
+    MyAssert(MyConstBoolObject(c > 0));
+    EXPECT_TRUE(SetAndClearAssertFlag());
+}
+
+namespace {
+    void MyAssertByInt(int cond) {
+        if (cond) {
+            return;
+        }
+        MyAssertImpl();
+    }
+}
+
+TEST_F(TestTemplateAssert, Int) {
+    bool b = true;
+    MyAssertByInt(b);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    MyConstBoolObject objBool(true);
+    MyAssertByInt(objBool);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    int c = 1;
+    MyAssertByInt(c);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+    MyAssertByInt(1);
+    EXPECT_FALSE(SetAndClearAssertFlag());
+
+    // intに変換できないのでコンパイルエラーになる
+    // MyAssertByInt(&c);
+    // void* p = nullptr;
+    // MyAssertByInt(p);
+}
+
 /*
 Local Variables:
 mode: c++
