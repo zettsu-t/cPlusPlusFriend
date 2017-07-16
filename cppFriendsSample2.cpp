@@ -898,6 +898,10 @@ TEST_F(TestTemplateAssert, ConstTrue) {
     const MyConstBoolObject obj(true);
     MyAssert(obj);
     EXPECT_FALSE(SetAndClearAssertFlag());
+
+    std::vector<bool> vec {true, true};
+    MyAssert(vec.at(0));
+    EXPECT_FALSE(SetAndClearAssertFlag());
 }
 
 TEST_F(TestTemplateAssert, TemplateFalse) {
@@ -928,6 +932,10 @@ TEST_F(TestTemplateAssert, TemplateFalse) {
 
     // 式
     MyAssert(MyConstBoolObject(c > 0));
+    EXPECT_TRUE(SetAndClearAssertFlag());
+
+    std::vector<bool> vec {false, false};
+    MyAssert(vec.at(0));
     EXPECT_TRUE(SetAndClearAssertFlag());
 }
 
