@@ -577,6 +577,20 @@ TEST_F(TestProcessorExceptionDeathTest, IntMaxMin) {
     ASSERT_DEATH(ProcessorException::may_divide_by_zero(INT_MIN, -1, 0), "");
 }
 
+// 元記事は下記によるもの。64bit Cygwin向けに変更した。
+// http://blog.onlinedisassembler.com/blog/?p=23
+// 15 bytesもある命令。実行はできない。
+void LongestInstruction(void) {
+    // objdumpの出力
+    // <_Z18LongestInstructionv>:
+    // 64 67 f0 43 81 84 88    lock addl $0xaaaaaaaa,%fs:0x77777777(%r8d,%r9d,4)
+    // 77 77 77 77 aa aa aa
+    // aa
+    asm volatile (
+        "lock addl $0xaaaaaaaa, %%fs:0x77777777(%%r8d, %%r9d, 4)\n\t"
+        :::);
+}
+
 /*
   Local Variables:
   mode: c++
