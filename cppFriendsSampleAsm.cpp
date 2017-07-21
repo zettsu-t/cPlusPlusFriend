@@ -583,11 +583,11 @@ TEST_F(TestProcessorExceptionDeathTest, IntMaxMin) {
 void LongestInstruction(void) {
     // objdumpの出力
     // <_Z18LongestInstructionv>:
-    // 64 67 f0 43 81 84 88    lock addl $0xaaaaaaaa,%fs:0x77777777(%r8d,%r9d,4)
-    // 77 77 77 77 aa aa aa
-    // aa
+    // 64 67 f0 43 81 84 88    lock addl $0xa0a0a0a0,%fs:0x50505050(%r8d,%r9d,4)
+    // 50 50 50 50 a0 a0 a0
+    // a0
     asm volatile (
-        "lock addl $0xaaaaaaaa, %%fs:0x77777777(%%r8d, %%r9d, 4)\n\t"
+        "lock addl $0xa0a0a0a0, %%fs:0x50505050(%%r8d, %%r9d, 4)\n\t"
         :::);
 }
 
