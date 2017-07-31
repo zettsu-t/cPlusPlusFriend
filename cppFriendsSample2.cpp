@@ -329,7 +329,12 @@ constexpr int MyNumericLimits(void) {
 }
 
 static_assert(MyNumericLimits<uint64_t>() == 19, "");
+
+// Cygwin GCC 6.3.0では定数式ではないとされてコンパイルエラーになる
+// GCC 5.4.0ではコンパイルエラーにならない
+#if (__GNUC__ < 6)
 static_assert(MyNumericLimits<int64_t>() == 18, "");
+#endif
 
 constexpr int MyIntMinExplicit(int l, int r) {
     return (l < r) ? l : r;

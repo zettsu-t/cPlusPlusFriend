@@ -288,8 +288,8 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 * Windows 10 Creators Update 64bit Edition
 * Cygwin 64bit version (2.8.0)
 * Google Test / Mock (1.7.0)
-* Boost C++ Libraries (1.60.0)
-* gcc (5.4.0)
+* Boost C++ Libraries (1.63.0)
+* gcc (6.3.0)
 * clang (4.0.1)
 * Ruby (2.3.3p222)
 
@@ -341,6 +341,48 @@ $ ruby -ne '$_.ascii_only? ? 0 : (puts "#{$.} : #{$_}" ; abort)' LICENSE.txt ; e
 $ ruby -ne '$_.ascii_only? ? 0 : (puts "#{$.} : #{$_}" ; abort)' cppFriends.cpp ; echo $?
 31 :     // すごーい! シリアライザはクラスを永続化できるフレンズなんだね
 1
+```
+
+### Cygwin GCC 5.4.0から6.3.0にアップグレードする
+
+Cygwin GCC 5.4.0を6.3.0に変更したことに伴い、本レポジトリのソースコードを変更しないと、コンパイルおよびテストに失敗しました。
+
+#### C++標準の違い
+
+GCC6.3.0で-stdが無いときは、-std=gnu++14になります。-std=gnu++98にするときは明示する必要があります。
+
+#### 定数式の扱い
+
+GCC6.3.0では下記のテンプレートについて、T=uint64_tは定数式になりますが、T=int64_tは定数式になりません。
+
+```c++
+template <typename T>
+constexpr int MyNumericLimits(T a, int digits) {
+    auto n = a * 10 + 9;
+    return (n > a) ? MyNumericLimits(n, digits + 1) : digits;
+}
+
+template <typename T>
+constexpr int MyNumericLimits(void) {
+    return MyNumericLimits<T>(9,1);
+}
+```
+
+GCC6.3.0では上段はコンパイルできますが、下段はコンパイルエラーになります。GCC5.4.0ではいずれもコンパイルできます。
+
+```c++
+static_assert(MyNumericLimits<uint64_t>() == 19, "");
+static_assert(MyNumericLimits<int64_t>() == 18, "");
+```
+
+#### ムーブコンストラクタ/ムーブ代入演算子
+
+ムーブコンストラクタ/ムーブ代入演算子を=defaultするとき、GCC 6.3.0ではprivate, protectedにするとエラーになります。publicにするとエラーになりません。GCC5.4.0ではprivateにしてもコンパイルできます。
+
+```c++
+private:
+    Train(Train&&) = default;
+    Train& operator =(Train&&) = default;
 ```
 
 ### switch-caseは整数しか振り分けられない

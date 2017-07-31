@@ -72,12 +72,17 @@ public:
         return str;
     }
 
+    // GCC 6.3.0ではprivate, protectedにするとエラーになる
+    // private within this context
+// protected:
+// private:
+    Train(Train&&) = default;
+    Train& operator =(Train&&) = default;
+
 private:
     // Effective Modern C++ 項目17を参照
     Train(const Train&) = default;
     Train& operator =(const Train&) = default;
-    Train(Train&&) = default;
-    Train& operator =(Train&&) = default;
 
     class InvalidValue : public std::ios_base::failure {
     public:

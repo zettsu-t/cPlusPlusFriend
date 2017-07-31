@@ -164,6 +164,7 @@ DETERMINE_FILE_TYPE=file
 CFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 
 CFLAGS=-std=gnu11 -O2 $(CFLAGS_WALL)
+CPPFLAGS_CPP98SPEC=-std=gnu++98
 CPPFLAGS_CPPSPEC=-std=gnu++14
 CPPFLAGS_ARCH=-mavx2 -DCPPFRIENDS_AVX2
 CPPFLAGS_COMMON= $(CFLAGS_WALL) $(GTEST_GMOCK_INCLUDE)
@@ -309,7 +310,7 @@ $(OBJ_THREAD): $(SOURCE_THREAD)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CPP98): $(SOURCE_CPP98)
-	$(CXX) $(CPPFLAGS_COMMON) -O2 -o $@ -c $<
+	$(CXX) $(CPPFLAGS_COMMON) $(CPPFLAGS_CPP98SPEC) -O2 -o $@ -c $<
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<

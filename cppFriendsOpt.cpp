@@ -156,15 +156,23 @@ TEST_F(TestMyCounter, MultiCore) {
 
     const MyCounter::Number count = 4000000;  // 十分大きくする
     SizeOfThreads sizeOfThreads = hardwareConcurrency_;
-    std::cout << "Run on multi threading\n";
+    std::cout << "Run on " << sizeOfThreads << " threads\n";
     runCounters(sizeOfThreads, count);
 
     MyCounter::Number expected = static_cast<decltype(expected)>(sizeOfThreads) * count;
     // 最適化しなければこうはならない
 #ifdef CPPFRIENDS_NO_OPTIMIZATION
+    // 偶然割り切れることもあり得なくもないが
+    EXPECT_TRUE(MyCounter::GetValue() % count);
     EXPECT_GT(expected, MyCounter::GetValue());
 #else
+    EXPECT_FALSE(MyCounter::GetValue() % count);
+#if (__GNUC__ < 6)
     EXPECT_EQ(expected, MyCounter::GetValue());
+    // GCC6では物理コア数分しか増えない
+    // 2コア4論理スレッドなら、4倍ではなく2倍になるということ
+    // 競合動作なのだから、そもそも正しいexpectationは書けない
+#endif
 #endif
     // マルチコアなら競合が起きるので成り立つはずだが、条件次第では競合しない可能性もある
     EXPECT_GT(expected, MyCounter::GetVolatileValue());

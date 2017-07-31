@@ -11,6 +11,11 @@ static_assert(sizeof(char) == 1, "Unexpected char size");
 #endif
 
 TEST_F(TestCpp98BoostFusionVector, Numbered) {
+#if (__GNUC__ >= 6)
+    // GCC 6.3.0は、-std=gnu++98 と明記しないと-std=gnu++14になる
+    // なので、以下のコメントアウトを外すと、C++14として通る
+    // static_assert(sizeof(char) == 1, "");
+#endif
     EXPECT_NE(typeid(boost::fusion::vector<int,int>), typeid(boost::fusion::vector2<int,int>));
 }
 
