@@ -357,22 +357,45 @@ GCC6.3.0では下記のテンプレートについて、T=uint64_tは定数式�
 
 ```c++
 template <typename T>
-constexpr int MyNumericLimits(T a, int digits) {
+constexpr int MyNumericLimitsDigits10_A(T a, int digits) {
+    // 整数オーバフローを意図的に起こす
     auto n = a * 10 + 9;
-    return (n > a) ? MyNumericLimits(n, digits + 1) : digits;
+    return (n > a) ? MyNumericLimitsDigits10_A(n, digits + 1) : digits;
 }
 
 template <typename T>
-constexpr int MyNumericLimits(void) {
-    return MyNumericLimits<T>(9,1);
+constexpr int MyNumericLimitsDigits10_A(void) {
+    return MyNumericLimitsDigits10_A<T>(9,1);
 }
 ```
 
-GCC6.3.0では上段はコンパイルできますが、下段はコンパイルエラーになります。GCC5.4.0ではいずれもコンパイルできます。
+GCC6.3.0では上段はコンパイルできますが、下段はコンパイルエラーになります。GCC5.4.0ではいずれもコンパイルできます。符号あり整数のオーバフローに対する動作は未定義ですので、GCC6.3.0は定数が求まらないとしてエラーにするようです。
 
 ```c++
-static_assert(MyNumericLimits<uint64_t>() == 19, "");
-static_assert(MyNumericLimits<int64_t>() == 18, "");
+static_assert(MyNumericLimitsDigits10_A<uint64_t>() == 19, "");
+static_assert(MyNumericLimitsDigits10_A<int64_t>() == 18, "");
+```
+
+整数オーバフローを発生させないように書き換えるとコンパイルできます。
+
+```c++
+template <typename T>
+constexpr int MyNumericLimitsDigits10_B(T a, int digits) {
+    auto n = a / 10;
+    return (n) ? MyNumericLimitsDigits10_B(n, digits + 1) : digits;
+}
+
+template <typename T>
+constexpr int MyNumericLimitsDigits10_B(void) {
+    T maxNumber = 0;
+    constexpr size_t shift = sizeof(T) * 8 - ((std::is_signed<T>::value) ? 1 : 0);
+    for(size_t i=0; i<shift; ++i) {
+        // maxNumber *= 2 は -Wconversionで警告が出る
+        maxNumber = static_cast<T>(maxNumber * 2);
+        ++maxNumber;
+    }
+    return MyNumericLimitsDigits10_B<T>(maxNumber,0);
+}
 ```
 
 #### ムーブコンストラクタ/ムーブ代入演算子

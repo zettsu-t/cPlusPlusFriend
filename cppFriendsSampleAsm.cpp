@@ -581,6 +581,7 @@ TEST_F(TestProcessorExceptionDeathTest, IntMaxMin) {
 // http://blog.onlinedisassembler.com/blog/?p=23
 // 15 bytesもある命令。実行はできない。
 void LongestInstruction(void) {
+#ifdef __x86_64__
     // objdumpの出力
     // <_Z18LongestInstructionv>:
     // 64 67 f0 43 81 84 88    lock addl $0xa0a0a0a0,%fs:0x50505050(%r8d,%r9d,4)
@@ -589,6 +590,7 @@ void LongestInstruction(void) {
     asm volatile (
         "lock addl $0xa0a0a0a0, %%fs:0x50505050(%%r8d, %%r9d, 4)\n\t"
         :::);
+#endif
 }
 
 /*

@@ -318,23 +318,53 @@ static_assert(std::numeric_limits<int64_t>::digits10 == 18, "");
 
 // 敢えて自作する
 template <typename T>
-constexpr int MyNumericLimits(T a, int digits) {
+constexpr int MyNumericLimitsDigits10_A(T a, int digits) {
+    // 整数オーバフローを意図的に起こす
     auto n = a * 10 + 9;
-    return (n > a) ? MyNumericLimits(n, digits + 1) : digits;
+    return (n > a) ? MyNumericLimitsDigits10_A(n, digits + 1) : digits;
 }
 
 template <typename T>
-constexpr int MyNumericLimits(void) {
-    return MyNumericLimits<T>(9,1);
+constexpr int MyNumericLimitsDigits10_A(void) {
+    return MyNumericLimitsDigits10_A<T>(9,1);
 }
 
-static_assert(MyNumericLimits<uint64_t>() == 19, "");
+static_assert(MyNumericLimitsDigits10_A<uint64_t>() == 19, "");
 
 // Cygwin GCC 6.3.0では定数式ではないとされてコンパイルエラーになる
 // GCC 5.4.0ではコンパイルエラーにならない
 #if (__GNUC__ < 6)
-static_assert(MyNumericLimits<int64_t>() == 18, "");
+static_assert(MyNumericLimitsDigits10_A<int64_t>() == 18, "");
 #endif
+
+template <typename T>
+constexpr int MyNumericLimitsDigits10_B(T a, int digits) {
+    auto n = a / 10;
+    return (n) ? MyNumericLimitsDigits10_B(n, digits + 1) : digits;
+}
+
+template <typename T>
+constexpr int MyNumericLimitsDigits10_B(void) {
+    T maxNumber = 0;
+    constexpr size_t shift = sizeof(T) * 8 - ((std::is_signed<T>::value) ? 1 : 0);
+    for(size_t i=0; i<shift; ++i) {
+        // maxNumber *= 2 は -Wconversionで警告が出る
+        maxNumber = static_cast<T>(maxNumber * 2);
+        ++maxNumber;
+    }
+    return MyNumericLimitsDigits10_B<T>(maxNumber,0);
+}
+
+static_assert(MyNumericLimitsDigits10_B<uint64_t>() == 19, "");
+static_assert(MyNumericLimitsDigits10_B<int64_t>()  == 18, "");
+static_assert(MyNumericLimitsDigits10_B<uint64_t>() == std::numeric_limits<uint64_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<uint32_t>() == std::numeric_limits<uint32_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<uint16_t>() == std::numeric_limits<uint16_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<uint8_t>()  == std::numeric_limits<uint8_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<int64_t>() == std::numeric_limits<int64_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<int32_t>() == std::numeric_limits<int32_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<int16_t>() == std::numeric_limits<int16_t>::digits10, "");
+static_assert(MyNumericLimitsDigits10_B<int8_t>()  == std::numeric_limits<int8_t>::digits10, "");
 
 constexpr int MyIntMinExplicit(int l, int r) {
     return (l < r) ? l : r;
