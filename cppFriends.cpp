@@ -216,7 +216,13 @@ private:
     }
 };
 
-class TestSerialization : public ::testing::Test{};
+class TestSerialization : public ::testing::Test {
+protected:
+    void checkIfStartWith(const std::string& actual, const std::string& keyword) {
+        EXPECT_EQ(0, actual.find(keyword));
+        return;
+    }
+};
 
 TEST_F(TestSerialization, Initialize) {
     Train train;
@@ -323,8 +329,9 @@ TEST_F(TestSerialization, StdInvalid) {
             actual = e.what();
         }
 
+        // MinGWでは": iostream error"が後ろにつく
         const std::string expected = "Invalid number 3";
-        EXPECT_EQ(expected, actual);
+        checkIfStartWith(actual, expected);
     }
 
     {
@@ -359,7 +366,7 @@ TEST_F(TestSerialization, BoostInvalidOut) {
     }
 
     const std::string expected = "Invalid number 3";
-    EXPECT_EQ(expected, actual);
+    checkIfStartWith(actual, expected);
 }
 
 TEST_F(TestSerialization, BoostInvalidIn) {
@@ -390,7 +397,7 @@ TEST_F(TestSerialization, BoostInvalidIn) {
             actual = e.what();
         }
 
-        EXPECT_EQ(test.second, actual);
+        checkIfStartWith(actual, test.second);
     }
 }
 

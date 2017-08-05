@@ -545,6 +545,19 @@ TEST_F(TestProcessorExceptionDeathTest, Unsafe) {
     ASSERT_DEATH(divideByZeroUnsafe(15, 0, -1), "");
 }
 
+TEST_F(TestProcessorExceptionDeathTest, Abs) {
+    EXPECT_EQ(0,  ProcessorException::abs_int(0));
+    EXPECT_EQ(1,  ProcessorException::abs_int(1));
+    EXPECT_EQ(1,  ProcessorException::abs_int(-1));
+
+    constexpr int intMax = std::numeric_limits<int>::max();
+    constexpr int intMin = std::numeric_limits<int>::min();
+    EXPECT_EQ(intMax, ProcessorException::abs_int(intMax));
+    EXPECT_EQ(intMin, ProcessorException::abs_int(intMin));
+}
+
+#if !defined(__MINGW32__) && !defined(__MINGW64__)
+// MinGWでは、FPEが発生するが処理が先に進まない
 TEST_F(TestProcessorExceptionDeathTest, MuchSafe) {
     // int32_tの範囲で解を表現できないのでCPU例外が発生する
     constexpr int32_t intMin = std::numeric_limits<int32_t>::min();
@@ -559,23 +572,13 @@ TEST_F(TestProcessorExceptionDeathTest, TooLarge) {
     ASSERT_DEATH(ProcessorException::may_divide_by_zero(intMin, -1, 0), "");
 }
 
-TEST_F(TestProcessorExceptionDeathTest, Abs) {
-    EXPECT_EQ(0,  ProcessorException::abs_int(0));
-    EXPECT_EQ(1,  ProcessorException::abs_int(1));
-    EXPECT_EQ(1,  ProcessorException::abs_int(-1));
-
-    constexpr int intMax = std::numeric_limits<int>::max();
-    constexpr int intMin = std::numeric_limits<int>::min();
-    EXPECT_EQ(intMax, ProcessorException::abs_int(intMax));
-    EXPECT_EQ(intMin, ProcessorException::abs_int(intMin));
-}
-
 TEST_F(TestProcessorExceptionDeathTest, IntMaxMin) {
     if ((sizeof(int32_t) == sizeof(int)) && (std::numeric_limits<int32_t>::min() == INT_MIN)) {
         EXPECT_EQ(INT_MIN, ProcessorException::abs_int(INT_MIN));
     }
     ASSERT_DEATH(ProcessorException::may_divide_by_zero(INT_MIN, -1, 0), "");
 }
+#endif
 
 // 元記事は下記によるもの。64bit Cygwin向けに変更した。
 // http://blog.onlinedisassembler.com/blog/?p=23

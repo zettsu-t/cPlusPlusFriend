@@ -114,18 +114,32 @@ TEST_F(TestSpaceSet, PosixClass) {
     PrintCodePoints(SpaceSet, os);
     ScanSpaces(SpaceSet, PosixSpacePattern, os);
 
-    // Cygwin GCC 5.4.0 の出力結果
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    // MinGW GCC 7.1.0 の出力結果
     std::string expected = "20:a0:1680:2002:2003:2002:2003:2004:2005:"
         "2006:2007:2008:2009:200a:202f:205f:3000:"
-        "「 」:20&「 」:1680&「 」:2002&「 」:2003&「 」:2004&「 」:2005&「 」:"
-        "2006&「 」:2008&「 」:2009&「 」:200a&「 」:205f&「　」:3000&\n12 spaces found";
+        "「 」:20&「 」:a0&「 」:1680&「 」:2002&「 」:2003&「 」:2004&"
+        "「 」:2005&「 」:2006&「 」:2007&「 」:2008&「 」:2009&"
+        "「 」:200a&「 」:202f&「 」:205f&「　」:3000&\n15 spaces found";
+#else
+    // Cygwin GCC 6.3.0 の出力結果
+    std::string expected = "20:a0:1680:2002:2003:2002:2003:2004:2005:"
+        "2006:2007:2008:2009:200a:202f:205f:3000:"
+        "「 」:20&「 」:1680&「 」:2002&「 」:2003&「 」:2004&"
+        "「 」:2005&「 」:2006&「 」:2008&「 」:2009&"
+        "「 」:200a&「 」:205f&「　」:3000&\n12 spaces found";
+#endif
     EXPECT_EQ(expected, os.str());
 }
 
 TEST_F(TestSpaceSet, MetaSpace) {
-    // Cygwin GCC 5.4.0 の出力結果
     std::ostringstream os;
-    EXPECT_EQ(12, ScanSpaces(SpaceSet, MetaSpacePattern, os));
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    constexpr size_t expected = 15;
+#else
+    constexpr size_t expected = 12;
+#endif
+    EXPECT_EQ(expected, ScanSpaces(SpaceSet, MetaSpacePattern, os));
 }
 
 TEST_F(TestSpaceSet, NonSpace) {

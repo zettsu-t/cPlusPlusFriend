@@ -1,3 +1,24 @@
+# ビルド環境を識別する
+GCC_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3)
+LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\)\\b.*/\\1\\2/" | cut -c 1-2)
+
+ifeq ($(OS),Windows_NT)
+ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
+BUILD_ON_CYGWIN=yes
+else
+BUILD_ON_MINGW=yes
+# MinGWからstripコマンドを使うときは、明示的な拡張子が必要
+EXPLICIT_EXE_SUFFIX=.exe
+#パスにスペースが入っている(C:\Program Files)状況には対応しない
+MINGW_DIR=C:\MinGW
+# MinGW-32向けには書き換える必要がある
+ISYSTEM_MINGW_INCLUDE_DIR=$(MINGW_DIR)\include
+CLANG_TARGET=-target x86_64-pc-windows-gnu
+# 必要であれば設定する
+BOOST_LIB_POSTFIX=
+endif
+endif
+
 # コンソール出力に色を付ける
 ECHO_START="\e[104m
 ECHO_END=\e[0m"
@@ -21,7 +42,9 @@ TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
 TARGET_C_SJIS=cFriendsShiftJis
 TARGET_C=cFriends
+ifneq ($(BUILD_ON_MINGW),yes)
 TARGET_GCC_LTO=cppFriends_gcc_lto
+endif
 TARGET_CLANG=cppFriendsClang
 TARGET_CLANG_LTO=cppFriendsClang_lto
 OUTPUT_ASM87_C=cFriends87.s
@@ -93,17 +116,21 @@ OBJ_SAMPLE_1=cppFriendsSample1.o
 OBJ_SAMPLE_2=cppFriendsSample2.o
 OBJ_SAMPLE_ASM=cppFriendsSampleAsm.o
 OBJ_SAMPLE_SORT=cppFriendsSort.o
-OBJ_OPT=cppFriendsOpt.o
 OBJ_EXT=cppFriendsExt.o
+# スレッドとネットワークはMinGWでサポートしない
+ifneq ($(BUILD_ON_MINGW),yes)
+OBJ_OPT=cppFriendsOpt.o
 OBJ_THREAD=cppFriendsThread.o
+OBJ_NET=cppFriendsNet.o
+OBJ_NO_OPT=cppFriendsOpt_no_opt.o
+endif
+
 OBJ_CPP98=cppFriends98.o
 OBJ_SPACE=cppFriendsSpace.o
-OBJ_NET=cppFriendsNet.o
 OBJ_CLANG=cppFriendsClang.o
 OBJ_CLANG_EXT=cppFriendsClangExt.o
 OBJ_CLANG_TEST=cppFriendsClangTest.o
 
-OBJ_NO_OPT=cppFriendsOpt_no_opt.o
 OBJ_NO_OPT_EXT=cppFriends_no_optExt.o
 OBJ_MAIN_GCC_LTO=cppFriendsMain_gcc_lto.o
 OBJ_CLANG_GCC_LTO=cppFriendsClang_gcc_lto.o
@@ -160,29 +187,48 @@ WC?=wc
 RUBY?=ruby
 DETERMINE_FILE_TYPE=file
 
+ifeq ($(BUILD_ON_MINGW),yes)
+INCLUDES_GXX=$(addprefix -isystem,$(ISYSTEM_MINGW_INCLUDE_DIR))
+INCLUDES_CLANGXX=
+endif
+
 # http://d.hatena.ne.jp/higepon/20080430/1209525546
 CFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CFLAGS_COMMON=-std=gnu11 -O2 $(CFLAGS_WALL)
+GXX_CFLAGS=$(INCLUDES_GXX) $(CFLAGS_COMMON)
+CLANGXX_CFLAGS=$(CLANG_TARGET) $(INCLUDES_CLANGXX) $(CFLAGS_COMMON)
 
-CFLAGS=-std=gnu11 -O2 $(CFLAGS_WALL)
 CPPFLAGS_CPP98SPEC=-std=gnu++98
 CPPFLAGS_CPPSPEC=-std=gnu++14
 CPPFLAGS_ARCH=-mavx2 -DCPPFRIENDS_AVX2
-CPPFLAGS_COMMON= $(CFLAGS_WALL) $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS_COMMON=$(CFLAGS_WALL) $(GTEST_GMOCK_INCLUDE)
 CPPFLAGS=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -O2
-CPPFLAGS_NO_OPT=$(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -g -O0 -DCPPFRIENDS_NO_OPTIMIZATION
-CPPFLAGS_ERROR=-std=gnu++1z  $(CFLAGS_WALL) $(CPPFLAGS_COMMON) -O2
 
-CPPFLAGS_LTO=-flto -DCPPFRIENDS_ENABLE_LTO
+GXX_CPPFLAGS=$(INCLUDES_GXX) $(CPPFLAGS)
+GXX_CPPFLAGS_NO_OPT=$(INCLUDES_GXX) $(CPPFLAGS_CPPSPEC) $(CPPFLAGS_COMMON) -g -O0 -DCPPFRIENDS_NO_OPTIMIZATION
+GXX_CPPFLAGS_ERROR=$(INCLUDES_GXX) -std=gnu++1z $(CFLAGS_WALL) $(CPPFLAGS_COMMON) -O2
+GXX_CPPFLAGS_LTO=$(INCLUDES_GXX) -flto -DCPPFRIENDS_ENABLE_LTO $(CPPFLAGS)
 LDFLAGS_LTO=-Wno-attributes
-CLANGXX_COMMON_FLAGS=-D__STRICT_ANSI__
-CLANGXXFLAGS=-S -emit-llvm $(CLANGXX_COMMON_FLAGS)
-CLANGXXFLAGS_LTO=$(CPPFLAGS_LTO) $(CLANGXXFLAGS)
+
+CLANGXX_COMMON_FLAGS=$(INCLUDES_CLANGXX)
+ifeq ($(BUILD_ON_MINGW),yes)
+CLANGXX_COMMON_FLAGS+=$(CLANG_TARGET) -fno-exceptions -DBOOST_EXCEPTION_DISABLE=0 -DBOOST_NO_EXCEPTIONS=0
+else
+CLANGXX_COMMON_FLAGS+=-D__STRICT_ANSI__
+endif
+
+CLANGXX_FLAGS=-S -emit-llvm $(CLANGXX_COMMON_FLAGS) $(CPPFLAGS)
+CLANGXX_FLAGS_LTO=$(CLANGXX_FLAGS) $(CPPFLAGS_LTO)
 LLCFLAGS=-filetype=obj
 LLVM_OPT_FLAGS=-internalize -internalize-public-api-list=main,WinMain -O2
 
 LIBPATH=
 LDFLAGS=
-LIBS=-lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex -lboost_system
+LIBS=$(addsuffix $(BOOST_LIB_POSTFIX), -lboost_date_time -lboost_locale -lboost_serialization -lboost_random -lboost_regex -lboost_system)
+ifeq ($(BUILD_ON_MINGW),yes)
+CLANGXX_LDFLAGS=-Wl,--allow-multiple-definition
+CLANGXX_LIBS=-lsupc++
+endif
 
 INDENT_OPTIONS=--line-length10000 --dont-format-comments --dont-break-function-decl-args --dont-break-procedure-type --dont-line-up-parentheses --no-space-after-parentheses
 
@@ -194,7 +240,7 @@ RUBY_ONELINER_ASCII_ONLY='$$_.ascii_only? ? 0 : (puts $$. , $$_ ; abort)'
 all: $(TARGETS) force
 
 $(PREPROCESSED_CLANG_TEST): $(SOURCE_CLANG_TEST)
-	$(CXX) $(CPPFLAGS) -E -C -DONLY_PREPROCESSING -o $@ $<
+	$(CXX) $(GXX_CPPFLAGS) -E -C -DONLY_PREPROCESSING -o $@ $<
 
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
@@ -216,31 +262,31 @@ $(TARGET_C_SJIS): $(SOURCE_C_SJIS)
 	$(CPP) -o $@ $<
 	@./$@
 	@./$@ | $(WC) | $(GREP) "  1  "
-	-$(CPP) $(CFLAGS) -Werror -o $@ $<
+	-$(CPP) $(GXX_CFLAGS) -Werror -o $@ $<
 
 $(TARGET_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS_87) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS_87) -o $@ $<
 	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87) $(ECHO_END)
 	@./$@
-	$(CPP) $(CFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
 	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87_STORE) $(ECHO_END)
 	@./$@
-	$(CPP) $(CFLAGS) $(CASMFLAGS_64) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS_64) -o $@ $<
 	@echo -e $(ECHO_START)Using x64 and SSE $(ECHO_END)
 	@./$@
 
 $(TARGET_GCC_LTO): $(OBJS_GCC_LTO)
-	$(LD) $(CPPFLAGS_LTO) $(LDFLAGS_LTO) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(LD) $(GXX_CPPFLAGS_LTO) $(LDFLAGS_LTO) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 	./$@
 
 $(TARGET_CLANG): $(OBJ_ALL_IN_ONE_NO_LTO)
-	$(CXX) -o $@ $<
-	$(STRIP) $@
+	$(CXX) -o $@ $< $(CLANGXX_LDFLAGS) $(CLANGXX_LIBS)
+	$(STRIP) $@$(EXPLICIT_EXE_SUFFIX)
 	./$@
 
 $(TARGET_CLANG_LTO): $(OBJ_ALL_IN_ONE_LTO)
-	$(CXX) $(CPPFLAGS_LTO) -o $@ $<
-	$(STRIP) $@
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ $< $(CLANGXX_LIBS)
+	$(STRIP) $@$(EXPLICIT_EXE_SUFFIX)
 	./$@
 
 $(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
@@ -251,28 +297,28 @@ $(OUTPUT_FUNCLIST): $(INDENT_INPUT_SOURCE_H) $(INDENT_INPUT_SOURCE_C)
 	ctags -x --c-kinds=f --fields=+S $(OUTPUT_FUNCLIST_TEMP_SRCS) | sed -e 's/  */ /g' | cut -d' ' -f5- | tee $(OUTPUT_FUNCLIST)
 
 $(OUTPUT_ASM87_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87) -o $@ $<
 
 $(OUTPUT_ASM87_STORE_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS) $(CASMFLAGS_87_STORE) -o $@ $<
 
 $(OUTPUT_ASM64_C): $(SOURCE_C)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
 
 $(OUTPUT_ASM64_CLANG): $(SOURCE_C)
-	$(CLANG) $(CLANGXX_COMMON_FLAGS) $(CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
+	$(CLANG) $(CLANGXX_CFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
 
 $(OUTPUT_ASM_C_EXT1): $(SOURCE_C_EXT)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS) -o $@ $<
 
 $(OUTPUT_ASM_C_EXT2): $(SOURCE_C_EXT)
-	$(CPP) $(CFLAGS) $(CASMFLAGS) -DCPPFRIENDS_SIDE_EFFECT -o $@ $<
+	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS) -DCPPFRIENDS_SIDE_EFFECT -o $@ $<
 
 $(OUTPUT_ASM_CPP_CLANG): $(SOURCE_CLANG)
 	$(CLANGXX) $(CLANGXX_COMMON_FLAGS) $(CPPFLAGS) $(CASMFLAGS) -o $@ $<
 
 $(OUTPUT_ASM_CPP_GCC): $(SOURCE_CLANG)
-	$(CXX) $(CPPFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
+	$(CXX) $(GXX_CPPFLAGS) $(CASMFLAGS) $(CASMFLAGS_64) -o $@ $<
 
 force : $(SOURCE_ERROR)
 	$(RUBY) $(SOURCE_RUBY_CASEWHEN)
@@ -286,70 +332,73 @@ force : $(SOURCE_ERROR)
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_FRIENDS): $(SOURCE_FRIENDS)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_SAMPLE_1): $(SOURCE_SAMPLE_1)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_SAMPLE_2): $(SOURCE_SAMPLE_2)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_SAMPLE_ASM): $(SOURCE_SAMPLE_ASM)
-	$(CXX) $(CPPFLAGS) $(CPPFLAGS_ARCH) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) $(CPPFLAGS_ARCH) -o $@ -c $<
+
+$(OBJ_SAMPLE_SORT): $(SOURCE_SAMPLE_SORT)
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_OPT): $(SOURCE_OPT)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_EXT): $(SOURCE_EXT)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_THREAD): $(SOURCE_THREAD)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CPP98): $(SOURCE_CPP98)
-	$(CXX) $(CPPFLAGS_COMMON) $(CPPFLAGS_CPP98SPEC) -O2 -o $@ -c $<
+	$(CXX) $(INCLUDES_GXX) $(CPPFLAGS_COMMON) $(CPPFLAGS_CPP98SPEC) -O2 -o $@ -c $<
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_NET): $(SOURCE_NET)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG): $(SOURCE_CLANG)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG_EXT): $(SOURCE_CLANG_EXT)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_CLANG_TEST): $(SOURCE_CLANG_TEST)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(OBJ_NO_OPT): $(SOURCE_OPT)
-	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_NO_OPT) -o $@ -c $<
 
 $(OBJ_NO_OPT_EXT): $(SOURCE_EXT)
-	$(CXX) $(CPPFLAGS_NO_OPT) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_NO_OPT) -o $@ -c $<
 
 $(OBJ_MAIN_GCC_LTO): $(SOURCE_MAIN)
-	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ -c $<
 
 $(OBJ_CLANG_GCC_LTO): $(SOURCE_CLANG)
-	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ -c $<
 
 $(OBJ_CLANG_EXT_GCC_LTO): $(SOURCE_CLANG_EXT)
-	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ -c $<
 
 $(OBJ_CLANG_TEST_GCC_LTO): $(SOURCE_CLANG_TEST)
-	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ -c $<
 
 $(GTEST_OBJ): $(GTEST_SOURCE)
-	$(CXX) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
 
 $(GTEST_OBJ_LTO): $(GTEST_SOURCE)
-	$(CXX) $(CPPFLAGS_LTO) $(CPPFLAGS) -o $@ -c $<
+	$(CXX) $(GXX_CPPFLAGS_LTO) -o $@ -c $<
 
 $(OBJ_ALL_IN_ONE_NO_LTO) : $(BC_ALL)
 	$(LLC) $(LLCFLAGS) -o $@ $<
@@ -367,34 +416,34 @@ $(BC_OPT_LTO): $(BC_ALL_LTO)
 	$(LLVM_OPT) $(LLVM_OPT_FLAGS) -o $@ $<
 
 $(BC_MAIN): $(SOURCE_MAIN)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(BC_CLANG): $(SOURCE_CLANG)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(BC_CLANG_EXT): $(SOURCE_CLANG_EXT)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(BC_CLANG_TEST): $(SOURCE_CLANG_TEST)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(BC_MAIN_LTO): $(SOURCE_MAIN)
-	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS_LTO) -o $@ $<
 
 $(BC_CLANG_LTO): $(SOURCE_CLANG)
-	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS_LTO) -o $@ $<
 
 $(BC_CLANG_EXT_LTO): $(SOURCE_CLANG_EXT)
-	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS_LTO) -o $@ $<
 
 $(BC_CLANG_TEST_LTO): $(SOURCE_CLANG_TEST)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(GTEST_BC): $(GTEST_SOURCE)
-	$(CLANGXX) $(CLANGXXFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS) -o $@ $<
 
 $(GTEST_BC_LTO): $(GTEST_SOURCE)
-	$(CLANGXX) $(CLANGXXFLAGS_LTO) $(CPPFLAGS) -o $@ $<
+	$(CLANGXX) $(CLANGXX_FLAGS_LTO) -o $@ $<
 
 test: $(TARGET)
 	./$(TARGET)

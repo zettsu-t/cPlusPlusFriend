@@ -109,15 +109,26 @@ void exec_snprintf_twice(void) {
     const char src[8] = "0123456";    // 転送元
     char buf[10]      = "ABCDEFGHI";  // 壊れているかどうか後で調べる
 
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    // 非0を渡す必要がある
+    int size = snprintf(buf, 0, "%s", src);
+    // このsizeにNUL終端は含まない
+    fprintf(stderr, "%s <<<\n", buf);
+    // 十分なバッファがあれば書き込むはずの文字数が返ってくるはずだが...
+    assert(size == -1);
+    size = sizeof(src) - 1;
+#else
     // 最初の引数にNULLを渡しても大丈夫か?
 //  int size = snprintf(NULL, 0, "%s", src);
     int size = snprintf(buf, 0, "%s", src);
     // このsizeにNUL終端は含まない
     assert((size + 1) == sizeof(src));
+#endif
     assert(buf[sizeof(src)-2] == 'G');
 
     size_t requiredSize = (size_t)(size + 1);  // 符号が取れるのでキャストがないと警告が出る
-    snprintf(buf, requiredSize, "%s", src);
+    size = snprintf(buf, requiredSize, "%s", src);
+    assert((size + 1) == sizeof(src));
     assert(buf[sizeof(src)-2] == '6');
     assert(buf[sizeof(src)-1] == '\0');
     assert(buf[sizeof(buf)-2] == 'I');

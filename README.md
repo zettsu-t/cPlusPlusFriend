@@ -408,6 +408,18 @@ private:
     Train& operator =(Train&&) = default;
 ```
 
+### MinGW GCC 7.1.0の制限事項
+
+MinGW-w64 Distro 15.0 (GCC 7.1.0)でmakeできるようにしました。ただし以下の制限事項があります。
+
+- GCCのLTOは実行ファイルを生成できるが、実行できない
+- スレッドとネットワーク処理をコンパイル/リンクしない(MinGWでstd::thread, arpa/inet.hが使えないため)
+- clang++でC++例外が使えない。Boost C++ LibrariesもC++例外を使えないので、boost::throw_exceptionを定義している。
+- snprintfは、文字列がバッファに収まらないとき-1を返す(Cygwinはバッファが十分長ければ収めるはずの文字数を返す)
+- TEST_F(TestRegex, ReDos) で複雑な正規表現を処理するのが終了しない(Cygwinは例外を投げて終了する)
+- ::isasciiが使えない。代わりに__isasciiを使う。
+- CPU除算例外が発生したとき、処理が先に進まずプロセスが終了しない(Cygwinはプロセスが終了するのでDeathTestできる)
+
 ### switch-caseは整数しか振り分けられない
 
 [こちら](switchCase.md)に説明を書きました。Rubyのcase-whenは便利ですね。
