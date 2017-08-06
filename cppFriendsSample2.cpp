@@ -355,9 +355,15 @@ constexpr int MyNumericLimitsDigits10_B(T a, int digits) {
 
 template <typename T>
 constexpr int MyNumericLimitsDigits10_B(void) {
+    // std::is_signed
+    using BitWidth = decltype(sizeof(T));
+    constexpr T zero = 0;
+    constexpr T preZero = zero - static_cast<T>(1);
+    constexpr BitWidth isSigned = (zero > preZero) ? 1 : 0;
+
     T maxNumber = 0;
-    constexpr size_t shift = sizeof(T) * 8 - ((std::is_signed<T>::value) ? 1 : 0);
-    for(size_t i=0; i<shift; ++i) {
+    constexpr BitWidth shift = sizeof(T) * 8 - isSigned;
+    for(BitWidth i=0; i<shift; ++i) {
         // maxNumber *= 2 は -Wconversionで警告が出る
         maxNumber = static_cast<T>(maxNumber * 2);
         ++maxNumber;
