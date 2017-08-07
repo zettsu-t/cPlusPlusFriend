@@ -5,15 +5,22 @@ LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.*
 ifeq ($(OS),Windows_NT)
 ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
 BUILD_ON_CYGWIN=yes
+
 else
 BUILD_ON_MINGW=yes
+ifeq (,$(findstring x86_64,$(shell gcc -dumpmachine)))
+BUILD_ON_MINGW32=yes
+CLANG_TARGET=-target i686-pc-windows-gnu
+else
+CLANG_TARGET=-target x86_64-pc-windows-gnu
+endif
+
 # MinGWからstripコマンドを使うときは、明示的な拡張子が必要
 EXPLICIT_EXE_SUFFIX=.exe
 #パスにスペースが入っている(C:\Program Files)状況には対応しない
 MINGW_DIR=C:\MinGW
 # MinGW-32向けには書き換える必要がある
 ISYSTEM_MINGW_INCLUDE_DIR=$(MINGW_DIR)\include
-CLANG_TARGET=-target x86_64-pc-windows-gnu
 # 必要であれば設定する
 BOOST_LIB_POSTFIX=
 endif

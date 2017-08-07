@@ -538,7 +538,11 @@ TEST_F(TestDateFormat, LeapSecond) {
     {
         std::istringstream is("2017-01-01 08:59:61");
         is >> std::get_time(&t, dataDormat);
+#if defined(__MINGW32__) && !defined(__MINGW64__)
+        ASSERT_FALSE(is.fail());
+#else
         ASSERT_TRUE(is.fail());
+#endif
     }
 }
 

@@ -64,7 +64,9 @@ TEST_F(TestNarrowingCast, LongLongToDouble) {
     const std::string actual = os.str();
 
     // 下位の桁は保存されない
+#if !defined(__MINGW32__) || defined(__MINGW64__)
     EXPECT_TRUE(std::numeric_limits<decltype(d)>::is_iec559);
+#endif
     EXPECT_NE(base, actual);
 
     // 上位の桁は保存される
@@ -110,7 +112,7 @@ TEST_F(TestMacroExpansion, SingleStatement) {
     std::string log = message;
     log += "@";
     log += __PRETTY_FUNCTION__;
-    log += "in cppFriendsClangTest.cpp : 116";
+    log += "in cppFriendsClangTest.cpp : 118";
 
     bool cond = !out.tellp();
     if (cond) DEBUG_PRINT_COUT(out, message);

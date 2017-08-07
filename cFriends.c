@@ -1,9 +1,14 @@
 #include <assert.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "cFriends.h"
 #include "cFriendsCommon.h"
+
+#ifndef static_assert
+#define static_assert _Static_assert
+#endif
 
 // 定義が見えていたらどうだろう?
 volatile int g_memoryMappedClock;  // レジスタから値を読みに行くイメージ
@@ -109,7 +114,7 @@ void exec_snprintf_twice(void) {
     const char src[8] = "0123456";    // 転送元
     char buf[10]      = "ABCDEFGHI";  // 壊れているかどうか後で調べる
 
-#if defined(__MINGW32__) || defined(__MINGW64__)
+#ifdef __MINGW64__
     // 非0を渡す必要がある
     int size = snprintf(buf, 0, "%s", src);
     // このsizeにNUL終端は含まない

@@ -1,4 +1,6 @@
 // やめるのだフェネックで学ぶC++の実証コード
+#define  __STDC_LIMIT_MACROS
+#include <cstdint>
 #include <climits>
 #include <cstring>
 #include <algorithm>
