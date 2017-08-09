@@ -3,5 +3,5 @@
 
 require_relative './shuffleLinesImpl.rb'
 
-# まだ何もしない
+LineSetParser.new(MyProgramOption.new(ARGV)).shuffle.write
 0

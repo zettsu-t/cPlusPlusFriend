@@ -355,6 +355,10 @@ Compound statementがあることを教えて頂きました。[こちら](expan
 
 [こちら](upgradeCompiler.md)にまとめました。
 
+## ツイッターbotの投稿順序を並び替える
+
+[こちら](shuffleLines.md)に説明があります。
+
 ## ライセンス
 
 本レポジトリのライセンスは、[MITライセンス](LICENSE.txt)です。

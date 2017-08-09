@@ -1,12 +1,48 @@
 #!/usr/bin/ruby
 # coding: utf-8
 
-# 要素数がそれぞれm, n, ... 個の配列要素が、ほどよく入り混じるように並べ替える
-# ほどよく = 要素数が最大でないものについては、連続して出ないことを保証する
-class ArrayInterleaver
-  def initialize
-  end
+require 'optparse'
 
+# 文章を分類するための正規表現(最初に一致するものを使う)
+LINE_PATTERN_SET = [/\A\s*やめるのだ\s*フェネック/u, /けものフレンズ/u]
+
+# UTF-8で扱えない文字を置き換える規則
+CHARACTER_ENCODING_PARAMETER_SET = { :invalid => :replace, :replace => " " }
+
+# 実装の異常を見つけたら投げる例外
+class AppRuntimeError < StandardError
+end
+
+# 指定されたパラメータでは動作できない場合に投げる例外
+class AppInvalidParameter < StandardError
+end
+
+# コマンドオプション
+class MyProgramOption
+  attr_reader :patterns, :inFilename, :outFilename, :phrase
+
+  def initialize(argv)
+    @patterns = LINE_PATTERN_SET
+
+    options = {}
+    OptionParser.new do |opt|
+      opt.on('-i [filename]', '--input',  'UTF-8 input file name (default: stdin)')   { |v| options[:input] = v }
+      opt.on('-o [filename]', '--output', 'UTF-8 output file name (default: stdout)') { |v| options[:output] = v }
+      opt.on('-p [string]', '--phrase', 'phrase to find the last tweet (optional)')   { |v| options[:phrase] = v }
+      opt.parse!(argv)
+    end
+
+    inFilename = options[:input]
+    outFilename = options[:output]
+    phrase = options[:phrase]
+    @inFilename = inFilename.nil? ? nil : inFilename.to_s.strip
+    @outFilename = outFilename.nil? ? nil : outFilename.to_s.strip
+    @phrase = phrase.nil? ? nil : phrase.to_s.strip
+  end
+end
+
+# 要素数がそれぞれm, n, ... 個の配列要素が、ほどよく入り混じるように並べ替える
+class ArrayInterleaver
   # 引数   : 各配列の要素数を並べた配列 [整数]
   # 返り値 : 何番目の配列を取り出すか、を順に並べた配列
   # 例えば [4,2] を入力すると、 [0,0,1,0,1,0] を返す。何を返すかはランダムである。
@@ -43,5 +79,134 @@ class ArrayInterleaver
     end
 
     sequence
+  end
+end
+
+# 行=ツイートの集合
+class LineSet
+  def initialize(patterns)
+    # 第二引数を[]にすると、配列要素はすべて同一オブジェクトへの参照になってしまう
+    @lineArrays = Array.new(patterns.size + 1) { [] }
+    @patterns = patterns
+    @string = ""
+  end
+
+  # 1行=1ツイートを分類して追加する
+  def addLine(line)
+    i = @patterns.index { |pattern| line.match(pattern) }
+    i ||= -1
+    @lineArrays[i] << line
+    nil
+  end
+
+  # 行=ツイートの集合を並べ替える
+  def shuffle
+    lineArrays = @lineArrays.map(&:shuffle)
+    indexSizes = lineArrays.map(&:size)
+
+    ArrayInterleaver.new.makeSequence(indexSizes).each do |i|
+      # 改行コードを維持する
+      @string += lineArrays[i].shift
+    end
+
+    # 残った行を移動する
+    lineArrays.flatten.each { |line| @string += line }
+    nil
+  end
+
+  # 並べ替えてできた文字列表現を返す
+  def to_s
+    @string
+  end
+end
+
+# ファイルのすべての行を解析する
+class LineSetParser
+  def initialize(options)
+    # ユニットテストでは、ファイルを開かずにここで終了することができる
+    return unless options
+
+    patterns = options.patterns
+    inFilename = options.inFilename
+    @outFilename = options.outFilename
+    @phrase = options.phrase
+
+    if !inFilename.nil?
+      unless File.exist?(inFilename)
+        raise AppInvalidParameter, "#{inFilename} does not exist."
+      end
+
+      if !@outFilename.nil? && File.identical?(inFilename, @outFilename)
+        raise AppInvalidParameter, "Input and output files are identical."
+      end
+    end
+
+    if inFilename
+      File.open(inFilename, "r") { |inStream|
+        @lineSetQueue, @linesRead = parseInputStream(patterns, inStream)
+      }
+    else
+      @lineSetQueue, @linesRead = parseInputStream(patterns, STDIN)
+    end
+  end
+
+  # ファイルの行を入れ替える
+  def shuffle
+    @lineSetQueue.each(&:shuffle)
+    self
+  end
+
+  # ファイルの行を入れ替えたものを出力する
+  def write
+    @linesWritten = nil
+
+    if @outFilename
+      File.open(@outFilename, "w") { |outStream|
+        @linesWritten = writeToStream(outStream)
+      }
+    else
+      @linesWritten = writeToStream(STDOUT)
+    end
+
+    raise AppRuntimeError if  @linesRead != @linesWritten.lines.sort
+
+    if @outFilename
+      lines = []
+      File.open(@outFilename, "r") { |inStream|
+        while line = inStream.gets
+          lines << line
+        end
+      }
+      raise AppRuntimeError if  @linesRead != lines.sort
+    end
+  end
+
+  def parseInputStream(patterns, inStream)
+    lineSet = LineSet.new(patterns)
+    lineSetQueue = [lineSet]
+    linesSorted = []
+    found = @phrase.nil?
+
+    while line = inStream.gets
+      linesSorted << line
+      lineSet.addLine(line)
+      if !@phrase.nil? && line.index(@phrase)
+        lineSet = LineSet.new(patterns)
+        lineSetQueue << lineSet
+        found = true
+        @phrase = nil
+      end
+    end
+
+    raise AppInvalidParameter, "Cannot find #{@phrase} in the input." unless found
+    return lineSetQueue, linesSorted.sort
+  end
+
+  def writeToStream(outStream)
+    @lineSetQueue.reverse.map do |lineSet|
+      lines = lineSet.to_s
+      outStream.write(lines)
+      lines
+    end.join("")
   end
 end
