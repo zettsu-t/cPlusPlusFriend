@@ -114,9 +114,11 @@ INDENT_INPUT_SOURCE_C=cFriends.c
 SOURCE_RUBY_CASEWHEN=caseWhen.rb
 SOURCE_RUBY_AMPM24=amPm24.rb
 SOURCE_RUBY_SEATMAP=seatMap.rb
+SOURCE_RUBY_SHUFFLE_LINES=shuffleLines.rb
 SOURCE_RUBY_SHUFFLE_LINES_TEST=shuffleLinesTest.rb
 
 LICENSE_FILE=LICENSE.txt
+CPPFRIEND_BOT_TEXT=cppFriendsBot.txt
 
 OBJ_MAIN=cppFriendsMain.o
 OBJ_FRIENDS=cppFriends.o
@@ -342,6 +344,7 @@ ifeq ($(BUILD_ON_MINGW),yes)
 	$(CHCP_UTF8)
 endif
 	$(RUBY) $(SOURCE_RUBY_SHUFFLE_LINES_TEST)
+	bash -c "comm -3 <(sort $(CPPFRIEND_BOT_TEXT)) <($(RUBY) $(SOURCE_RUBY_SHUFFLE_LINES) -i $(CPPFRIEND_BOT_TEXT) | sort)" | wc | grep "  0 "
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)

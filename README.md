@@ -357,7 +357,7 @@ Compound statementがあることを教えて頂きました。[こちら](expan
 
 ## ツイッターbotの投稿順序を並び替える
 
-[こちら](shuffleLines.md)に説明があります。
+[こちら](shuffleLines.md)に説明を置きました。
 
 ## ライセンス
 

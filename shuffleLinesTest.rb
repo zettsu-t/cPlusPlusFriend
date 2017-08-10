@@ -9,7 +9,12 @@ require 'test/unit'
 SIZE_OF_RANDOM_TESTING_SMALL = 500
 SIZE_OF_RANDOM_TESTING_LARGE = 5000
 SIZE_OF_RANDOM_TESTING_FILE  = 10
+
+# 実際にbotで使うファイル
 TEST_INPUT_FILENAME = "cppFriendsBot.txt"
+# 説明用の入力ファイル
+TEST_SAMPLE_FILENAME = "shuffleLinesSample.txt"
+# 実行ファイル名
 TEST_COMMAND_NAME = "ruby -Ku shuffleLines.rb"
 
 class MockInputStream
@@ -284,7 +289,7 @@ class TestLineSet < Test::Unit::TestCase
       str = lineSet.to_s
       assert_not_match(/\d{2}/, str)
       assert_not_match(/[a-z]{2}/, str)
-    end.sort.uniq
+    end
   end
 end
 
@@ -572,6 +577,19 @@ class TestActualFile < Test::Unit::TestCase
     else
       assert_true(stderrstr.include?("Cannot find #{phrase} in the input."))
       assert_equal([], readAndSort(outFilename))
+    end
+  end
+
+  def test_sampleFile
+    SIZE_OF_RANDOM_TESTING_FILE.times do
+      command = "#{TEST_COMMAND_NAME} -i #{TEST_SAMPLE_FILENAME} -p 5"
+      stdoutstr, stderrstr, status = Open3.capture3(command)
+      assert_false(stdoutstr.empty?)
+      assert_equal("", stderrstr.chomp)
+      assert_true(status.success?)
+
+      str = stdoutstr.tr("\r\n", "")
+      assert_match(/\A\D{5}\d{5}\z/, str)
     end
   end
 end
