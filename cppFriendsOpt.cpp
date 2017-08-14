@@ -337,6 +337,16 @@ TEST_F(TestOverwriteVtable, Overwrite) {
 }
 #endif
 
+class TestDoublePrecision : public ::testing::Test{};
+
+TEST_F(TestDoublePrecision, Round) {
+    const double one = 1.0;
+    double divider = 49.0;
+    auto oneThird = one / divider;
+    auto nearOne = oneThird * divider;
+//  ASSERT_EQ(1.0, nearOne);
+}
+
 /*
 Local Variables:
 mode: c++
