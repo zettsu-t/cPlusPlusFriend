@@ -498,6 +498,34 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
     EXPECT_EQ(expected, solution);
 }
 
+#if !defined(__MINGW32__) && !defined(__MINGW64__)
+TEST_F(TestPrimalityTesting, ToBigNumber) {
+    using BigNumber = boost::multiprecision::int1024_t;
+//  using BigNumber = boost::multiprecision::number<boost::multiprecision::cpp_int>;
+    std::string partDividendStr = "123456789";
+    std::string partDividerStr  = "000000001";
+    std::string dividendStr = partDividendStr;
+    std::string dividerStr = "1";
+
+    constexpr size_t n = 20;
+    for(size_t i=1; i<n; ++i) {
+        dividendStr += partDividendStr;
+        dividerStr += partDividerStr;
+    }
+    EXPECT_EQ(n * partDividendStr.size(), dividendStr.size());
+    EXPECT_EQ((n - 1) * partDividerStr.size() + 1, dividerStr.size());
+
+    BigNumber dividend(dividendStr);
+    BigNumber divider(dividerStr);
+    EXPECT_EQ(dividendStr, dividend.str());
+    EXPECT_EQ(dividerStr, divider.str());
+
+    BigNumber zero("0");
+    BigNumber reminder = dividend % divider;
+    EXPECT_EQ(zero, reminder);
+}
+#endif
+
 // 時刻と時差を扱う
 namespace {
     std::string convertLocalTimeToUTC(const std::string& timeStr, const std::string& localeStr) {

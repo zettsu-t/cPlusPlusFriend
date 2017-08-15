@@ -344,7 +344,7 @@ TEST_F(TestDoublePrecision, Round) {
     double divider = 49.0;
     auto oneThird = one / divider;
     auto nearOne = oneThird * divider;
-//  ASSERT_EQ(1.0, nearOne);
+    EXPECT_DOUBLE_EQ(1.0, nearOne);
 }
 
 /*
