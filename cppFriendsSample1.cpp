@@ -407,6 +407,20 @@ TEST_F(TestMinMax, Empty) {
     EXPECT_EQ(INT_MAX, result);
 }
 
+TEST_F(TestMinMax, WrongMinUsage) {
+    std::vector<int> numbers = {1, -1, 3, 2};
+    auto iMin = std::min_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(-1, *iMin);
+
+    auto iForward = std::min(numbers.begin(), numbers.end());
+    ASSERT_NE(numbers.end(), iForward);
+    EXPECT_EQ(1, *iForward);
+
+    auto iReverse = std::min(numbers.rbegin(), numbers.rend());
+    ASSERT_NE(numbers.rend(), iReverse);
+    EXPECT_EQ(2, *iReverse);
+}
+
 // TEST_Fのように、書くだけでテーブルに登録されるものを作る
 class GlobalVariableTable {
 public:

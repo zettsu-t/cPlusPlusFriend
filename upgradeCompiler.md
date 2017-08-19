@@ -10,6 +10,7 @@ MinGW-w64 Distro 15.0 (GCC 7.1.0)でmakeできるようにしました。ただ�
 - snprintfは、文字列がバッファに収まらないとき-1を返す(Cygwinはバッファが十分長ければ収めるはずの文字数を返す)
 - TEST_F(TestRegex, ReDos) で複雑な正規表現を処理するのが終了しない(Cygwinは例外を投げて終了する)
 - ::isasciiが使えない。代わりに__isasciiを使う。
+- boost::multiprecision::cpp_intが使えない(実行時に異常終了する)
 - CPU除算例外が発生したとき、処理が先に進まずプロセスが終了しない(Cygwinはプロセスが終了するのでDeathTestできる)
 
 ## Cygwin GCC 5.4.0から6.3.0にアップグレード
