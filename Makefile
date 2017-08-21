@@ -267,7 +267,7 @@ $(TARGET): $(OBJS)
 
 $(TARGET_NO_OPT): $(OBJS_NO_OPT)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
-	./$@ --gtest_filter="TestMyCounter*:TestShifter*"
+	./$@ --gtest_filter="TestOpt*"
 
 cprog: $(TARGET_C_SJIS) $(TARGET_C)
 

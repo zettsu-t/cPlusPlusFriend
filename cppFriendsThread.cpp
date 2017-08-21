@@ -249,8 +249,7 @@ protected:
         Producer producer(mode, loopCount, dataSet, mx, ready, reader, writer);
         std::vector<std::unique_ptr<Consumer>> consumers;
         for(Count i=0; i<readerSize; ++i) {
-            consumers.push_back(std::unique_ptr<Consumer>(
-                                    new Consumer(mode, loopCount, dataSet, mx, ready, reader, writer)));
+            consumers.push_back(std::make_unique<Consumer>(mode, loopCount, dataSet, mx, ready, reader, writer));
         }
 
         {

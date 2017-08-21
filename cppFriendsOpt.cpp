@@ -61,7 +61,7 @@ MyCounter::Number MyCounter::nonVolatileCounter_ {0};
 volatile MyCounter::Number MyCounter::volatileCounter_ {0};
 std::atomic<MyCounter::Number> MyCounter::atomicCounter_ {0};
 
-class TestMyCounter : public ::testing::Test {
+class TestOptMyCounter : public ::testing::Test {
 protected:
     using SizeOfThreads = int;
 
@@ -96,7 +96,7 @@ protected:
 
         // 並行処理を作って、後で実行できるようにする
         for(decltype(sizeOfThreads) index = 0; index < sizeOfThreads; ++index) {
-            std::unique_ptr<MyCounter> pCounter(new MyCounter(count));
+            auto pCounter = std::make_unique<MyCounter>(count);
             MyCounter* pRawCounter = pCounter.get();
             futureSet.push_back(std::async(std::launch::async, [=](void) -> void { pRawCounter->Run(); }));
             counterSet.push_back(std::move(pCounter));
@@ -149,7 +149,7 @@ private:
     DWORD_PTR systemAffinityMask_  {1};
 };
 
-TEST_F(TestMyCounter, MultiCore) {
+TEST_F(TestOptMyCounter, MultiCore) {
     if (hardwareConcurrency_ <= 1) {
         return;
     }
@@ -180,7 +180,7 @@ TEST_F(TestMyCounter, MultiCore) {
     EXPECT_EQ(expected, MyCounter::GetAtomicValue());
 }
 
-TEST_F(TestMyCounter, SingleCore) {
+TEST_F(TestOptMyCounter, SingleCore) {
     /* 使うCPUを1個に固定する */
     DWORD_PTR procMask = 1;
     if (!SetProcessAffinityMask(GetCurrentProcess(), procMask)) {
@@ -200,7 +200,7 @@ TEST_F(TestMyCounter, SingleCore) {
     EXPECT_EQ(expected, MyCounter::GetAtomicValue());
 }
 
-TEST_F(TestMyCounter, ConstMemberFunction) {
+TEST_F(TestOptMyCounter, ConstMemberFunction) {
     IntBox::Data n = 1;
     IntBox box {n};
     EXPECT_EQ(n, box.Get());
@@ -225,9 +225,9 @@ TEST_F(TestMyCounter, ConstMemberFunction) {
     EXPECT_EQ(n, box.GetConstVar());
 }
 
-class TestShifter : public ::testing::Test{};
+class TestOptShifter : public ::testing::Test{};
 
-TEST_F(TestShifter, All) {
+TEST_F(TestOptShifter, All) {
     constexpr int32_t var = 2;
     int32_t result = -1;
     constexpr int32_t expected = var << 3;
@@ -247,6 +247,77 @@ TEST_F(TestShifter, All) {
 #endif
 
     EXPECT_EQ(expected, ShiftForInt32(var, CPPFRIENDS_SHIFT_COUNT));
+}
+
+namespace {
+    size_t g_objDeleteCount = 0;
+
+    class ObjectHolded {
+    public:
+        using Value = int;
+        ObjectHolded(Value arg) : value_(arg) {}
+        virtual ~ObjectHolded(void) { ++g_objDeleteCount; }
+        Value GetValue(void) const { return value_; }
+    private:
+        Value value_ {0};
+    };
+
+    class RawPointerHolder {
+    public:
+        RawPointerHolder(ObjectHolded* pObj) : pObj_(pObj) {}
+
+        virtual ~RawPointerHolder(void) {
+            delete pObj_;
+            pObj_ = nullptr;
+        }
+
+        ObjectHolded::Value GetValue(void) const {
+            return pObj_->GetValue();
+        }
+
+    private:
+        ObjectHolded* pObj_ {nullptr};
+    };
+}
+
+class TestOptReleaseUniquePtr : public ::testing::Test {
+    virtual void SetUp() override {
+        g_objDeleteCount = 0;
+    }
+};
+
+TEST_F(TestOptReleaseUniquePtr, UniquePtr) {
+    EXPECT_EQ(0, g_objDeleteCount);
+    {
+        constexpr ObjectHolded::Value value = 23;
+        auto pObj = std::make_unique<ObjectHolded>(value);
+        EXPECT_EQ(value, pObj->GetValue());
+        EXPECT_EQ(0, g_objDeleteCount);
+    }
+    EXPECT_EQ(1, g_objDeleteCount);
+}
+
+TEST_F(TestOptReleaseUniquePtr, Reset) {
+    constexpr ObjectHolded::Value value = 34;
+    auto pObj = std::make_unique<ObjectHolded>(value);
+    EXPECT_EQ(0, g_objDeleteCount);
+    EXPECT_EQ(value, pObj->GetValue());
+    pObj.reset();
+    EXPECT_EQ(1, g_objDeleteCount);
+}
+
+TEST_F(TestOptReleaseUniquePtr, Holder) {
+    constexpr ObjectHolded::Value value = 45;
+    auto pObj = std::make_unique<ObjectHolded>(value);
+    EXPECT_EQ(0, g_objDeleteCount);
+    {
+        RawPointerHolder holder(pObj.get());
+        // 所有権は放棄するが破棄はしない
+        pObj.release();
+        EXPECT_EQ(0, g_objDeleteCount);
+        EXPECT_EQ(value, holder.GetValue());
+    }
+    EXPECT_EQ(1, g_objDeleteCount);
 }
 
 namespace {
@@ -295,7 +366,7 @@ TEST_F(TestDebuggerDetecter, Trap) {
 class TestOverwriteVtable : public ::testing::Test {};
 
 TEST_F(TestOverwriteVtable, Standard) {
-    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc(2,3));
+    auto pObj = std::make_unique<SubDynamicObjectMemFunc>(2,3);
     std::ostringstream os;
     pObj->Print(os);
     EXPECT_EQ("23", os.str());
@@ -307,7 +378,7 @@ TEST_F(TestOverwriteVtable, Standard) {
 
 #if 0
 TEST_F(TestOverwriteVtable, Overwrite) {
-    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc(2,3));
+    auto pObj = std::make_unique<SubDynamicObjectMemFunc>(2,3);
     std::ostringstream os;
     pObj->Print(os);
 
@@ -322,7 +393,14 @@ TEST_F(TestOverwriteVtable, Overwrite) {
     // (gdb) info address ExtraMemFunc::Print
     // アドレスはコンパイルすると変わる
     // &ExtraMemFunc::Printを代入するととても小さい数字(25)が入る
-    FuncPtr fptr = {0x1004038b2ull};
+    FuncPtr fptr = {0};
+    if (sizeof(size_t) > 4) {
+        FuncPtr bafPtr = {static_cast<size_t>(0x1004038b2ull)};
+        fptr = bafPtr;
+    } else {
+        FuncPtr bafPtr = {static_cast<size_t>(0xffff38b2u)};
+        fptr = bafPtr;
+    }
 
     // 0:デストラクタ, 1:Clear, 2:Print
     pVtable[1] = fptr.addr;

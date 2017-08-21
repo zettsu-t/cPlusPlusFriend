@@ -33,11 +33,11 @@ namespace Devirtualization {
     }
 
     std::unique_ptr<BaseOutline> CreateBaseOutline(void) {
-        return std::unique_ptr<BaseOutline>(new BaseOutline());
+        return std::make_unique<BaseOutline>();
     }
 
     std::unique_ptr<BaseOutline> CreateDerivedOutline(void) {
-        return std::unique_ptr<BaseOutline>(new DerivedOutline());
+        return std::make_unique<DerivedOutline>();
     }
 }
 

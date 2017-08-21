@@ -130,6 +130,7 @@ class Train {
 1. 実行ファイルのバイナリサイズを削減するのに、使ってなさそうな関数を探して #if 0 - #endif を試すのはまわりくどいのだ! LTO(Link Time Optimization)を使うのだ!
 1. -flto オプションはすべてのソースコードのコンパイルとリンカにつけるのだ! -fltoをつけたりつけなかったりすると、リンクエラーになることがあるのだ!
 1. コーディング規約には、ソースコードのファイル名の命名規則を含めるのだ! さもないと、同名の*.oが二つできてリンクエラーになってしまうのだ!
+1. グローバル変数の初期化順序に依存して動かなくなるコードは、*.oをリンクする順序が変わることで発覚することがあるのだ! Makefileに$(sort *.o)をつけたり外したりして試すのだ!
 1. uint32_t = 1を一度に35回シフトして0になったのは、LTOが有効だからだ! LTOがないと8なのだ! Nビット整数を一度にN回以上シフトするのは未定義動作だから直すのだ!
 1. テンプレートマッチングをstd::is_pointerだけで済ましてはいけないのだ! 配列T(&)[SIZE]とstd::is_null_pointerに対するマッチングも必要なのだ!
 1. free(p);をif(p){}で囲む必要はないのだ! freeにNULLを渡しても無害なのだ! こういうインタフェースはnull object patternにして欲しいのだ! アライさんはその辺ばっちりなのだ!
@@ -195,6 +196,7 @@ class Train {
 1. static T& GetInstance(void) { static T instance; return instance; } はマルチスレッド環境ではシングルトンにならないことがあるのだ! シングルトンの実装方法をよく確認するのだ!
 1. boost/thread/future.hppなどをインクルードする.cppファイルで、Intel Syntaxのインラインアセンブリを使うと、アセンブラがエラーを出すことがあるぞ! Intel Syntaxでインラインアセンブリを記述するなら、その.cppファイルは他と分けた方がいいぞ!
 1. CreateInstance()がいつでも生ポインタを返したら、誰がdeleteするかわからなくなって、メモリリークしたり二重解放したりするかもしれないのだ! deleteして欲しければ、std::unique_ptrを返すことを検討するのだ! 生ポインタは所有権を渡さないという意志なのだ!
+1. unique_ptrが持つ素のポインタの所有権を手放したら、resetではなくreleaseするのだ。releaseしないと二回解放されてしまうのだ! std::localeにfacetを渡すときは気を付けるのだ!
 1. std::shared_ptrのダウンキャストは、getしてdynamic_castじゃないのだ! それじゃ何のために共有しているか分からないのだ! std::dynamic_pointer_castなのだ!
 1. abi::__cxa_demangleが返したものはfreeしないと[メモリリークするのだ!](https://gcc.gnu.org/onlinedocs/libstdc++/libstdc++-html-USERS-4.3/a01696.html) 誰がメモリを解放するか、仕様を確認するのだ!
 1. リークするのはメモリだけじゃないのだ! TCP/UDP受信ポートがリークしたら、プロセス終了まで同じ番号のポートが開けなくなるのだ!

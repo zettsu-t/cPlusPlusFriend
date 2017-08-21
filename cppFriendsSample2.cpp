@@ -528,14 +528,33 @@ TEST_F(TestPrimalityTesting, ToBigNumber) {
 
 // 時刻と時差を扱う
 namespace {
+    bool g_faultInStream = false;
+    size_t g_facetDeleteCount = 0;
+
+    class MyDebugFacet : public boost::posix_time::time_input_facet {
+    public:
+        MyDebugFacet(const string_type& str) : boost::posix_time::time_input_facet(str) {}
+        virtual ~MyDebugFacet(void) { ++g_facetDeleteCount; }
+    };
+
     std::string convertLocalTimeToUTC(const std::string& timeStr, const std::string& localeStr) {
-        auto* input_facet = new boost::posix_time::time_input_facet("%d/%m/%Y %H:%M:%S %ZP");
+        auto pInputFacet = std::make_unique<MyDebugFacet>("%d/%m/%Y %H:%M:%S %ZP");
         std::istringstream is(timeStr);
         boost::locale::generator gen;
         if (!localeStr.empty()) {
             is.imbue(gen(localeStr));
         }
-        is.imbue(std::locale(is.getloc(), input_facet));
+
+        if (g_faultInStream) {
+            throw std::runtime_error("Fail in imbue");
+        }
+        auto baseLoc = is.getloc();
+        auto newloc = std::locale(baseLoc, pInputFacet.get());
+        // 例外が投げられなかった場合は、input facetの所有権がnewlocに移ったので、
+        // スマートポインタの所有権を放棄する
+        pInputFacet.release();
+        is.imbue(newloc);
+
         boost::local_time::local_date_time lt(boost::posix_time::not_a_date_time);
         is >> lt;
 
@@ -545,7 +564,12 @@ namespace {
     }
 }
 
-class TestDateFormat : public ::testing::Test{};
+class TestDateFormat : public ::testing::Test {
+    virtual void SetUp() override {
+        g_faultInStream = false;
+        g_facetDeleteCount = 0;
+    }
+};
 
 TEST_F(TestDateFormat, LeapSecond) {
     const char* dataDormat = "%Y-%m-%d %H:%M:%S";
@@ -579,8 +603,17 @@ TEST_F(TestDateFormat, LeapSecond) {
 
 TEST_F(TestDateFormat, RepeatTime) {
     EXPECT_EQ("2017-Oct-29 00:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 BST+1", "en_GB.UTF-8"));
+    EXPECT_EQ(1, g_facetDeleteCount);
     EXPECT_EQ("2017-Oct-29 01:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 GMT+0", "en_GB.UTF-8"));
+    EXPECT_EQ(2, g_facetDeleteCount);
     EXPECT_EQ("2017-Oct-28 16:30:00", convertLocalTimeToUTC("29/10/2017 01:30:00 JST+9", "ja_JP.UTF-8"));
+    EXPECT_EQ(3, g_facetDeleteCount);
+}
+
+TEST_F(TestDateFormat, Except) {
+    g_faultInStream = true;
+    ASSERT_ANY_THROW(convertLocalTimeToUTC("29/10/2017 01:30:00 JST+9", "ja_JP.UTF-8"));
+    EXPECT_EQ(1, g_facetDeleteCount);
 }
 
 namespace JapariPark {
@@ -853,7 +886,7 @@ private:
 namespace {
     template <typename Result, typename ... ArgTypes>
     auto CreateDelayedFunction(Result(&f)(ArgTypes...), ArgTypes... args) {
-        std::unique_ptr<BaseDelayedFunction<Result>> func(new DelayedFunction<Result, void, ArgTypes...>(f, args...));
+        auto func = std::make_unique<DelayedFunction<Result, void, ArgTypes...>>(f, args...);
         return func;
     }
 

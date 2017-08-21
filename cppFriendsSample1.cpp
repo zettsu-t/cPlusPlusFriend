@@ -843,7 +843,7 @@ TEST_F(TestZeroInitialize, StandardLayout) {
 #if 0
 static_assert(!std::is_standard_layout<DynamicObjectMemFunc>::value, "Must not be standard layout");
 TEST_F(TestZeroInitialize, NonStandardLayout) {
-    std::unique_ptr<DynamicObjectMemFunc> pObj(new SubDynamicObjectMemFunc);
+    auto pObj = std::make_unique<SubDynamicObjectMemFunc>();
     pObj->memberA_ = 2;
     pObj->memberB_ = 3;
 
@@ -895,13 +895,13 @@ private:
 template <typename T>
 auto CreateConcreteCommand(const T& f) {
     // Return Value Optimization を期待している
-    return std::unique_ptr<BaseCommand>(new ConcreteCommand<T>(f));
+    return std::make_unique<ConcreteCommand<T>>(f);
 }
 
 template <typename Result, typename ... ArgTypes>
 auto CreateConcreteCommand(Result(&f)(ArgTypes...)) {
     // Named Return Value Optimization を期待している
-    std::unique_ptr<BaseCommand> command(new ConcreteCommandF<Result, ArgTypes...>(f));
+    auto command = std::make_unique<ConcreteCommandF<Result, ArgTypes...>>(f);
     return command;
 }
 
