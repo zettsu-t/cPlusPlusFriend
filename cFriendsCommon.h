@@ -30,6 +30,29 @@ extern "C" {
     // そもそもCで空の構造体は作れない(未定義動作)
     typedef struct tagTestingEmptyStruct {} TestingEmptyStruct;
 
+    typedef int SpeedKph;  // 時速キロ
+
+    // 速度の段階
+    typedef enum tagSpeedIndex {
+        SPEED_STOP,
+        SPEED_LOW,
+        SPEED_MIDDLE,
+        SPEED_HIGH,   // もっと速い場合は読み替える
+        SPEED_COUNT,  // 要素数
+    } SpeedIndex;
+
+    // 普通の速度指示
+    typedef struct tagSpeedParameter {
+        size_t     size;  // この構造体、またはこの構造体を含む構造体のbyteサイズ
+        SpeedIndex index;
+    } SpeedParameter;
+
+    // 特に速い速度指示
+    typedef struct tagExtSpeedParameter {
+        SpeedParameter base;  // 必ず先頭メンバに置く
+        SpeedKph   maxSpeed;
+    } ExtSpeedParameter;
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

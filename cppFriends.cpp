@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <boost/algorithm/string.hpp>
 #include <boost/archive/text_oarchive.hpp>
@@ -399,6 +400,126 @@ TEST_F(TestSerialization, BoostInvalidIn) {
 
         checkIfStartWith(actual, test.second);
     }
+}
+
+// 通常の速度計
+class SpeedController {
+public:
+    virtual ~SpeedController(void) = default;
+
+    SpeedKph GetSpeed(const SpeedParameter& param) const {
+        SpeedKph speed = 0;
+
+        if (param.size >= sizeof(param)) {
+            // 本来ならテーブルをあらかじめ作っておくが、本題ではないので簡単に済ませる
+            switch(param.index) {
+            case SPEED_STOP:
+                break;
+            case SPEED_LOW:
+                speed = 45;
+                break;
+            case SPEED_MIDDLE:
+                speed = 70;
+                break;
+            case SPEED_HIGH:
+                // もっと速く走れる場合は読み替える
+                speed = 130;
+                break;
+            default:
+                break;
+            }
+        }
+
+        return speed;
+    }
+};
+
+// 高速走行に対応した速度計
+class HighSpeedController {
+public:
+    HighSpeedController(SpeedKph maxSpeed) : maxSpeed_(maxSpeed) {}
+    virtual ~HighSpeedController(void) = default;
+
+    SpeedKph GetSpeed(const SpeedParameter& param) const {
+        // 入れ子の構造体は、必ず先頭でなければならない
+        static_assert(offsetof(ExtSpeedParameter, base) == 0, "Must be its first member");
+        static_assert(std::is_same<
+                      decltype(ExtSpeedParameter::base),
+                      std::remove_cv_t<std::remove_reference_t<decltype(param)>>>::value,
+                      "Must have a same type");
+
+        // Chain of responsibility
+        if (param.size < sizeof(ExtSpeedParameter) || (param.index != SPEED_HIGH)) {
+            return base_.GetSpeed(param);
+        }
+
+        auto extParam = reinterpret_cast<const ExtSpeedParameter&>(param);
+        return std::min(maxSpeed_, extParam.maxSpeed);
+    }
+
+private:
+    SpeedController base_;
+    SpeedKph maxSpeed_ {0};
+};
+
+class TestVersioning : public ::testing::Test {};
+
+TEST_F(TestVersioning, InvalidSize) {
+    SpeedParameter zero {0, SPEED_LOW};
+    SpeedParameter minusOne {sizeof(SpeedParameter) - 1, SPEED_LOW};
+
+    SpeedController ctrl;
+    EXPECT_EQ(0, ctrl.GetSpeed(zero));
+    EXPECT_EQ(0, ctrl.GetSpeed(minusOne));
+
+    HighSpeedController highCtrl(160);
+    EXPECT_EQ(0, highCtrl.GetSpeed(zero));
+    EXPECT_EQ(0, highCtrl.GetSpeed(minusOne));
+}
+
+TEST_F(TestVersioning, PartialInvalidSize) {
+    ExtSpeedParameter param {{sizeof(param) - 1, SPEED_LOW}, 150};
+    SpeedController ctrl;
+    HighSpeedController highCtrl(160);
+    EXPECT_EQ(45, ctrl.GetSpeed(param.base));
+    EXPECT_EQ(45, highCtrl.GetSpeed(param.base));
+}
+
+TEST_F(TestVersioning, InvalidParam) {
+    SpeedParameter param {sizeof(param), SPEED_COUNT};
+    SpeedController ctrl;
+    HighSpeedController highCtrl(160);
+    EXPECT_EQ(0, ctrl.GetSpeed(param));
+    EXPECT_EQ(0, highCtrl.GetSpeed(param));
+}
+
+TEST_F(TestVersioning, Valid) {
+    struct TestCase {
+        SpeedIndex index;
+        SpeedKph   expected;
+        SpeedKph   expectedExt;
+    };
+
+    constexpr TestCase testCases[] = {
+        {SPEED_STOP, 0, 0}, {SPEED_LOW, 45, 45}, {SPEED_MIDDLE, 70, 70}, {SPEED_HIGH, 130, 140}};
+
+    SpeedController ctrl;
+    HighSpeedController highCtrl(150);
+    for(const auto& test : testCases) {
+        SpeedParameter param {sizeof(param), test.index};
+        EXPECT_EQ(test.expected, ctrl.GetSpeed(param));
+        EXPECT_EQ(test.expected, highCtrl.GetSpeed(param));
+
+        ExtSpeedParameter paramExt {{sizeof(paramExt), test.index}, 140};
+        EXPECT_EQ(test.expectedExt, highCtrl.GetSpeed(paramExt.base));
+    }
+
+    ExtSpeedParameter paramLower = {{sizeof(paramLower), SPEED_HIGH}, 140};
+    ExtSpeedParameter paramOver  = {{sizeof(paramOver), SPEED_HIGH}, 160};
+    EXPECT_EQ(130, ctrl.GetSpeed(paramOver.base));
+    EXPECT_EQ(130, ctrl.GetSpeed(paramLower.base));
+    EXPECT_EQ(140, highCtrl.GetSpeed(paramLower.base));
+    EXPECT_EQ(150, highCtrl.GetSpeed(paramOver.base));
 }
 
 class TestRandomNumber : public ::testing::Test{};
