@@ -6,6 +6,12 @@ require 'optparse'
 # 文章を分類するための正規表現(最初に一致するものを使う)
 LINE_PATTERN_SET = [/\A\s*やめるのだ\s*フェネック/u, /けものフレンズ/u]
 
+# プロプロセッサ指令およびハッシュタグ(前方一致)
+HASHTAG_SET = ["define", "include", "if", "endif", "pragma",
+               "やめるのだフェネックで学ぶ", "けものフレンズ",
+               "はシャープ", "はハッシュタグ", "の後はコメント",
+               "newgame", "imas_cg"]
+
 # UTF-8で扱えない文字を置き換える規則
 CHARACTER_ENCODING_PARAMETER_SET = { :invalid => :replace, :replace => " " }
 
@@ -19,25 +25,77 @@ end
 
 # コマンドオプション
 class MyProgramOption
-  attr_reader :patterns, :inFilename, :outFilename, :phrase
+  attr_reader :patterns, :inFilename, :outFilename, :phrase, :checkTweets
 
   def initialize(argv)
     @patterns = LINE_PATTERN_SET
 
     options = {}
     OptionParser.new do |opt|
-      opt.on('-i [filename]', '--input',  'UTF-8 input file name (default: stdin)')   { |v| options[:input] = v }
-      opt.on('-o [filename]', '--output', 'UTF-8 output file name (default: stdout)') { |v| options[:output] = v }
-      opt.on('-p [string]', '--phrase', 'phrase to find the last tweet (optional)')   { |v| options[:phrase] = v }
+      opt.on('-i', '--input [filename]', 'UTF-8 input file name (default: stdin)')   { |v| options[:input] = v }
+      opt.on('-o', '--output [filename]', 'UTF-8 output file name (default: stdout)') { |v| options[:output] = v }
+      opt.on('-p', '--phrase [string]', 'phrase to find the last tweet (optional)')   { |v| options[:phrase] = v }
+      opt.on('-c', '--[no-]check', 'check tweets (default: no checking tweets)')   { |v| options[:checkTweets] = v }
       opt.parse!(argv)
     end
 
     inFilename = options[:input]
     outFilename = options[:output]
     phrase = options[:phrase]
+    checkTweets = options[:checkTweets]
     @inFilename = inFilename.nil? ? nil : inFilename.to_s.strip
     @outFilename = outFilename.nil? ? nil : outFilename.to_s.strip
     @phrase = phrase.nil? ? nil : phrase.to_s.strip
+    @checkTweets = checkTweets.nil? ? false : checkTweets
+  end
+end
+
+# 行を検査するインタフェースを持つが何もしない
+class NullLineChecker
+  def initialize(outStream)
+  end
+
+  # 指摘事項があればtrue, なければfalse
+  def check(line)
+    false
+  end
+end
+
+# ツイートを検査する
+class TweetChecker
+  def initialize(outStream)
+    @outStream = outStream
+  end
+
+  def check(argLine)
+    line = argLine.chomp
+    [:checkMention, :checkHashtag].reduce(false) { |r, m| r |= send(m, line) }
+  end
+
+  def checkMention(line)
+    if line.match(/(\A|\s)@[\da-zA-Z]+(\z|\s)/)
+      @outStream.puts "Mention(s) found in #{line}"
+      true
+    else
+      false
+    end
+  end
+
+  def checkHashtag(line)
+    unknownHashtags = line.scan(/(\A|\s)\#(\S+)/).map do |tag|
+      (tag.size < 2) || HASHTAG_SET.any? do |keyword|
+        i = tag[1].strip.index(keyword)
+        !i.nil? && i == 0
+      end ? nil : tag[1]
+    end.compact
+
+    if unknownHashtags.empty?
+      false
+    else
+      str = unknownHashtags.map { |tag| '#' + tag }.join(", ")
+      @outStream.puts "Unknown tag(s) #{str} found"
+      true
+    end
   end
 end
 
@@ -130,6 +188,7 @@ class LineSetParser
     inFilename = options.inFilename
     @outFilename = options.outFilename
     @phrase = options.phrase
+    checker = options.checkTweets ? TweetChecker.new(STDERR) : NullLineChecker.new(STDERR)
 
     if !inFilename.nil?
       unless File.exist?(inFilename)
@@ -143,10 +202,10 @@ class LineSetParser
 
     if inFilename
       File.open(inFilename, "r") { |inStream|
-        @lineSetQueue, @linesRead = parseInputStream(patterns, inStream)
+        @lineSetQueue, @linesRead = parseInputStream(patterns, inStream, checker)
       }
     else
-      @lineSetQueue, @linesRead = parseInputStream(patterns, STDIN)
+      @lineSetQueue, @linesRead = parseInputStream(patterns, STDIN, checker)
     end
   end
 
@@ -181,7 +240,7 @@ class LineSetParser
     end
   end
 
-  def parseInputStream(patterns, inStream)
+  def parseInputStream(patterns, inStream, checker)
     lineSet = LineSet.new(patterns)
     lineSetQueue = [lineSet]
     linesSorted = []
@@ -190,6 +249,7 @@ class LineSetParser
     while line = inStream.gets
       linesSorted << line
       lineSet.addLine(line)
+      checker.check(line)
       if !@phrase.nil? && line.index(@phrase)
         lineSet = LineSet.new(patterns)
         lineSetQueue << lineSet

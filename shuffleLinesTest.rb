@@ -34,6 +34,10 @@ class MockOutputStream
     @str = ""
   end
 
+  def puts(line)
+    @str += line + "\n"
+  end
+
   def write(line)
     @str += line
   end
@@ -51,6 +55,7 @@ class TestMyProgramOption < Test::Unit::TestCase
     assert_equal("name", opt.inFilename)
     assert_nil(opt.outFilename)
     assert_nil(opt.phrase)
+    assert_false(opt.checkTweets)
   end
 
   data(
@@ -64,6 +69,7 @@ class TestMyProgramOption < Test::Unit::TestCase
     assert_nil(opt.inFilename)
     assert_equal("name", opt.outFilename)
     assert_nil(opt.phrase)
+    assert_false(opt.checkTweets)
   end
 
   data(
@@ -77,6 +83,7 @@ class TestMyProgramOption < Test::Unit::TestCase
     assert_nil(opt.inFilename)
     assert_nil(opt.outFilename)
     assert_equal("name", opt.phrase)
+    assert_false(opt.checkTweets)
   end
 
   data(
@@ -90,6 +97,20 @@ class TestMyProgramOption < Test::Unit::TestCase
     assert_nil(opt.inFilename)
     assert_nil(opt.outFilename)
     assert_equal(expected, opt.phrase)
+    assert_false(opt.checkTweets)
+  end
+
+  data(
+    'set' => ["-c", true],
+    'set long'   => ["--check", true],
+    'unset long' => ["--no-check", false])
+  def test_checkTweets(data)
+    arg, expected = data
+    opt = MyProgramOption.new([arg])
+    assert_nil(opt.inFilename)
+    assert_nil(opt.outFilename)
+    assert_nil(opt.phrase)
+    assert_equal(expected, opt.checkTweets)
   end
 
   def test_empty
@@ -97,6 +118,8 @@ class TestMyProgramOption < Test::Unit::TestCase
     assert_nil(opt.inFilename)
     assert_nil(opt.outFilename)
     assert_nil(opt.phrase)
+    assert_false(opt.checkTweets)
+    assert_not_nil(opt.checkTweets)
   end
 
   def test_mixed
@@ -139,6 +162,110 @@ class TestMyProgramOption < Test::Unit::TestCase
 
   def test_patterns
     assert_equal(LINE_PATTERN_SET, MyProgramOption.new([]).patterns)
+  end
+end
+
+class TestNullLineChecker < Test::Unit::TestCase
+  def test_all
+    assert_false(NullLineChecker.new(nil).check(""))
+  end
+end
+
+class TestTweetChecker < Test::Unit::TestCase
+  data(
+    'empty' => "",
+    'plain' => "line",
+    'kana'  => "@ホスト名",
+    'user 1'  => "user@hostname",
+    'user 2'  => "ユーザ@ホスト名",
+    'hashmark' => "#",
+    'not a hashtag' => "ユーザ#ホスト名")
+  def test_checkNothingFound(data)
+    line = data
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    assert_false(checker.checkMention(line))
+    assert_false(checker.checkHashtag(line))
+    assert_false(checker.check(line))
+    assert_true(outStream.str.empty?)
+  end
+
+  data(
+    'simple' => "@a",
+    'space 1' => " @a ",
+    'space 2' => "@a ",
+    'spaces'  => " @a ",
+    'pre'  => "本文 @a ",
+    'post' => " @a 本文",
+    'full' => "前文 @a 本文")
+  def test_checkMention(data)
+    line = data
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    assert_true(checker.checkMention(line))
+    assert_equal("Mention(s) found in #{line}\n", outStream.str)
+    assert_true(checker.check(line))
+  end
+
+  def test_checkMultipleMention
+    line = "前文 @a 本文 @b まとめ"
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    assert_true(checker.checkMention(line))
+    assert_equal("Mention(s) found in #{line}\n", outStream.str)
+    assert_true(checker.check(line))
+  end
+
+  def test_checkKnownHashtags
+    [HASHTAG_SET, "ifdef", "ifndef"].flatten.each do |tag|
+      line = '#' + tag
+      outStream = MockOutputStream.new
+      checker = TweetChecker.new(outStream)
+      assert_false(checker.checkHashtag(line))
+      assert_false(checker.check(line))
+      assert_true(outStream.str.empty?)
+    end
+  end
+
+  def test_checkUnknownHashtags
+    ["tag", "タグ"].each do |tag|
+      ["", " "].each do |prefix|
+        ["", " "].each do |postfix|
+          line = prefix + '#' + tag + postfix
+          outStream = MockOutputStream.new
+          checker = TweetChecker.new(outStream)
+          assert_true(checker.checkHashtag(line))
+          assert_equal("Unknown tag(s) " + '#' + "#{tag} found\n", outStream.str)
+          assert_true(checker.check(line))
+        end
+      end
+    end
+  end
+
+  def test_checkMultipleTags
+    line = '#tagA #tagB #tagC'
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    assert_true(checker.checkHashtag(line))
+    assert_equal('Unknown tag(s) #tagA, #tagB, #tagC found' + "\n", outStream.str)
+    assert_true(checker.check(line))
+  end
+
+  data(
+    'simple' => ["@a #tag", true,
+                 "Mention(s) found in @a #tag\nUnknown tag(s) #tag found\n"],
+    'spaces' => [" @a #tag ", true,
+                 "Mention(s) found in  @a #tag \nUnknown tag(s) #tag found\n"],
+    'multi' => ["@a #tagA @b #tagB", true,
+                "Mention(s) found in @a #tagA @b #tagB\nUnknown tag(s) #tagA, #tagB found\n"],
+    'body' => ["前文 user@hostname A#B @a #tag 本文", true,
+                "Mention(s) found in 前文 user@hostname A#B @a #tag 本文\nUnknown tag(s) #tag found\n"])
+  def test_checkSentence(data)
+    line, expected, expectedStr = data
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    assert_equal(expected, checker.check(line))
+    assert_equal(expectedStr, outStream.str)
   end
 end
 
@@ -299,7 +426,7 @@ class TestLineSetParser < Test::Unit::TestCase
     inputLines = ["1", "a", "A", "2"]
     inStream = MockInputStream.new(inputLines)
     patterns = [/\A\d/, /\A[a-x]/, /\A[A-Z]/]
-    actual, lines = parser.parseInputStream(patterns, inStream)
+    actual, lines = parser.parseInputStream(patterns, inStream, NullLineChecker.new(nil))
 
     assert_equal(1, actual.size)
     assert_equal(inputLines.sort, lines)
@@ -314,12 +441,22 @@ class TestLineSetParser < Test::Unit::TestCase
     inputLines = ["1", "a", delimiter, "b", "2"]
     inStream = MockInputStream.new(inputLines)
     patterns = [/\A\d/, /\A[a-x]/]
-    actual, lines = parser.parseInputStream(patterns, inStream)
+    actual, lines = parser.parseInputStream(patterns, inStream, NullLineChecker.new(nil))
 
     assert_equal(2, actual.size)
     assert_equal(inputLines.sort, lines)
     assert_equal([["1"], ["a"], [delimiter]], actual[0].instance_variable_get(:@lineArrays))
     assert_equal([["2"], ["b"], []], actual[1].instance_variable_get(:@lineArrays))
+  end
+
+  def test_parseInputStreamWithCheck
+    parser = LineSetParser.new(nil)
+    inputLines = ["#tag", "@a"]
+    inStream = MockInputStream.new(inputLines)
+    outStream = MockOutputStream.new
+    checker = TweetChecker.new(outStream)
+    actual, lines = parser.parseInputStream([], inStream, checker)
+    assert_equal("Unknown tag(s) #tag found\nMention(s) found in @a\n", outStream.str)
   end
 
   def setUpLineSetQueue
@@ -588,8 +725,25 @@ class TestActualFile < Test::Unit::TestCase
       assert_equal("", stderrstr.chomp)
       assert_true(status.success?)
 
-      str = stdoutstr.tr("\r\n", "")
+      str = stdoutstr.tr("\r\n@#xy ", "")
       assert_match(/\A\D{5}\d{5}\z/, str)
     end
+  end
+
+  data(
+    'set' => ["-c", true],
+    'set long'   => ["--check", true],
+    'unset long' => ["--no-check", false])
+  def test_checkFile(data)
+    arg, expected = data
+    command = "#{TEST_COMMAND_NAME} -i #{TEST_SAMPLE_FILENAME} #{arg}"
+    stdoutstr, stderrstr, status = Open3.capture3(command)
+    assert_false(stdoutstr.empty?)
+    str =  "Mention(s) found in 3 @x #y\n"
+    str += "Unknown tag(s) #y found\n"
+    str += "Unknown tag(s) #x found\n"
+    str += "Mention(s) found in c @y"
+    expectedStr = expected ? str : ""
+    assert_equal(expectedStr, stderrstr.chomp)
   end
 end
