@@ -453,7 +453,7 @@ public:
             return base_.GetSpeed(param);
         }
 
-        auto extParam = reinterpret_cast<const ExtSpeedParameter&>(param);
+        const auto& extParam = reinterpret_cast<const ExtSpeedParameter&>(param);
         return std::min(maxSpeed_, extParam.maxSpeed);
     }
 
