@@ -63,13 +63,6 @@ cppFriendsSpace.bat
 
 を実行すると、ビルドして実行します。MinGWのインストール先はC:\MinGWに固定していますので、適宜cppFriendsSpace.batを変更してください。Boost C++ Librariesのファイル名が異なる場合(-mtなどがついている)場合も適宜変更してください。
 
-当方の実行環境は以下の通りです。
-
-* Windows 10 Creators Update 64bit Edition
-* MinGW-w64 (Distro 14.1)
-* gcc (6.3.0)
-* Boost C++ Libraries (1.63.0)
-
 MinGWでは、Boost.Regexの空白文字(\sと[:space:])は、15文字すべてを空白とみなしました。しかしCygwinでは12文字しか空白とみなしませんでした。
 
 ### ファイルにUS-ASCII以外の文字が含まれないことを確認する
