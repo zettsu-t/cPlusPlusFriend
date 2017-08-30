@@ -33,7 +33,7 @@ class FileCreater
     File.open(cppFilename, "w") { |outStream|
       ["#ifndef #{guard}", "#define #{guard}", "namespace {",
        generateNode(), generateSymlink(), generateHardlink(),
-       "#endif", "}"].each { |str| outStream.puts str}
+       "}", "#endif"].each { |str| outStream.puts str}
     }
   end
 
