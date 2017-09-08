@@ -13,7 +13,13 @@ MinGW-w64 Distro 15.1 (GCC 7.2.0)でmakeできるようにしました。ただ�
 - boost::multiprecision::cpp_intが使えない(実行時に異常終了する)
 - CPU除算例外が発生したとき、処理が先に進まずプロセスが終了しない(Cygwinはプロセスが終了するのでDeathTestできる)
 
+## LLVM/clang++ 5.0.0
+
+現時点ではコンパイル-リンクできません。
+
 ## LLVM/clang++ 4.0.1対応
+
+c++config.h の
 
 ```bash
 #define _GLIBCXX_USE_FLOAT128 1
