@@ -1159,6 +1159,10 @@ TEST_F(TestDanglingIterator, Pop) {
     }
 }
 
+static_assert((2 * 2) == 4, "I expect 2 * 2 is equal to 4");
+static_assert((0b1 * 0b1) == 0b1, "");
+// static_assert((0b2 * 0b2) == 0b4, "");
+
 /*
 Local Variables:
 mode: c++
