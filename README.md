@@ -34,6 +34,72 @@ RDTSC命令の下の桁に偏りがある、という判定は実行環境によ
 
 ## その他もろもろ
 
+### strlenで文字列が空かどうか調べる
+
+GCCで、strlen(pStr) == 0を使って文字列が空かどうか調べると、先頭が0かどうかだけ判定し、文字列の長さは調べないようです。
+
+cFriendsCommon.hとcFriends.cから作られる、cFriends64.sのアセンブリコードを確認すると分かります。main関数のコードを見ると分かります。
+
+```c++
+static const size_t LongStringLength = 0xffffffff;
+static inline char* CreateLongString(void) {
+    const size_t LongStringBufferLength = LongStringLength + 1;
+    char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));
+    assert(pStr);
+
+    for(size_t i=0; i<LongStringLength; ++i) {
+        pStr[i] = 'a';
+    }
+    pStr[LongStringLength] = '\0';
+    return pStr;
+}
+
+static inline int IsLongStringEmpty(void) {
+    char* pStr = CreateLongString();
+    int result = (strlen(pStr) == 0);
+    free(pStr);
+    pStr = NULL;
+    return result;
+}
+
+static inline size_t GetLongStringLength(void) {
+    char* pStr = CreateLongString();
+    size_t length = strlen(pStr);
+    free(pStr);
+    pStr = NULL;
+    return length;
+}
+```
+
+```gas
+call    CreateLongString     # 返り値のraxは文字列の先頭を指す
+movzx   edi, BYTE PTR [rax]  # 先頭の文字を取得する
+mov     rcx, rax
+call    free
+test    dil, dil             # 先頭の文字が0かどうか
+je      assert失敗時の処理に飛ぶ
+
+call    GetTickCount()を呼ぶ
+mov     edi, eax
+
+call    CreateLongString
+mov     r12, rax
+mov     rcx, rax
+call    strlen()を呼ぶ
+# 以下略
+```
+
+Cygwinでテストを実行すると、以下の処理に掛かった実行時間を順に表示します。上記のアセンブリから推測される通り、長さが0かどうか調べるためにはstrlenを呼ばないのでその処理時間が掛からないことが分かります。
+
+1. 文字列の確保と解放だけ
+1. 文字列の確保と解放に加えて、長さが0かどうか調べる
+1. 文字列の確保と解放に加えて、長さを調べる
+
+```text
+Using x64 and SSE
+2906, 2922, 3359 [msec]
+```
+
 ### LTO(Link Time Optimization)
 
 既述の通りmakeを実行すると、LTOを有効にした実行ファイルと、そうでないものを生成します。実行ファイルのシンボルテーブルを確認すると、UnusedFunctionの定義が以下の通りになります。

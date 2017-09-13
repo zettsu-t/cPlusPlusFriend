@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
 #include "cFriends.h"
 #include "cFriendsCommon.h"
 
@@ -168,8 +169,23 @@ int main(int argc, char* argv[]) {
     exec_snprintf();
     exec_snprintf_twice();
     print_infinity();
+
+    time_t startTime = GetTickCount();
+    char* pStr = CreateLongString();
+    free(pStr);
+    time_t emptyTime = GetTickCount();
+    assert(!IsLongStringEmpty());
+    time_t lengthTime = GetTickCount();
+    assert(GetLongStringLength() == LongStringLength);
+    time_t stopTime = GetTickCount();
+
+    printf("%lu, %lu, %lu [msec]\n",
+           (unsigned long)(emptyTime  - startTime),
+           (unsigned long)(lengthTime - emptyTime),
+           (unsigned long)(stopTime   - lengthTime));
     return 0;
 }
+
 
 /*
 Local Variables:

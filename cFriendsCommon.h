@@ -1,6 +1,10 @@
 #ifndef CPPFRIENDS_CFRIENDSCOMMON_H
 #define CPPFRIENDS_CFRIENDSCOMMON_H
 
+#include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -52,6 +56,35 @@ extern "C" {
         SpeedParameter base;  // 必ず先頭メンバに置く
         SpeedKph   maxSpeed;
     } ExtSpeedParameter;
+
+    static const size_t LongStringLength = 0xffffffff;
+    static inline char* CreateLongString(void) {
+        const size_t LongStringBufferLength = LongStringLength + 1;
+        char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));
+        assert(pStr);
+
+        for(size_t i=0; i<LongStringLength; ++i) {
+            pStr[i] = 'a';
+        }
+        pStr[LongStringLength] = '\0';
+        return pStr;
+    }
+
+    static inline int IsLongStringEmpty(void) {
+        char* pStr = CreateLongString();
+        int result = (strlen(pStr) == 0);
+        free(pStr);
+        pStr = NULL;
+        return result;
+    }
+
+    static inline size_t GetLongStringLength(void) {
+        char* pStr = CreateLongString();
+        size_t length = strlen(pStr);
+        free(pStr);
+        pStr = NULL;
+        return length;
+    }
 
 #ifdef __cplusplus
 }
