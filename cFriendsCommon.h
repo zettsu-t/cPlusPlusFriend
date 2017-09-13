@@ -57,7 +57,7 @@ extern "C" {
         SpeedKph   maxSpeed;
     } ExtSpeedParameter;
 
-    static const size_t LongStringLength = 0xffffffff;
+    static const size_t LongStringLength = 0xefffffff;
     static inline char* CreateLongString(void) {
         const size_t LongStringBufferLength = LongStringLength + 1;
         char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));

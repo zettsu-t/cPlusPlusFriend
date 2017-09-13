@@ -41,7 +41,7 @@ GCCで、strlen(pStr) == 0を使って文字列が空かどうか調べると、
 cFriendsCommon.hとcFriends.cから作られる、cFriends64.sのアセンブリコードを確認すると分かります。main関数のコードを見ると分かります。
 
 ```c++
-static const size_t LongStringLength = 0xffffffff;
+static const size_t LongStringLength = 0xefffffff;
 static inline char* CreateLongString(void) {
     const size_t LongStringBufferLength = LongStringLength + 1;
     char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));
@@ -103,7 +103,7 @@ Cygwinでテストを実行すると、以下の処理に掛かった実行時�
 
 ```text
 Using x64 and SSE
-2906, 2922, 3359 [msec]
+2719, 2734, 3094 [msec]
 ```
 
 ### LTO(Link Time Optimization)
