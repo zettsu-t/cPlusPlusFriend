@@ -69,6 +69,12 @@ static inline size_t GetLongStringLength(void) {
     pStr = NULL;
     return length;
 }
+
+int main(int argc, char* argv[]) {
+    assert(!IsLongStringEmpty());
+    time_t lengthTime = GetTickCount();
+    assert(GetLongStringLength() == LongStringLength);
+}
 ```
 
 ```gas
