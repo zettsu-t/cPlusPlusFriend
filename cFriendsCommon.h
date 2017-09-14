@@ -57,15 +57,16 @@ extern "C" {
         SpeedKph   maxSpeed;
     } ExtSpeedParameter;
 
-    static const size_t LongStringLength = 0xefffffff;
+    // README.mdはこの値で測る。メモリが足りなければ随時減らしてください。
+//  static const size_t LongStringLength = (sizeof(size_t) > 4) ? 0xefffffff : 0xfffffff;
+    // メモリの少ないPCでも失敗しない控えめなサイズだが、数百Mbyteないと有意な差が出ない
+    static const size_t LongStringLength = 0xffff;
     static inline char* CreateLongString(void) {
         const size_t LongStringBufferLength = LongStringLength + 1;
         char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));
         assert(pStr);
 
-        for(size_t i=0; i<LongStringLength; ++i) {
-            pStr[i] = 'a';
-        }
+        memset(pStr, 'a', LongStringLength);
         pStr[LongStringLength] = '\0';
         return pStr;
     }

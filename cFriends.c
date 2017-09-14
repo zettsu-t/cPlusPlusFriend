@@ -170,14 +170,14 @@ int main(int argc, char* argv[]) {
     exec_snprintf_twice();
     print_infinity();
 
-    time_t startTime = GetTickCount();
+    DWORD startTime = GetTickCount();
     char* pStr = CreateLongString();
     free(pStr);
-    time_t emptyTime = GetTickCount();
+    DWORD emptyTime = GetTickCount();
     assert(!IsLongStringEmpty());
-    time_t lengthTime = GetTickCount();
+    DWORD lengthTime = GetTickCount();
     assert(GetLongStringLength() == LongStringLength);
-    time_t stopTime = GetTickCount();
+    DWORD stopTime = GetTickCount();
 
     printf("%lu, %lu, %lu [msec]\n",
            (unsigned long)(emptyTime  - startTime),

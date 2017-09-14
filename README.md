@@ -42,14 +42,13 @@ cFriendsCommon.hとcFriends.cから作られる、cFriends64.sのアセンブリ
 
 ```c++
 static const size_t LongStringLength = 0xefffffff;
+
 static inline char* CreateLongString(void) {
     const size_t LongStringBufferLength = LongStringLength + 1;
     char* pStr = (char*)(malloc(sizeof(char) * LongStringBufferLength));
     assert(pStr);
 
-    for(size_t i=0; i<LongStringLength; ++i) {
-        pStr[i] = 'a';
-    }
+    memset(pStr, 'a', LongStringLength);
     pStr[LongStringLength] = '\0';
     return pStr;
 }
@@ -89,9 +88,10 @@ call    GetTickCount()を呼ぶ
 mov     edi, eax
 
 call    CreateLongString
-mov     r12, rax
+mov     rbp, rax
 mov     rcx, rax
 call    strlen()を呼ぶ
+mov     rcx, rbp
 # 以下略
 ```
 
@@ -102,8 +102,7 @@ Cygwinでテストを実行すると、以下の処理に掛かった実行時�
 1. 文字列の確保と解放に加えて、長さを調べる
 
 ```text
-Using x64 and SSE
-2719, 2734, 3094 [msec]
+1766, 1750, 2062 [msec]
 ```
 
 ### LTO(Link Time Optimization)

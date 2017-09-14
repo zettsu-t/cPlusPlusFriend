@@ -112,6 +112,7 @@ SOURCE_C_SJIS=cFriendsShiftJis.c
 SOURCE_C=cFriends.c
 SOURCE_C_EXT=cFriendsExt.c
 SOURCE_ERROR=cppFriendsError.cpp
+HEADERS_C=cFriends.h cFriendsCommon.h
 INDENT_INPUT_SOURCE_H=cFriends.h
 INDENT_INPUT_SOURCE_C=cFriends.c
 
@@ -280,7 +281,7 @@ $(TARGET_C_SJIS): $(SOURCE_C_SJIS)
 	@./$@ | $(WC) | $(GREP) "  1  "
 	-$(CPP) $(GXX_CFLAGS) -Werror -o $@ $<
 
-$(TARGET_C): $(SOURCE_C)
+$(TARGET_C): $(SOURCE_C) $(HEADERS_C)
 	$(CPP) $(GXX_CFLAGS) $(CASMFLAGS_87) -o $@ $<
 	@echo -e $(ECHO_START)Using x87 and compile with $(CASMFLAGS_87) $(ECHO_END)
 	@./$@
