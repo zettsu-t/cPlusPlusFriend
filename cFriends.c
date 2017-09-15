@@ -173,6 +173,8 @@ int main(int argc, char* argv[]) {
     DWORD startTime = GetTickCount();
     char* pStr = CreateLongString();
     free(pStr);
+    pStr = NULL;
+
     DWORD emptyTime = GetTickCount();
     assert(!IsLongStringEmpty());
     DWORD lengthTime = GetTickCount();

@@ -71,7 +71,7 @@ static inline size_t GetLongStringLength(void) {
 
 int main(int argc, char* argv[]) {
     assert(!IsLongStringEmpty());
-    time_t lengthTime = GetTickCount();
+    DWORD lengthTime = GetTickCount();
     assert(GetLongStringLength() == LongStringLength);
 }
 ```
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 call    CreateLongString     # 返り値のraxは文字列の先頭を指す
 movzx   edi, BYTE PTR [rax]  # 先頭の文字を取得する
 mov     rcx, rax
-call    free
+call    free()を呼ぶ
 test    dil, dil             # 先頭の文字が0かどうか
 je      assert失敗時の処理に飛ぶ
 

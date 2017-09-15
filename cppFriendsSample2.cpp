@@ -22,10 +22,12 @@
 #include <boost/fusion/container/vector.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/locale.hpp>
+#include <boost/logic/tribool.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/multiprecision/miller_rabin.hpp>
+#include <boost/optional.hpp>
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
@@ -1199,6 +1201,47 @@ TEST_F(TestFileAlias, All) {
             EXPECT_TRUE(boost::filesystem::equivalent(HardlinkFilename, SymlinkFilename));
         }
     }
+}
+
+class TestTriBool : public ::testing::Test {};
+
+TEST_F(TestTriBool, TriBool) {
+    boost::logic::tribool tb = boost::logic::indeterminate;
+    EXPECT_TRUE(boost::logic::indeterminate(tb));
+    if (tb) {
+        EXPECT_TRUE(false);
+    } else {
+        EXPECT_TRUE(true);
+    }
+
+    if (!tb) {
+        EXPECT_TRUE(false);
+    } else {
+        EXPECT_TRUE(true);
+    }
+
+    tb = false;
+    EXPECT_FALSE(boost::logic::indeterminate(tb));
+    EXPECT_FALSE(tb);
+    EXPECT_TRUE(!tb);
+
+    tb = true;
+    EXPECT_FALSE(boost::logic::indeterminate(tb));
+    EXPECT_TRUE(tb);
+    EXPECT_FALSE(!tb);
+}
+
+TEST_F(TestTriBool, Optional) {
+    boost::optional<bool> tb;
+    EXPECT_FALSE(tb);
+
+    tb = false;
+    ASSERT_TRUE(tb);
+    EXPECT_FALSE(*tb);
+
+    tb = true;
+    ASSERT_TRUE(tb);
+    EXPECT_TRUE(*tb);
 }
 
 /*
