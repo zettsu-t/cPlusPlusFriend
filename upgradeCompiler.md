@@ -2,7 +2,7 @@
 
 ## MinGW GCC 7.2.0の制限事項
 
-MinGW-w64 Distro 15.1 (GCC 7.2.0)でmakeできるようにしました。ただし以下の制限事項があります。
+MinGW-w64 Distro 15.1 (GCC 7.2.0) + LLVM 5.0.0 でmakeできるようにしました。ただし以下の制限事項があります。
 
 - GCCのLTOは実行ファイルを生成できるが、実行できない
 - スレッドとネットワーク処理をコンパイル/リンクしない(MinGWでstd::thread, arpa/inet.hが使えないため)
@@ -12,6 +12,7 @@ MinGW-w64 Distro 15.1 (GCC 7.2.0)でmakeできるようにしました。ただ�
 - ::isasciiが使えない。代わりに__isasciiを使う。
 - boost::multiprecision::cpp_intが使えない(実行時に異常終了する)
 - CPU除算例外が発生したとき、処理が先に進まずプロセスが終了しない(Cygwinはプロセスが終了するのでDeathTestできる)
+- clang++ -MMオプションで依存関係(.d)を作るとき、C++標準ヘッダファイルを見つけれない
 
 ## LLVM/clang++ 5.0.0
 
