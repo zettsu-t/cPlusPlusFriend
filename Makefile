@@ -21,6 +21,8 @@ EXPLICIT_EXE_SUFFIX=.exe
 MINGW_DIR=C:\MinGW
 # MinGW-32向けには書き換える必要がある
 ISYSTEM_MINGW_INCLUDE_DIR=$(MINGW_DIR)\include
+ISYSTEM_MINGW_CLANG_INCLUDE_DIRS = $(ISYSTEM_MINGW_INCLUDE_DIR) $(ISYSTEM_MINGW_INCLUDE_DIR)\c++\$(GCC_VERSION) $(ISYSTEM_MINGW_INCLUDE_DIR)\c++\$(GCC_VERSION)\x86_64-w64-mingw32 $(MINGW_DIR)\x86_64-w64-mingw32\include
+
 # 必要であれば設定する
 BOOST_LIB_POSTFIX=
 endif
@@ -49,11 +51,12 @@ TARGET=cppFriends
 TARGET_NO_OPT=cppFriends_no_opt
 TARGET_C_SJIS=cFriendsShiftJis
 TARGET_C=cFriends
+# Clang for Windows にはllvm-linkがない
 ifneq ($(BUILD_ON_MINGW),yes)
 TARGET_GCC_LTO=cppFriends_gcc_lto
-endif
 TARGET_CLANG=cppFriendsClang
 TARGET_CLANG_LTO=cppFriendsClang_lto
+endif
 OUTPUT_ASM87_C=cFriends87.s
 OUTPUT_ASM87_STORE_C=cFriends87-store.s
 OUTPUT_ASM64_C=cFriends64.s
@@ -205,8 +208,8 @@ CHCP_UTF8=chcp 65001
 DETERMINE_FILE_TYPE=file
 
 ifeq ($(BUILD_ON_MINGW),yes)
-INCLUDES_GXX=$(addprefix -isystem,$(ISYSTEM_MINGW_INCLUDE_DIR))
-INCLUDES_CLANGXX=
+INCLUDES_GXX=$(addprefix -isystem ,$(ISYSTEM_MINGW_INCLUDE_DIR))
+INCLUDES_CLANGXX=$(addprefix -isystem ,$(ISYSTEM_MINGW_CLANG_INCLUDE_DIRS))
 endif
 
 # http://d.hatena.ne.jp/higepon/20080430/1209525546

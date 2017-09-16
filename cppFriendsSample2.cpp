@@ -1208,6 +1208,7 @@ class TestTriBool : public ::testing::Test {};
 TEST_F(TestTriBool, TriBool) {
     boost::logic::tribool tb = boost::logic::indeterminate;
     EXPECT_TRUE(boost::logic::indeterminate(tb));
+
     if (tb) {
         EXPECT_TRUE(false);
     } else {
