@@ -1206,30 +1206,34 @@ TEST_F(TestFileAlias, All) {
 class TestTriBool : public ::testing::Test {};
 
 TEST_F(TestTriBool, TriBool) {
-    boost::logic::tribool tb = boost::logic::indeterminate;
-    EXPECT_TRUE(boost::logic::indeterminate(tb));
+    boost::logic::tribool b = boost::logic::indeterminate;
+#if 0
+    EXPECT_TRUE(b);   // actual false
+    EXPECT_FALSE(b);  // actual true
+#endif
+    EXPECT_TRUE(boost::logic::indeterminate(b));
 
-    if (tb) {
+    if (b) {
         EXPECT_TRUE(false);
     } else {
         EXPECT_TRUE(true);
     }
 
-    if (!tb) {
+    if (!b) {
         EXPECT_TRUE(false);
     } else {
         EXPECT_TRUE(true);
     }
 
-    tb = false;
-    EXPECT_FALSE(boost::logic::indeterminate(tb));
-    EXPECT_FALSE(tb);
-    EXPECT_TRUE(!tb);
+    b = false;
+    EXPECT_FALSE(boost::logic::indeterminate(b));
+    EXPECT_FALSE(b);
+    EXPECT_TRUE(!b);
 
-    tb = true;
-    EXPECT_FALSE(boost::logic::indeterminate(tb));
-    EXPECT_TRUE(tb);
-    EXPECT_FALSE(!tb);
+    b = true;
+    EXPECT_FALSE(boost::logic::indeterminate(b));
+    EXPECT_TRUE(b);
+    EXPECT_FALSE(!b);
 }
 
 TEST_F(TestTriBool, Optional) {
