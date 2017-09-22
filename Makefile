@@ -282,8 +282,8 @@ $(TARGET): $(OBJS)
 	./$@ --gtest_filter="*DeathTest*"
 	$(RM) $(OUTPUT_LOGS)
 	./$@ --gtest_filter="TestCompoundStatement*" 1>$(OUTPUT_LOG_STDOUT) 2>$(OUTPUT_LOG_STDERR)
-	grep -i "Printf in compound statements" $(OUTPUT_LOG_STDOUT)
-	grep -i "Printf in compound statements" $(OUTPUT_LOG_STDERR)
+	$(GREP) -i "Printf in compound statements" $(OUTPUT_LOG_STDOUT)
+	$(GREP) -i "Printf in compound statements" $(OUTPUT_LOG_STDERR)
 
 $(TARGET_NO_OPT): $(OBJS_NO_OPT)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
@@ -356,7 +356,7 @@ $(OUTPUT_ASM_CPP_GCC): $(SOURCE_CLANG)
 force : $(SOURCE_ERROR)
 	$(RUBY) $(SOURCE_RUBY_CASEWHEN)
 	$(RUBY) $(SOURCE_RUBY_AMPM24)
-	$(RUBY) $(SOURCE_RUBY_SEATMAP) | grep -i "100% passed"
+	$(RUBY) $(SOURCE_RUBY_SEATMAP) | $(GREP) -i "100% passed"
 	$(RUBY) -ne $(RUBY_ONELINER_ASCII_ONLY) $(LICENSE_FILE)
 	$(RUBY) -ne $(RUBY_ONELINER_ASCII_ONLY) $(SOURCE_FRIENDS) ; test $$? -ne 0
 	$(DETERMINE_FILE_TYPE) $(LICENSE_FILE) | $(GREP) -i "ASCII text"
@@ -366,7 +366,9 @@ ifeq ($(BUILD_ON_MINGW),yes)
 	$(CHCP_UTF8)
 endif
 	$(RUBY) $(SOURCE_RUBY_SHUFFLE_LINES_TEST)
-	bash -c "comm -3 <(sort $(CPPFRIEND_BOT_TEXT)) <($(RUBY) $(SOURCE_RUBY_SHUFFLE_LINES) -i $(CPPFRIEND_BOT_TEXT) | sort)" | wc | grep "  0 "
+	bash -c "comm -3 <(sort $(CPPFRIEND_BOT_TEXT)) <($(RUBY) $(SOURCE_RUBY_SHUFFLE_LINES) -i $(CPPFRIEND_BOT_TEXT) | sort)" | wc | $(GREP) "  0 "
+	$(GREP) -v --quiet "vtable" $(CPPFRIEND_BOT_TEXT) ; test $$? -eq 0
+	$(GREP) --quiet "fennec" $(CPPFRIEND_BOT_TEXT) ; test $$? -eq 1
 	-$(CXX) $(CPPFLAGS_ERROR) -c $<
 
 $(OBJ_MAIN): $(SOURCE_MAIN)
