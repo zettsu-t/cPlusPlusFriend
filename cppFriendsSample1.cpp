@@ -5,6 +5,7 @@
 #include <cstring>
 #include <algorithm>
 #include <functional>
+#include <fstream>
 #include <iomanip>
 #include <memory>
 #include <regex>
@@ -1157,6 +1158,47 @@ TEST_F(TestDanglingIterator, Pop) {
         strList.Pop();
 #endif
     }
+}
+
+class TestMatchingBOM : public ::testing::Test{
+protected:
+    virtual void SetUp() override {
+        clearAll();
+    }
+
+    virtual void TearDown() override {
+        clearAll();
+    }
+
+    void readHeadLine(const char* filename) {
+        std::ifstream is(filename);
+        std::getline(is, str1_);
+        std::getline(is, str2_);
+    }
+
+    void clearAll(void) {
+        str1_.clear();
+        str2_.clear();
+    }
+
+    std::string str1_;
+    std::string str2_;
+};
+
+TEST_F(TestMatchingBOM, ByteOrderMark) {
+    readHeadLine("sampleWithBom.txt");
+    ASSERT_FALSE(str1_.empty());
+    ASSERT_FALSE(str2_.empty());
+
+    std::regex reWithoutBom("^Word[\\r\\n]*");
+    std::smatch matchWithoutBom;
+    EXPECT_FALSE(std::regex_match(str1_, matchWithoutBom, reWithoutBom));
+    EXPECT_TRUE(std::regex_match(str2_, matchWithoutBom, reWithoutBom));
+
+    std::regex reWithBom("^...Word[\\r\\n]*");
+    std::smatch matchWithBom;
+    EXPECT_TRUE(std::regex_match(str1_, matchWithBom, reWithBom));
+    EXPECT_FALSE(std::regex_match(str2_, matchWithBom, reWithBom));
 }
 
 static_assert((2 * 2) == 4, "I expect 2 * 2 is equal to 4");
