@@ -4,6 +4,7 @@
 require_relative './asciiOnlyCheckerImpl.rb'
 require 'open3'
 require 'tempfile'
+require 'tmpdir'
 require 'test/unit'
 
 class MockInputStream
@@ -312,5 +313,15 @@ class TestActualInputFile < Test::Unit::TestCase
     assert_equal(expectedResult, file.failed)
     str = os.str.gsub(/\/\S+/, "")
     assert_equal(expectedStr, str)
+  end
+
+  def test_fileNotExist
+    assert_equal(0, InputFileSet.new(["__file_does_not_exist__"]).exitStatus)
+  end
+
+  def test_dir
+    Dir.mktmpdir("ascii_only_testing") { |dir|
+      assert_equal(0, InputFileSet.new([dir]).exitStatus)
+    }
   end
 end

@@ -104,6 +104,8 @@ class InputFileSet
     @plainExtractor = PlainExtractor.new
 
     failed = filenameSet.reduce(false) do |result, filename|
+      # シンボリックリンクは未対応
+      next unless File.file?(filename)
       extractor = getExtractor(filename)
       result | InputFile.new(filename, extractor, STDOUT).failed
     end
