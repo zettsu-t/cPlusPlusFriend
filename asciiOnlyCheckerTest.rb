@@ -25,7 +25,8 @@ class MockOutputStream
   end
 
   def puts(line)
-    @str += line + "\n"
+    @str += line
+    @str += "\n" if line == line.chomp
   end
 end
 
@@ -37,7 +38,7 @@ class TestParagraph < Test::Unit::TestCase
 
     os = MockOutputStream.new
     assert_false(paragraph.print(os))
-    assert_equal(expected + "\n\n\n", os.str)
+    assert_equal(expected + "\n\n", os.str)
   end
 
   def test_multipleLines
@@ -48,7 +49,7 @@ class TestParagraph < Test::Unit::TestCase
 
     os = MockOutputStream.new
     assert_false(paragraph.print(os))
-    assert_equal(expected + "\n\n\n", os.str)
+    assert_equal(expected + "\n\n", os.str)
   end
 
   data(
@@ -63,19 +64,19 @@ class TestParagraph < Test::Unit::TestCase
 
     os = MockOutputStream.new
     assert_true(paragraph.print(os))
-    assert_equal(header + expected + "\n\n\n", os.str)
+    assert_equal(header + expected + "\n\n", os.str)
   end
 end
 
 class TestPlainExtractor < Test::Unit::TestCase
   data(
-    'no spaces' => ["line",  "line"],
-    'left' =>     [" line",  "line"],
-    'right' =>     ["line ", "line"],
-    'both' =>     [" line ", "line"],
-    'zenkaku 1' => [ " 　 ",  "　"],
-    'zenkaku 2' => [ " 全角 ",  "全角"])
-  def test_all(data)
+    'no spaces' => ["line",  ["line"]],
+    'left' =>      [" line", ["line"]],
+    'right' =>     ["line ", ["line"]],
+    'both' =>      [" line ", ["line"]],
+    'zenkaku 1' => [ " 　 ",  ["　"]],
+    'zenkaku 2' => [ " 全角 ", ["全角"]])
+  def test_plainExtractor(data)
     line, expected = data
     assert_equal(expected, PlainExtractor.new.extract(line))
   end
@@ -83,13 +84,17 @@ end
 
 class TestCppCommentExtractor < Test::Unit::TestCase
   data(
-    'cpp comment 1' => ["//comment",  "comment"],
-    'cpp comment 2' => ["// comment", "comment"],
-    'cpp comment 3' => ["//コメント",  "コメント"],
-    'cpp comment 4' => ["// コメント", "コメント"],
-    'c directive' => ["#define", ""],
-    'code' => ["int a = 0;", ""])
-  def test_all(data)
+    'cpp comment 1' => ["//comment",  ["comment"]],
+    'cpp comment 2' => ["// comment", ["comment"]],
+    'cpp comment 3' => ["//コメント",  ["コメント"]],
+    'cpp comment 4' => ["// コメント", ["コメント"]],
+    'cpp comment 5' => ["// comment // コメント", ["comment // コメント"]],
+    'c directive' => ["#define", [""]],
+    'code' => ["int a = 0;", [""]],
+    'code and comment 1' => ["int a = 0; // comment", ["", "comment"]],
+    'code and comment 2' => ["int a = 0; //コメント //comment", ["", "コメント //comment"]],
+  )
+  def test_cppComment(data)
     line, expected = data
     assert_equal(expected, CppCommentExtractor.new.extract(line))
   end
@@ -97,13 +102,17 @@ end
 
 class TestScriptCommentExtractor < Test::Unit::TestCase
   data(
-    'comment 1' => ["#comment",  "comment"],
-    'comment 2' => ["# comment", "comment"],
-    'comment 3' => ["#コメント",  "コメント"],
-    'comment 4' => ["# コメント", "コメント"],
-    'cpp comment' => ["//comment",  ""],
-    'code' => ["a = 0;", ""])
-  def test_all(data)
+    'comment 1' => ["#comment",  ["comment"]],
+    'comment 2' => ["# comment", ["comment"]],
+    'comment 3' => ["#コメント",  ["コメント"]],
+    'comment 4' => ["# コメント", ["コメント"]],
+    'comment 5' => ["# comment # コメント", ["comment # コメント"]],
+    'cpp comment' => ["//comment",  [""]],
+    'code' => ["a = 0;", [""]],
+    'code and comment 1' => ["a = 0; # comment", ["", "comment"]],
+    'code and comment 2' => ["a = 0; #コメント #comment", ["", "コメント #comment"]]
+  )
+  def test_scriptComment(data)
     line, expected = data
     assert_equal(expected, ScriptCommentExtractor.new.extract(line))
   end
@@ -111,10 +120,10 @@ end
 
 class TestInputFile < Test::Unit::TestCase
   data(
-    'none'   => [["first",  "second", "third"],  false, "foo.txt : 1\nfirst second third\n\n\n"],
-    'head'   => [["一行目", "second", "third"],  true,  "Non-ASCII characters found in foo.txt : 1\n一行目 second third\n\n\n"],
-    'middle' => [["first",  "二行目", "third"],  true,  "Non-ASCII characters found in foo.txt : 1\nfirst 二行目 third\n\n\n"],
-    'last'   => [["first",  "second", "三行目"], true,  "Non-ASCII characters found in foo.txt : 1\nfirst second 三行目\n\n\n"])
+    'none'   => [["first",  "second", "third"],  false, "foo.txt : 1\nfirst second third\n\n"],
+    'head'   => [["一行目", "second", "third"],  true,  "Non-ASCII characters found in foo.txt : 1\n一行目 second third\n\n"],
+    'middle' => [["first",  "二行目", "third"],  true,  "Non-ASCII characters found in foo.txt : 1\nfirst 二行目 third\n\n"],
+    'last'   => [["first",  "second", "三行目"], true,  "Non-ASCII characters found in foo.txt : 1\nfirst second 三行目\n\n"])
   def test_plain(data)
     lines, expectedResult, expectedStr = data
     os = MockOutputStream.new
@@ -125,8 +134,8 @@ class TestInputFile < Test::Unit::TestCase
   end
 
   data(
-    'comment' =>     [["// 一行目", "// second", "# third", "4"], true, "Non-ASCII characters found in foo.txt : 1\n一行目 second\n\n\n"],
-    'non comment' => [["// first",  "二行目", "//third"], false, "foo.txt : 1\nfirst\n\n\nfoo.txt : 3\nthird\n\n\n"])
+    'comment' =>     [["// 一行目", "// second", "# third", "4"], true, "Non-ASCII characters found in foo.txt : 1\n一行目 second\n\n"],
+    'non comment' => [["// first",  "二行目", "//third"], false, "foo.txt : 1\nfirst\n\nfoo.txt : 3\nthird\n\n"])
   def test_cpp(data)
     lines, expectedResult, expectedStr = data
     os = MockOutputStream.new
@@ -136,9 +145,25 @@ class TestInputFile < Test::Unit::TestCase
     assert_equal(expectedStr, os.str)
   end
 
+
   data(
-    'comment' =>     [["# 一行目", "# second", "// third", "4"], true, "Non-ASCII characters found in foo.txt : 1\n一行目 second\n\n\n"],
-    'non comment' => [["# first",  "二行目", "#third"], false, "foo.txt : 1\nfirst\n\n\nfoo.txt : 3\nthird\n\n\n"])
+    'members 1' => [["int a; // 一行目", "int b; // second", "int c; // third"], true,
+                    "Non-ASCII characters found in foo.txt : 1\n一行目\n\nfoo.txt : 2\nsecond\n\nfoo.txt : 3\nthird\n\n"],
+    'members 2' => [["int a; // first", "int b;", "int c; // 三行目"], true,
+                    "foo.txt : 1\nfirst\n\nNon-ASCII characters found in foo.txt : 3\n三行目\n\n"]
+  )
+  def test_cppCode(data)
+    lines, expectedResult, expectedStr = data
+    os = MockOutputStream.new
+    file = InputFile.new("", nil, os)
+    is = MockInputStream.new(lines)
+    assert_equal(expectedResult, file.parse("foo.txt", CppCommentExtractor.new, os, is))
+    assert_equal(expectedStr, os.str)
+  end
+
+  data(
+    'comment' =>     [["# 一行目", "# second", "// third", "4"], true, "Non-ASCII characters found in foo.txt : 1\n一行目 second\n\n"],
+    'non comment' => [["# first",  "二行目", "#third"], false, "foo.txt : 1\nfirst\n\nfoo.txt : 3\nthird\n\n"])
   def test_script(data)
     lines, expectedResult, expectedStr = data
     os = MockOutputStream.new
@@ -149,8 +174,23 @@ class TestInputFile < Test::Unit::TestCase
   end
 
   data(
-    'ascii'     => ["first", false, "foo.cpp : 457\nfirst\n\n\n"],
-    'non ascii' => ["一行目", true, "Non-ASCII characters found in foo.cpp : 457\n一行目\n\n\n"])
+    'members 1' =>   [["a # 一行目", "b # second", "c # third"], true,
+                      "Non-ASCII characters found in foo.txt : 1\n一行目\n\nfoo.txt : 2\nsecond\n\nfoo.txt : 3\nthird\n\n"],
+    'members 2' =>   [["a #first", "b #二行目", "c"], true,
+                      "foo.txt : 1\nfirst\n\nNon-ASCII characters found in foo.txt : 2\n二行目\n\n"]
+  )
+  def test_scriptCode(data)
+    lines, expectedResult, expectedStr = data
+    os = MockOutputStream.new
+    file = InputFile.new("", nil, os)
+    is = MockInputStream.new(lines)
+    assert_equal(expectedResult, file.parse("foo.txt", ScriptCommentExtractor.new, os, is))
+    assert_equal(expectedStr, os.str)
+  end
+
+  data(
+    'ascii'     => ["first", false, "foo.cpp : 457\nfirst\n\n"],
+    'non ascii' => ["一行目", true, "Non-ASCII characters found in foo.cpp : 457\n一行目\n\n"])
   def test_checkSingleLine(data)
     line, expectedResult, expectedStr = data
     os = MockOutputStream.new
@@ -179,12 +219,12 @@ class TestInputFile < Test::Unit::TestCase
   end
 
   data(
-    'ascii only'  => [["first", "second", "third"], false, "foo.cpp : 456\nfirst second third\n\n\n"],
-    'non ascii 2-1' => [["一行目", "second"], true, "Non-ASCII characters found in foo.cpp : 456\n一行目 second\n\n\n"],
-    'non ascii 2-2' => [["first", "二行目"],  true, "Non-ASCII characters found in foo.cpp : 456\nfirst 二行目\n\n\n"],
-    'non ascii 3-1' => [["一行目", "second", "third"], true, "Non-ASCII characters found in foo.cpp : 456\n一行目 second third\n\n\n"],
-    'non ascii 3-2' => [["first", "二行目",  "third"], true, "Non-ASCII characters found in foo.cpp : 456\nfirst 二行目 third\n\n\n"],
-    'non ascii 3-3' => [["first", "second", "三行目"], true, "Non-ASCII characters found in foo.cpp : 456\nfirst second 三行目\n\n\n"])
+    'ascii only'  => [["first", "second", "third"], false, "foo.cpp : 456\nfirst second third\n\n"],
+    'non ascii 2-1' => [["一行目", "second"], true, "Non-ASCII characters found in foo.cpp : 456\n一行目 second\n\n"],
+    'non ascii 2-2' => [["first", "二行目"],  true, "Non-ASCII characters found in foo.cpp : 456\nfirst 二行目\n\n"],
+    'non ascii 3-1' => [["一行目", "second", "third"], true, "Non-ASCII characters found in foo.cpp : 456\n一行目 second third\n\n"],
+    'non ascii 3-2' => [["first", "二行目",  "third"], true, "Non-ASCII characters found in foo.cpp : 456\nfirst 二行目 third\n\n"],
+    'non ascii 3-3' => [["first", "second", "三行目"], true, "Non-ASCII characters found in foo.cpp : 456\nfirst second 三行目\n\n"])
   def test_checkMultiLines(data)
     lines, expectedResult, expectedStr = data
     os = MockOutputStream.new
@@ -226,7 +266,7 @@ class TestInputFileSet < Test::Unit::TestCase
       fileSet.getExtractor(filename).instance_of?(PlainExtractor)
     end
 
-    ["Makefile", "Makefile.mk", "Makefile.in", "Makefile_var"].each do |filename|
+    ["Makefile", "Makefile.mk", "Makefile.in", "Makefile_var", "dir/Makefile"].each do |filename|
       fileSet.getExtractor(filename).instance_of?(ScriptCommentExtractor)
     end
   end
@@ -234,10 +274,10 @@ end
 
 class TestActualInputFile < Test::Unit::TestCase
   data(
-    'one line' => [["a"], " : 1\na\n\n\n"],
-    'one paragraph'  => [["a", "b"], " : 1\na b\n\n\n"],
-    'paragraphs 1' => [["", "b", "", "d", "e", "", "g", ""], " : 2\nb\n\n\n : 4\nd e\n\n\n : 7\ng\n\n\n"],
-    'paragraphs 2'  => [["", "b", "", "d", "e", "", "g", "h"], " : 2\nb\n\n\n : 4\nd e\n\n\n : 7\ng h\n\n\n"])
+    'one line' => [["a"], " : 1\na\n\n"],
+    'one paragraph'  => [["a", "b"], " : 1\na b\n\n"],
+    'paragraphs 1' => [["", "b", "", "d", "e", "", "g", ""], " : 2\nb\n\n : 4\nd e\n\n : 7\ng\n\n"],
+    'paragraphs 2'  => [["", "b", "", "d", "e", "", "g", "h"], " : 2\nb\n\n : 4\nd e\n\n : 7\ng h\n\n"])
   def test_plainFile(data)
     lines, expectedStr = data
     inTmpfile = Tempfile.new("input")
@@ -253,15 +293,15 @@ class TestActualInputFile < Test::Unit::TestCase
   end
 
   data(
-    'one line' => [["カナ"], "Non-ASCII characters found in  : 1\nカナ\n\n\n"],
+    'one line' => [["カナ"], "Non-ASCII characters found in  : 1\nカナ\n\n"],
     'one paragraph'  => [["a", "カナ"],
-                         "Non-ASCII characters found in  : 1\na カナ\n\n\n"],
+                         "Non-ASCII characters found in  : 1\na カナ\n\n"],
     'paragraphs 1' => [["", "b", "", "d", "カナ", "", "g", ""],
-                       " : 2\nb\n\n\nNon-ASCII characters found in  : 4\nd カナ\n\n\n : 7\ng\n\n\n"],
+                       " : 2\nb\n\nNon-ASCII characters found in  : 4\nd カナ\n\n : 7\ng\n\n"],
     'paragraphs 2'  => [["", "b", "", "d", "e", "", "g", "カナ"],
-                        " : 2\nb\n\n\n : 4\nd e\n\n\nNon-ASCII characters found in  : 7\ng カナ\n\n\n"],
+                        " : 2\nb\n\n : 4\nd e\n\nNon-ASCII characters found in  : 7\ng カナ\n\n"],
     'paragraphs 3'  => [["", "b", "", "かな", "e", "", "g", "カナ"],
-                        " : 2\nb\n\n\nNon-ASCII characters found in  : 4\nかな e\n\n\nNon-ASCII characters found in  : 7\ng カナ\n\n\n"])
+                        " : 2\nb\n\nNon-ASCII characters found in  : 4\nかな e\n\nNon-ASCII characters found in  : 7\ng カナ\n\n"])
   def test_plainKanaFile(data)
     lines, expectedStr = data
     inTmpfile = Tempfile.new("input")
@@ -278,9 +318,9 @@ class TestActualInputFile < Test::Unit::TestCase
 
   data(
     'paragraphs 1'  => [["", "// b", "", "かな", "e", "", "//g ", "カナ"], false,
-                        " : 2\nb\n\n\n : 7\ng\n\n\n"],
+                        " : 2\nb\n\n : 7\ng\n\n"],
     'paragraphs 2'  => [["", "// カナ", "", "# d", "e", "", "g", "//カナ"], true,
-                        "Non-ASCII characters found in  : 2\nカナ\n\n\nNon-ASCII characters found in  : 8\nカナ\n\n\n"])
+                        "Non-ASCII characters found in  : 2\nカナ\n\nNon-ASCII characters found in  : 8\nカナ\n\n"])
   def test_cppFile(data)
     lines, expectedResult, expectedStr = data
     inTmpfile = Tempfile.new("input")
@@ -298,9 +338,9 @@ class TestActualInputFile < Test::Unit::TestCase
 
   data(
     'paragraphs 1'  => [["", "# b", "", "かな", "e", "", "#g ", "カナ"], false,
-                        " : 2\nb\n\n\n : 7\ng\n\n\n"],
+                        " : 2\nb\n\n : 7\ng\n\n"],
     'paragraphs 2'  => [["", "# カナ", "", "// d", "e", "", "# g", "# カナ"], true,
-                        "Non-ASCII characters found in  : 2\nカナ\n\n\nNon-ASCII characters found in  : 7\ng カナ\n\n\n"])
+                        "Non-ASCII characters found in  : 2\nカナ\n\nNon-ASCII characters found in  : 7\ng カナ\n\n"])
   def test_scriptFile(data)
     lines, expectedResult, expectedStr = data
     inTmpfile = Tempfile.new("input")

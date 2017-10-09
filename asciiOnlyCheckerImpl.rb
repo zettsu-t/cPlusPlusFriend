@@ -2,6 +2,16 @@
 # -*- coding: utf-8 -*-
 # This script checks whether files have US-ASCII characters only.
 
+# これらがファイル名の末尾についていたら調べない
+FILENAME_ENDED_IGNORED = ["~", "bak"]
+
+# 接頭辞
+PREFIX_SET_SCRIPT = ["Makefile"]
+
+# 拡張子(.を除く)
+SUFFIX_SET_CPP = ["c", "h", "cpp", "hpp", "cc"]
+SUFFIX_SET_SCRIPT = ["sh", "pl", "rb", "s", "mk", "in"]
+
 class Paragraph
   def initialize(filename, lineNumber, line)
     @str = "#{filename} : #{lineNumber}\n#{line}"
@@ -28,30 +38,42 @@ class PlainExtractor
   def initialize
   end
 
+  # Extractorによっては、複数行に分割できる
   def extract(line)
-    line.strip
+    [line.strip]
   end
 end
 
 class CppCommentExtractor
   def initialize
-    @parent = PlainExtractor.new
   end
 
   def extract(line)
-    md = @parent.extract(line).match(/\/\/\s*(.+)\z/)
-    md ? md[1].strip : ""
+    # 最初のコメント開始記号に一致させるのは、greedyではなくreluctantにする
+    result = [""]
+    if md = line.strip.match(/\A(.*?)\/\/\s*(.+)\z/)
+      # コードのある行は独立した段落にする
+      result = [] if md[1].strip.empty?
+      result << md[2]
+    end
+
+    result
   end
 end
 
 class ScriptCommentExtractor
   def initialize
-    @parent = PlainExtractor.new
   end
 
   def extract(line)
-    md = @parent.extract(line).match(/\#(.+)\z/)
-    md ? md[1].strip : ""
+    # // と同様
+    result = [""]
+    if md = line.strip.match(/\A(.*?)\#\s*(.+)\z/)
+      result = [] if md[1].strip.empty?
+      result << md[2]
+    end
+
+    result
   end
 end
 
@@ -74,8 +96,10 @@ class InputFile
     result = false
 
     while line = inStream.gets
-      paragraph, failed = check(filename, lineNumber, extractor.extract(line.chomp), paragraph, outStream)
-      result |= failed
+      extractor.extract(line.chomp).each do |str|
+        paragraph, failed = check(filename, lineNumber, str, paragraph, outStream)
+        result |= failed
+      end
       lineNumber += 1
     end
 
@@ -105,7 +129,11 @@ class InputFileSet
 
     failed = filenameSet.reduce(false) do |result, filename|
       # シンボリックリンクは未対応
-      next unless File.file?(filename)
+      if FILENAME_ENDED_IGNORED.any? { |str| filename.end_with?(str) } || !File.file?(filename)
+        warn "! skip #{filename}"
+        next
+      end
+
       extractor = getExtractor(filename)
       result | InputFile.new(filename, extractor, STDOUT).failed
     end
@@ -113,15 +141,16 @@ class InputFileSet
   end
 
   def getExtractor(filename)
-    extractor = @plainExtractor
-    return @scriptCommentExtractor if filename.match(/\AMakefile/)
+    name = File.basename(filename)
+    return @scriptCommentExtractor if PREFIX_SET_SCRIPT.any? { |str| name.start_with?(str) }
 
-    md = filename.match(/\.([a-zA-Z\d]+)\z/)
+    extractor = @plainExtractor
+    md = name.match(/\.([a-zA-Z\d]+)\z/)
     return extractor unless md
     suffix = md[1]
 
-    return @cppCommentExtractor if ["c", "h", "cpp", "hpp", "cc"].any? { |ext| ext == suffix }
-    return @scriptCommentExtractor if ["sh", "pl", "rb", "s", "mk", "in"].any? { |ext| ext == suffix }
+    return @cppCommentExtractor if SUFFIX_SET_CPP.any? { |ext| ext == suffix }
+    return @scriptCommentExtractor if SUFFIX_SET_SCRIPT.any? { |ext| ext == suffix }
     extractor
   end
 end
