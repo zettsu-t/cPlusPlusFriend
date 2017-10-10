@@ -194,6 +194,13 @@ static_assert(std::is_standard_layout<NestedStandardLayoutObject>::value, "Not s
 static_assert(!std::is_standard_layout<DynamicObject>::value, "Standard layout");
 static_assert(!std::is_standard_layout<NestedDynamicObject>::value, "Standard layout");
 
+namespace {
+    // Aはポインタだが、Bは違う
+    int* g_confusingA, g_confusingB;
+    static_assert(std::is_pointer<decltype(g_confusingA)>::value);
+    static_assert(!std::is_pointer<decltype(g_confusingB)>::value);
+}
+
 // 本当はどこかのヘッダファイルにまとめて書き、必要な.cppファイルだけがインクルードする
 enum class FriendType : int {
     SERVAL,

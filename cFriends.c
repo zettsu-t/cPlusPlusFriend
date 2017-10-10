@@ -188,6 +188,9 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+/* Aはポインタだが、Bは違う */
+int* g_confusingVarA, g_confusingVarB;
+
 /*
 Local Variables:
 mode: c
