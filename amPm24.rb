@@ -3,6 +3,7 @@
 
 require 'test/unit'
 
+# AM/PM表記
 def parseHourString(timestamp)
 # timestamp.sub(/(\D*)(\d+)/){ t=$2.to_i; ( t + ((!$1.include?("午後") || (t > 12)) ? 0 : 12)).to_s }.to_i
   timestamp.sub(/(\D*)(\d+)/){t=$2.to_i;(t+((!$1.include?("午後")||(t>12))?0:12)).to_s}.to_i
@@ -58,5 +59,33 @@ class TestSeatMap < Test::Unit::TestCase
         assert_equal(expected, actual)
       end
     end
+  end
+end
+
+# 飛び石連休
+class TestHoliday < Test::Unit::TestCase
+  def test_fullSequence
+    holiday = "休"
+    weekday = "出"
+    daySet = [holiday, weekday]
+
+    # 休日と平日の並び
+    dayArraySet = daySet
+    1.upto(9) { |i| dayArraySet = dayArraySet.product(daySet) }
+    assert_equal(1024, dayArraySet.size)
+
+    dayArraySet.each do |days|
+      input = weekday + days.flatten.join("") + weekday
+      output = input.gsub(/#{holiday}(#{weekday}?#{holiday})+/) { |str| holiday * str.size }
+
+      expected = weekday + (1..(input.size-2)).map do |i|
+        (input[i-1] == holiday && input[i+1] == holiday) ? holiday : input[i]
+      end.join("") + weekday
+      assert_equal(expected, output)
+    end
+  end
+
+  def test_exmaple
+    assert_equal("出休出出＝＝＝＝出", "出休出出休出休休出".gsub(/休(出?休)+/) { |s| "＝" * s.size })
   end
 end
