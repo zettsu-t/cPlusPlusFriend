@@ -2,6 +2,7 @@
 #define  __STDC_LIMIT_MACROS
 #include <cstdint>
 #include <climits>
+#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <functional>
@@ -1167,7 +1168,7 @@ TEST_F(TestDanglingIterator, Pop) {
     }
 }
 
-class TestMatchingBOM : public ::testing::Test{
+class TestMatchingBOM : public ::testing::Test {
 protected:
     virtual void SetUp() override {
         clearAll();
@@ -1206,6 +1207,18 @@ TEST_F(TestMatchingBOM, ByteOrderMark) {
     std::smatch matchWithBom;
     EXPECT_TRUE(std::regex_match(str1_, matchWithBom, reWithBom));
     EXPECT_FALSE(std::regex_match(str2_, matchWithBom, reWithBom));
+}
+
+class TestNanFloat : public ::testing::Test {
+protected:
+    double mySqrt(double a, double b) {
+        return sqrt(a/b);
+    }
+};
+
+TEST_F(TestNanFloat, Sqrt) {
+    auto resultIsNaN = std::isnan(mySqrt(1.0, -1.0));
+    EXPECT_TRUE(resultIsNaN);
 }
 
 static_assert((2 * 2) == 4, "I expect 2 * 2 is equal to 4");
