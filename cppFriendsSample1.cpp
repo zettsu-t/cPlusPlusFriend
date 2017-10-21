@@ -87,6 +87,19 @@ TEST_F(TestTypeCast, EnumCast) {
     std::ostringstream os;
     os << std::hex << intEnum << std::hex << uintEnum << std::hex << llEnum;
     EXPECT_EQ("7fffffffefffffff7fffffffffffffff", os.str());
+
+    // これもついでに
+    static_assert(std::is_same<decltype(sizeof(4)), size_t>::value, "");
+    static_assert(sizeof(int) == sizeof(4), "");
+    static_assert(alignof(int) == alignof(4), "");
+
+    struct alignas(32) IntBox {
+        int member;
+    };
+
+    IntBox intBox {1};
+    static_assert((alignof(decltype(intBox)) % 32) == 0, "");
+    EXPECT_EQ(1, intBox.member);
 }
 
 TEST_F(TestTypeCast, PopCount) {
