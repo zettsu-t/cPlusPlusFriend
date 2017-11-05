@@ -1,0 +1,70 @@
+data/input.txt : 1
+shell bang
+
+data/input.txt : 3
+Single line comment 3
+
+data/input.txt : 5
+Single line comment 5
+
+data/input.txt : 6
+Single line comment 6
+
+data/input.txt : 7
+Single line comment 7
+
+data/input.txt : 8
+Single line comment 8
+
+data/input.txt : 10
+C-style single line comment
+
+data/input.txt : 11
+C++/C99-style single line comment */
+
+data/input.txt : 13
+This is a multi line comment.
+
+data/input.txt : 19
+This is another multi line comment.
+
+data/input.txt : 23
+C-Style multi line comment
+
+data/input.txt : 34
+Multi line comment 1, Multi line comment 2, Multi line comment 3
+
+data/input.txt : 38
+A B C
+
+data/input.txt : 40
+E
+
+data/input.txt : 40
+G
+
+data/input.txt : 40
+H
+
+data/input.txt : 42
+P Q R
+
+data/input.txt : 44
+S
+
+data/input.txt : 46
+Multi line comment A, Multi line comment B
+
+data/input.txt : 48
+Comment a
+
+data/input.txt : 49
+Comment b
+
+data/input.txt : 50
+Comment C, Comment D '''E'''
+
+data/input.txt : 50
+Comment 5
+
+

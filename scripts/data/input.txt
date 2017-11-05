@@ -1,0 +1,61 @@
+# shell bang
+
+code; # Single line comment 3
+
+''' Single line comment 5 '''
+""" Single line comment 6 """
+""" Single line comment 7 """
+''' Single line comment 8 '''
+
+/* C-style single line comment */
+// C++/C99-style single line comment */
+
+'''
+ This is
+a multi line
+comment.
+'''
+
+""" This is another 
+multi line  
+ comment. """
+
+/*
+C-Style
+multi line
+comment
+*/
+
+''' '''
+'''  '''
+"""   """
+"""    """
+
+# Multi line comment 1,
+#Multi line comment 2,
+# Multi line comment 3
+
+''' A
+B C
+''' d  '''E'''  f  ''' G '''  # H
+
+''' P
+Q R
+''' # S
+
+#Multi line comment A,
+# Multi line comment B
+code;  # Comment a
+code;  # Comment b
+# Comment C,
+# Comment D '''E'''
+'''
+Comment
+5 '''
+
+code;
+
+'"""'
+"'''"
+"'''"
+'"""'
