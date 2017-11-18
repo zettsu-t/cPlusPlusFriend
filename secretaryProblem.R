@@ -12,13 +12,13 @@ secretary_problem <- function (item_size, pass_list) {
     for (pass_index in seq(1, length(pass_list), 1)) {
         index_right <- if (pass_index >= length(pass_list)) item_size else pass_list[pass_index + 1]
         index_next_left <- index_right + 1
-        while(length(selected_nums) < pass_index) {
+        while((length(selected_nums) < pass_index) && ((index_left + 1) < index_right)) {
             sliced_nums <- nums[index_left:index_right]
-            index = detect_index(sliced_nums, function(x) {x > pivot})
+            index <- detect_index(sliced_nums, function(x) {x > pivot})
             if (index <= 0) {
                 break
             }
-            pivot = sliced_nums[index]
+            pivot <- sliced_nums[index]
             selected_nums <- append(selected_nums, pivot)
             index_left <- index_left + index
         }
@@ -37,7 +37,7 @@ simulate_secretary_problem <- function (item_size, pass_list, trial_size) {
 optimize_secretary_problem_1 <- function (item_size, trial_size, iter_size) {
     sim <- function (cutoff) {
         pass_list <- c(cutoff) * item_size
-        score = if (pass_list[1] <= 1 || pass_list[1] >= item_size) {
+        score <- if (pass_list[1] <= 1 || pass_list[1] >= item_size) {
             1.0 / item_size
         } else {
             simulate_secretary_problem(item_size, pass_list, trial_size)
@@ -55,7 +55,7 @@ optimize_secretary_problem_1 <- function (item_size, trial_size, iter_size) {
 optimize_secretary_problem_3 <- function (item_size, trial_size, iter_size) {
     sim <- function (cutoff_1, cutoff_2, cutoff_3) {
         pass_list <- round(c(cutoff_1, cutoff_2, cutoff_3) * item_size)
-        score = if (pass_list[1] >= pass_list[2] || pass_list[2] >= pass_list[3] ||
+        score <- if (pass_list[1] >= pass_list[2] || pass_list[2] >= pass_list[3] ||
                     pass_list[1] <= 1 || pass_list[3] >= item_size) {
             1.0 / item_size
         } else {
