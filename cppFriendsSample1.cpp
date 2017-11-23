@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <bitset>
 #include <functional>
 #include <fstream>
 #include <iomanip>
@@ -1222,16 +1223,72 @@ TEST_F(TestMatchingBOM, ByteOrderMark) {
     EXPECT_FALSE(std::regex_match(str2_, matchWithBom, reWithBom));
 }
 
-class TestNanFloat : public ::testing::Test {
+class TestFloatingNumber : public ::testing::Test {
 protected:
     double mySqrt(double a, double b) {
         return sqrt(a/b);
     }
 };
 
-TEST_F(TestNanFloat, Sqrt) {
+TEST_F(TestFloatingNumber, Sqrt) {
     auto resultIsNaN = std::isnan(mySqrt(1.0, -1.0));
     EXPECT_TRUE(resultIsNaN);
+}
+
+namespace {
+    template<typename T>
+    std::string ConvertToBits(const T& obj) {
+        uint8_t bitPattern[sizeof(T)] {0};
+        static_assert(sizeof(bitPattern) == sizeof(T), "");
+        ::memmove(bitPattern, &obj, sizeof(T));
+
+        // リトルエンディアン
+        std::ostringstream os;
+        size_t i = sizeof(T);
+        while(i > 0) {
+            os << std::bitset<8>(bitPattern[i-1]);
+            --i;
+        }
+
+        return os.str();
+    }
+
+    // 符号、指数部、仮数部で区切る
+    std::string SplitDoubleComponents(const std::string& str) {
+        return str.substr(0, 1) + ":" + str.substr(1, 11) + ":" + str.substr(12, 52);
+    }
+
+    // 仮数部のビットパターンが最後にあることを確認する
+    void CheckLastDigits(const std::string& digits, const std::string& subDigits) {
+        ASSERT_GT(digits.size(), subDigits.size());
+        EXPECT_EQ(digits.size() - subDigits.size(), digits.rfind(subDigits));
+   }
+}
+
+TEST_F(TestFloatingNumber, TooLarge) {
+    constexpr long long int HalfBigMoneyInt = 2500000000000001ll;
+    const double HalfBigMoneyDouble = HalfBigMoneyInt;
+    auto digits = SplitDoubleComponents(ConvertToBits(HalfBigMoneyInt));
+    CheckLastDigits(digits, "0100000000000001");
+    digits = SplitDoubleComponents(ConvertToBits(HalfBigMoneyDouble));
+    CheckLastDigits(digits, "01000000000000010");
+
+    // doubleで、5000兆円 + 1 では1を表現できる。
+    // doubleの仮数部は、最上位bitは1であることを暗黙に仮定している。
+    constexpr long long int BigMoneyInt = 5000000000000001ll;
+    const double BigMoneyDouble = BigMoneyInt;
+    digits = SplitDoubleComponents(ConvertToBits(BigMoneyInt));
+    CheckLastDigits(digits, "01000000000000001");
+    digits = SplitDoubleComponents(ConvertToBits(BigMoneyDouble));
+    CheckLastDigits(digits, "01000000000000001");
+
+    // doubleでは、5000兆円*2 + 1 では1を表現できない
+    constexpr long long int TwiceBigMoneyInt = 10000000000000001ll;
+    double TwiceBigMoneyDouble = TwiceBigMoneyInt;
+    digits = SplitDoubleComponents(ConvertToBits(TwiceBigMoneyInt));
+    CheckLastDigits(digits, "010000000000000001");
+    digits = SplitDoubleComponents(ConvertToBits(TwiceBigMoneyDouble));
+    CheckLastDigits(digits, "01000000000000000");
 }
 
 static_assert((2 * 2) == 4, "I expect 2 * 2 is equal to 4");
