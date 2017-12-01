@@ -120,7 +120,7 @@ class CommentExtractor(object):
         if matcher is None:
             matcher, tail, is_comment = self.extract_delimiter(line)
             if matcher is None:
-                match_obj = re.match(r'^[^#]*(#)\s*(.*)', line)
+                match_obj = re.match(r'^[^#]*(#+)\s*(.*)', line)
                 if match_obj is None:
                     match_obj = re.match(r'^(.*?)\/\/\s*(.*)', line)
                 if match_obj is not None:

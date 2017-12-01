@@ -201,7 +201,10 @@ class TestExtractDelimiter(TestCase):
     def test_extract_comments_hatch(self):
         '''Find comments after #'''
         cases = [['', None, []],
+                 ['#word ', None, ['word']],
                  ['# word ', None, ['word']],
+                 ['## word ', None, ['word']],
+                 ['### word ', None, ['word']],
                  ['code # word', None, ['word']],
                  ['code # word', 'a', ['', 'word']]]
         extractor = tested.CommentExtractor([])
