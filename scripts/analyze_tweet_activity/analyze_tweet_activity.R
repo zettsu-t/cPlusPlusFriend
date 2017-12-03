@@ -9,8 +9,10 @@ library(fitdistrplus)
 
 default_infilename <- 'data/in.csv'   # input data filename
 default_outfilename <- 'data/out.png' # output image filename
-low_impression_threshold  <- 60   # 1/3 of followers
-high_impression_threshold <- 403  # exp(6)
+
+## Range fit by analyze_tweet_activity_range.py
+low_impression_threshold  <- 79   # less than half of followers
+high_impression_threshold <- 283  # exp(6)
 
 ## Assume tweets are posted by a bot when they are posted at
 ## even-hour, 00-05 minute UTC.
@@ -18,9 +20,19 @@ is_bot <- function(time_str) {
     ifelse((grep(' \\d\\[02468]:\\d[0-5] ', time_str) == 0), FALSE , TRUE)
 }
 
+exp_linear_string <- function(x) {
+    sprintf('%3.0f', floor(exp(x)))
+}
+
+draw_exp_linear_labels <- function(data) {
+    ticks <- seq(min(data), max(data), (max(data) - min(data)) / 10)
+    labels <- lapply(ticks, exp_linear_string)
+    axis(1, at=unlist(ticks), labels=labels, col.axis='orchid', las=2, cex=0.4)
+}
+
 ## Draws P-P plot and histogram
 ## X-axis: impression (linear), Y-axis: frequency of tweets (linear or log)
-draw_pp_hist <- function(data, model, title, xlabel, show_estimation) {
+draw_pp_hist <- function(data, model, title, xlabel, show_estimation, show_labal) {
     ylabel <- 'Frequency of tweets'
     ## Estimates a distribution under the 'model'
     fd <- fitdist(data, model)
@@ -37,7 +49,9 @@ draw_pp_hist <- function(data, model, title, xlabel, show_estimation) {
               xlab=xlabel, col='royalblue', lwd=2, add=TRUE)
     } else {
         hist(data, xlab=xlabel, ylab=ylabel, main=title, prob=TRUE, xaxt='n', yaxt='n')
-        axis(side=1, labels=FALSE)
+        if (show_labal == TRUE) {
+            draw_exp_linear_labels(data)
+        }
     }
 }
 
@@ -50,23 +64,24 @@ draw_pp_loghist <- function(data, title, xlabel) {
     ## distributed under the power law.
     hist_log.data <- hist(data, breaks=10, plot=FALSE)
     hist_log.data$counts <- log(hist_log.data$counts + 1)
-    plot(hist_log.data, # xaxt='n', yaxt='n',
+    plot(hist_log.data, xaxt='n', yaxt='n',
          main=title, xlab='ln(Impressions)', ylab='ln(Frequency of tweets)')
 
     ## Overwrites a regression line
     m <- lm(hist_log.data$counts ~ hist_log.data$mids)
     abline(m, col='royalblue', lwd=2)
+    draw_exp_linear_labels(data)
 }
 
 ## Draws all charts
 draw_all_pp_hist <- function(impressions, low_impressions, high_impressions, fontsize) {
     par(mfcol=c(2, 5), ps=fontsize)
 
-    draw_pp_hist(impressions, 'norm', 'Impressions', 'Impressions', FALSE)
-    draw_pp_hist(low_impressions, 'norm', 'Except high Impressions', 'Impressions', TRUE)
+    draw_pp_hist(impressions, 'norm', 'Impressions', 'Impressions', FALSE, FALSE)
+    draw_pp_hist(low_impressions, 'norm', 'Except high impressions', 'Impressions', TRUE, FALSE)
 
-    draw_pp_hist(log(impressions), 'norm', 'Impressions', 'ln(Impressions)', FALSE)
-    draw_pp_hist(log(low_impressions), 'norm', 'Except high impressions', 'ln(Impressions)', TRUE)
+    draw_pp_hist(log(impressions), 'norm', 'Impressions', 'ln(Impressions)', FALSE, TRUE)
+    draw_pp_hist(log(low_impressions), 'norm', 'Except high impressions', 'ln(Impressions)', TRUE, TRUE)
 
     draw_pp_loghist(log(high_impressions), 'High impressions', 'ln(Impressions)')
 }

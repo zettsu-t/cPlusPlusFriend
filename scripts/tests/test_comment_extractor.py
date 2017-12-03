@@ -205,6 +205,7 @@ class TestExtractDelimiter(TestCase):
                  ['# word ', None, ['word']],
                  ['## word ', None, ['word']],
                  ['### word ', None, ['word']],
+                 ['## # of e', None, ['# of e']],
                  ['code # word', None, ['word']],
                  ['code # word', 'a', ['', 'word']]]
         extractor = tested.CommentExtractor([])
