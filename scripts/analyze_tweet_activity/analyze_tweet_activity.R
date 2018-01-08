@@ -11,13 +11,13 @@ default_infilename <- 'data/in.csv'   # input data filename
 default_outfilename <- 'data/out.png' # output image filename
 
 ## Range fit by analyze_tweet_activity_range.py
-low_impression_threshold  <- 79   # less than half of followers
-high_impression_threshold <- 283  # exp(6)
+low_impression_threshold  <- 82   # less than half of followers
+high_impression_threshold <- 294  # exp(6)
 
 ## Assume tweets are posted by a bot when they are posted at
 ## even-hour, 00-05 minute UTC.
 is_bot <- function(time_str) {
-    ifelse((grep(' \\d\\[02468]:\\d[0-5] ', time_str) == 0), FALSE , TRUE)
+    grepl(' \\d[02468]:\\d[0-5] ', time_str)
 }
 
 exp_linear_string <- function(x) {
@@ -41,7 +41,6 @@ draw_pp_hist <- function(data, model, title, xlabel, show_estimation, show_labal
 
     if (show_estimation == TRUE) {
         hist(data, xlab=xlabel, ylab=ylabel, main=title, prob=TRUE, xaxt='n', yaxt='n')
-        axis(side=1, labels=FALSE)
         # Overwrites an estimatsion under the 'model'.
         # The first parameter for curve must have name 'x'.
         x <- data
@@ -49,9 +48,10 @@ draw_pp_hist <- function(data, model, title, xlabel, show_estimation, show_labal
               xlab=xlabel, col='royalblue', lwd=2, add=TRUE)
     } else {
         hist(data, xlab=xlabel, ylab=ylabel, main=title, prob=TRUE, xaxt='n', yaxt='n')
-        if (show_labal == TRUE) {
-            draw_exp_linear_labels(data)
-        }
+    }
+
+    if (show_labal == TRUE) {
+        draw_exp_linear_labels(data)
     }
 }
 
@@ -100,19 +100,39 @@ raw_data <- data.table(read.csv(file=file.path(infilename),
 data <- raw_data[complete.cases(raw_data),]
 
 ## Sets whether each tweets are possibly posted by the bot
-data$bot <- lapply(data$time, is_bot)
-## Excludes manual posts
-data$bot <- lapply(data$bot, function(x) { ifelse(x == TRUE, TRUE, NA) })
-data <- data[!is.na(data$bot)]
+data$bot <- unlist(lapply(data$time, is_bot))
 
 ## Cut tweets with low impressions that suggest they are missed in observations
-impressions <- data$impression[data$impression >= low_impression_threshold]
+data_no_low <- data[data$impression >= low_impression_threshold]
 ## Separate low impressions from high impressions which have different distributions
-low_impressions <- impressions[impressions < high_impression_threshold]
-high_impressions <- impressions[impressions >= high_impression_threshold]
+data_middle <- data_no_low[data_no_low$impressions < high_impression_threshold]
+data_high <- data[data$impressions >= high_impression_threshold]
+
+## Excludes manual posts
+## Cut tweets with low impressions that suggest they are missed in observations
+no_low_impressions <- data_no_low[data_no_low$bot == TRUE]$impressions
+middle_impressions <- data_middle[data_middle$bot == TRUE]$impressions
+high_impressions <- data_high[data_high$bot == TRUE]$impressions
 
 ## Draws on screen and writes to a PNG file
-draw_all_pp_hist(impressions, low_impressions, high_impressions, 16)
+draw_all_pp_hist(no_low_impressions, middle_impressions, high_impressions, 16)
 png(filename=outfilename, width=1600, height=800)
-draw_all_pp_hist(impressions, low_impressions, high_impressions, 16)
+draw_all_pp_hist(no_low_impressions, middle_impressions, high_impressions, 16)
 dev.off()
+
+## Includes manual posts
+data_no_low.glm <- glm(formula = impressions ~ retweets + likes + bot, data_no_low, family=gaussian(log))
+data_no_low.step <- stepAIC(data_no_low.glm, trace = FALSE)
+
+data.glm <- glm(formula = impressions ~ retweets + likes + bot, data, family=gaussian(log))
+data.step <- stepAIC(data.glm, trace = FALSE)
+
+data_middle.glm <- glm(formula = impressions ~ retweets + likes + bot, data_middle, family=gaussian(log))
+data_middle.step <- stepAIC(data_middle.glm, trace = FALSE)
+
+summary(data_no_low.step)
+
+nrow(data)
+summary(data.step)
+nrow(data_middle)
+summary(data_middle.step)
