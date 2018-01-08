@@ -6,6 +6,7 @@
 library(Cairo)
 library(data.table)
 library(fitdistrplus)
+library(functional)
 
 default_infilename <- 'data/in.csv'   # input data filename
 default_outfilename <- 'data/out.png' # output image filename
@@ -18,6 +19,12 @@ high_impression_threshold <- 294  # exp(6)
 ## even-hour, 00-05 minute UTC.
 is_bot <- function(time_str) {
     grepl(' \\d[02468]:\\d[0-5] ', time_str)
+}
+
+## Return whether each column contains a word
+contains_word <- function(word, col) {
+    ## Assume the word contains no escapes
+    grepl(word, col)
 }
 
 exp_linear_string <- function(x) {
@@ -102,6 +109,10 @@ data <- raw_data[complete.cases(raw_data),]
 ## Sets whether each tweets are possibly posted by the bot
 data$bot <- unlist(lapply(data$time, is_bot))
 
+## Classify hashtags
+data$Hashtag <- factor(data$Hashtag)
+#data$newgame <- unlist(lapply(data$Tweet.text, Curry(contains_word, word='#newgame')))
+
 ## Cut tweets with low impressions that suggest they are missed in observations
 data_no_low <- data[data$impression >= low_impression_threshold]
 ## Separate low impressions from high impressions which have different distributions
@@ -121,18 +132,29 @@ draw_all_pp_hist(no_low_impressions, middle_impressions, high_impressions, 16)
 dev.off()
 
 ## Includes manual posts
-data_no_low.glm <- glm(formula = impressions ~ retweets + likes + bot, data_no_low, family=gaussian(log))
-data_no_low.step <- stepAIC(data_no_low.glm, trace = FALSE)
+data_no_high <- data[data$impressions < high_impression_threshold]
+nrow(data_no_high)
+boxplot(log(data_no_high$impressions))
+data_no_high.glm <- glm(formula = impressions ~ retweets + replies + likes + bot, data_no_high, family=gaussian(log))
+data_no_high.step <- stepAIC(data_no_high.glm, trace = FALSE)
+summary(data_no_high.step)
 
-data.glm <- glm(formula = impressions ~ retweets + likes + bot, data, family=gaussian(log))
-data.step <- stepAIC(data.glm, trace = FALSE)
-
-data_middle.glm <- glm(formula = impressions ~ retweets + likes + bot, data_middle, family=gaussian(log))
+data_middle <- data_no_high[data_no_high$impressions >= low_impression_threshold]
+nrow(data_middle)
+boxplot(log(data_middle$impressions))
+data_middle.glm <- glm(formula = impressions ~ retweets + replies + likes + bot, data_middle, family=gaussian(log))
 data_middle.step <- stepAIC(data_middle.glm, trace = FALSE)
-
-summary(data_no_low.step)
+summary(data_middle.step)
 
 nrow(data)
+boxplot(log(data$impressions))
+data.glm <- glm(formula = impressions ~ retweets + replies + likes + bot, data, family=gaussian(log))
+data.step <- stepAIC(data.glm, trace = FALSE)
 summary(data.step)
-nrow(data_middle)
-summary(data_middle.step)
+
+data_hashtag <- data_middle[data_middle$bot == TRUE]
+#data_hashtag <- data[data$bot == TRUE]
+boxplot(log(impressions) ~ Hashtag, data=data_hashtag,
+        title='Middle', xlab='Hashtag', ylab='log(tweet impression)')
+data_hashtag_lm <- lm(formula = log(impressions) ~ Hashtag, data_hashtag)
+summary(data_hashtag_lm)
