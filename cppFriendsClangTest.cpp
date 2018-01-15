@@ -228,6 +228,15 @@ TEST_F(TestCompoundStatement, Loop) {
     EXPECT_EQ(expected, err.str());
 }
 
+class TestMySingletonTest : public ::testing::Test {};
+
+TEST_F(TestMySingletonTest, All) {
+    auto& instance1 = MySingletonClass::GetInstance();
+    EXPECT_EQ(1, instance1.GetValue());
+    auto& instance2 = MySingletonClass::GetInstance();
+    EXPECT_EQ(&instance1, &instance2);
+}
+
 /*
 Local Variables:
 mode: c++

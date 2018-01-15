@@ -162,6 +162,18 @@ namespace ProcessorException {
     }
 }
 
+// このstatic変数を作ったかどうかのフラグはatomicではない
+MySingletonClass& MySingletonClass::GetInstance(void) {
+    static MySingletonClass instance(1);
+    return instance;
+}
+
+int MySingletonClass::GetValue(void) const {
+    return a_;
+}
+
+MySingletonClass::MySingletonClass(int a) : a_(a) {}
+
 /*
 Local Variables:
 mode: c++
