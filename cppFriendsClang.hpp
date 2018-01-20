@@ -72,17 +72,6 @@ namespace ProcessorException {
 // LTOの有無で動作が変わる
 extern uint32_t ShiftManyFor1(uint32_t src);
 
-// Singletonコードの生成
-class MySingletonClass {
-public:
-    static MySingletonClass& GetInstance(void);
-    virtual int GetValue(void) const;
-private:
-    MySingletonClass(int a);
-    virtual ~MySingletonClass(void) = default;
-    int a_;
-};
-
 #endif // CPPFRIENDS_CPPFRIENDS_CLANG_HPP
 
 /*

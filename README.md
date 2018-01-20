@@ -105,6 +105,21 @@ Cygwinでテストを実行すると、以下の処理に掛かった実行時�
 1734, 1735, 2047 [msec]
 ```
 
+### Singletonとスレッドセーフ
+
+よく知られたSingletonの実装方法として、以下のコードがあります。
+
+```cpp
+MySingletonClass& MySingletonClass::GetInstance(void) {
+    static MySingletonClass instance(1);
+    return instance;
+}
+```
+
+かつてこの方法はスレッドセーフではない、と言われていました。インスタンスを作ったかどうかのフラグを複数スレッドが同時に確認して、同時に複数のインスタンスができてしまうことがあるからです。C++11ではスレッドセーフになり、最近のCygwin GCCであれば-fno-threadsafe-staticsオプションを付けなければC++98でもスレッドセーフになります。
+
+makeするとcppFriendsSingleton.s (C++11), cppFriendsSingleton_thread_safe.s (C++98), cppFriendsSingleton_no_thread_safe.s (C++98 -fno-threadsafe-statics)ができますので、_ZN16MySingletonClass11GetInstanceEv に __cxa_guard_acquire の有無をご確認ください。
+
 ### LTO(Link Time Optimization)
 
 既述の通りmakeを実行すると、LTOを有効にした実行ファイルと、そうでないものを生成します。実行ファイルのシンボルテーブルを確認すると、UnusedFunctionの定義が以下の通りになります。
