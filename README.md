@@ -116,9 +116,9 @@ MySingletonClass& MySingletonClass::GetInstance(void) {
 }
 ```
 
-かつてこの方法はスレッドセーフではない、と言われていました。インスタンスを作ったかどうかのフラグを複数スレッドが同時に確認して、同時に複数のインスタンスができてしまうことがあるからです。C++11ではスレッドセーフになり、最近のCygwin GCCであれば-fno-threadsafe-staticsオプションを付けなければC++98でもスレッドセーフになります。
+かつてこの方法はスレッドセーフではない、と言われていました。インスタンスを作ったかどうかのフラグを複数スレッドが同時に確認して、同時に複数のインスタンスができてしまうことがあるからです。C++11ではスレッドセーフになり、Cygwin GCCであれば-fno-threadsafe-staticsオプションを付けなければC++98でもスレッドセーフになります。
 
-makeするとcppFriendsSingleton.s (C++11), cppFriendsSingleton_thread_safe.s (C++98), cppFriendsSingleton_no_thread_safe.s (C++98 -fno-threadsafe-statics)ができますので、_ZN16MySingletonClass11GetInstanceEv に __cxa_guard_acquire の有無をご確認ください。
+makeするとcppFriendsSingleton.s (C++11), cppFriendsSingleton_thread_safe.s (C++98), cppFriendsSingleton_no_thread_safe.s (C++98 -fno-threadsafe-statics)ができますので、_ZN16MySingletonClass11GetInstanceEv に __cxa_guard_acquire があるかどうかご確認ください。
 
 ### LTO(Link Time Optimization)
 
