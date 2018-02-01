@@ -1295,6 +1295,30 @@ static_assert((2 * 2) == 4, "I expect 2 * 2 is equal to 4");
 static_assert((0b1 * 0b1) == 0b1, "");
 // static_assert((0b2 * 0b2) == 0b4, "");
 
+int MyMaxTest1(int l, int r) {
+    auto max = std::max(l, r);
+    return max;
+}
+
+using std::max;
+int MyMaxTest2(int l, int r) {
+    auto max = std::max(l, r);
+    return max;
+}
+
+int MyMaxTest3(int l, int r) {
+    auto value = max(l, r);
+    return value;
+}
+
+#if 0
+// こうは書けない。maxが衝突する
+int MyMaxTest4(int l, int r) {
+    auto max = max(l, r);
+    return max;
+}
+#endif
+
 /*
 Local Variables:
 mode: c++
