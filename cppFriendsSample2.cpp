@@ -24,6 +24,9 @@
 #include <boost/locale.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/ordered_index.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/multiprecision/miller_rabin.hpp>
@@ -1247,6 +1250,54 @@ TEST_F(TestTriBool, Optional) {
     tb = true;
     ASSERT_TRUE(tb);
     EXPECT_TRUE(*tb);
+}
+
+namespace {
+    struct Element {
+        int id;
+        std::string key;
+        std::string value;
+    };
+
+    // http://www.boost.org/doc/libs/1_66_0/libs/multi_index/example/basic.cpp
+    // には{}があるが、なくてもよい
+    struct id;
+    struct key;
+
+    using MyOrderedDic = boost::multi_index_container <
+        Element,
+        boost::multi_index::indexed_by <
+            boost::multi_index::ordered_unique <
+                boost::multi_index::tag<id>,
+                BOOST_MULTI_INDEX_MEMBER(Element, decltype(Element::id), Element::id)>,
+            boost::multi_index::ordered_unique <
+                boost::multi_index::tag<key>,
+                BOOST_MULTI_INDEX_MEMBER(Element, decltype(Element::key), Element::key)>
+            >>;
+}
+
+class TestMultiIndex : public ::testing::Test {};
+
+TEST_F(TestMultiIndex, OrderedDic) {
+    MyOrderedDic dic;
+    dic.insert(Element{1, "Serval Cat", "Leptailurus serval"});
+    dic.insert(Element{2, "Fennec Fox", "Vulpes zerda"});
+    dic.insert(Element{3, "Raccoon", "Procyon lotor"});
+
+    std::ostringstream osId;
+    for(const auto& element : dic.get<id>()) {
+        osId << element.key;
+    }
+    EXPECT_EQ("Serval CatFennec FoxRaccoon", osId.str());
+
+    std::ostringstream osKey;
+    std::ostringstream osValue;
+    for(const auto& element : dic.get<key>()) {
+        osKey << element.key;
+        osValue << element.value;
+    }
+    EXPECT_EQ("Fennec FoxRaccoonServal Cat", osKey.str());
+    EXPECT_EQ("Vulpes zerdaProcyon lotorLeptailurus serval", osValue.str());
 }
 
 /*
