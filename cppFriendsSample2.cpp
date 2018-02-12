@@ -1264,6 +1264,9 @@ namespace {
     struct id;
     struct key;
 
+    // 宣言は複数あってもよい
+    struct id;
+
     using MyOrderedDic = boost::multi_index_container <
         Element,
         boost::multi_index::indexed_by <

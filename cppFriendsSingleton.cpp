@@ -1,4 +1,3 @@
-#include <boost/fusion/container/vector.hpp>
 #include <gtest/gtest.h>
 
 // Singletonコードの生成
