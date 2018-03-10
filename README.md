@@ -4,7 +4,7 @@
 
 ## C++でやっていいこと悪いこと
 
-[cppDosAndDonts.md](cppDosAndDonts.md)にまとめました。この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。
+[cppDosAndDonts.md](cppDosAndDonts.md)にまとめました。この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。最近は更新していないので、botのツイート一覧[cppFriendsBot.txt](cppFriendsBot.txt)を直接ご参照ください。
 
 ### フェネックとアライさんのやり取りを一通り実行する
 
@@ -19,12 +19,12 @@ make
 当方の実行環境は以下の通りです。Google Test / Mockは$HOME直下にあると仮定していますので、それ以外の場合はMakefileを変更してください。AVX命令を使用することが前提ですので、サポートしていないプロセッサの場合は、Makefileの _CPPFLAGS_ARCH_ をコメントアウトしてください。
 
 * Windows 10 Creators Update 64bit Edition
-* Cygwin 64bit version (2.8.0)
+* Cygwin 64bit version (2.10.0)
 * Google Test / Mock [(最新)](https://github.com/google/googletest)
-* Boost C++ Libraries (1.63.0)
-* gcc (6.3.0)
-* clang (4.0.1)
-* Ruby (2.3.3p222)
+* Boost C++ Libraries (1.64.0)
+* gcc (6.4.0)
+* clang (5.0.1)
+* Ruby (2.3.6p384)
 
 RDTSC命令の下の桁に偏りがある、という判定は実行環境によっては失敗するようです。何回か試して失敗するようでしたら、閾値を期待値に寄せるか、諦めてコメントアウトしてください。
 
