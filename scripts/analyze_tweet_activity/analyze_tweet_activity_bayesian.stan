@@ -1,25 +1,23 @@
 data {
-  int<lower=0> N_morning;
-  int<lower=0> N_night;
-  real<lower=0> Y_morning[N_morning];
-  real<lower=0> Y_night[N_night];
+  int<lower=0> N_base;
+  int<lower=0> N_alt;
+  vector[N_base] Y_base;
+  vector[N_alt] Y_alt;
 }
 
 parameters {
-  real<lower=0> mu_morning;
-  real<lower=0> mu_night;
-  real<lower=0> sigma_morning;
-  real<lower=0> sigma_night;
+  real<lower=0> mu_base;
+  real<lower=0> mu_alt;
+  real<lower=0> sigma_base;
+  real<lower=0> sigma_alt;
 }
 
 transformed parameters {
   real difference;
-  difference = mu_night - mu_morning;
+  difference = mu_alt - mu_base;
 }
 
 model {
-  for (n in 1:N_morning)
-    Y_morning[n] ~ student_t(4, mu_morning, sigma_morning);
-  for (n in 1:N_night)
-    Y_night[n] ~ student_t(4, mu_night, sigma_night);
+  Y_base ~ student_t(4, mu_base, sigma_base);
+  Y_alt ~ student_t(4, mu_alt, sigma_alt);
 }
