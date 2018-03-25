@@ -6,20 +6,65 @@ library(rstan)
 library(ggplot2)
 
 infilename <- 'data/converted2.csv'
-pngfilename <- 'data/converted2.png'
-d <- data.table(read.csv(file=file.path(infilename),
-                         header=TRUE, fileEncoding='utf-8',
-                         stringsAsFactors=FALSE))
+png_basename <- 'data/converted2_'
+png_extension <- '.png'
+
+make_column_name <- function(prefix, index) {
+    paste(prefix, '_', toString(index), sep='')
+}
+
+tweets <- data.table(read.csv(file=file.path(infilename),
+                              header=TRUE, fileEncoding='utf-8',
+                              stringsAsFactors=FALSE))
+
+# Extract time indexes
+unique_time_indexes <- unique(tweets$time_index)
+time_indexes <- sort(unique_time_indexes[unique_time_indexes > 0])
 
 # Posted at 07:00
-d_morning <- d[time_index == 0]
-# Posted at 19:00
-d_night <- d[time_index == 3]
+tweets_base <- tweets[time_index == 0]
 
-data <- list(N_morning=nrow(d_morning), N_night=nrow(d_night), Y_morning=log(d_morning$impressions), Y_night=log(d_night$impressions))
-fit <- stan(file='analyze_tweet_activity_bayesian.stan', data=data, seed=123)
-fit.coda<-mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
+all_data <- NULL
+diff_column_names <- NULL
 
-png(filename=pngfilename, width=1200, height=800)
-plot(fit.coda)
-dev.off()
+for(i in time_indexes) {
+    # Posted at 19:00
+    tweets_alt <- tweets[time_index == i]
+
+    input_data <- list(N_base=nrow(tweets_base), N_alt=nrow(tweets_alt),
+                       Y_base=log(tweets_base$impressions), Y_alt=log(tweets_alt$impressions))
+    fit <- stan(file='analyze_tweet_activity_bayesian.stan', data=input_data, seed=123)
+    fit.coda <- mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
+
+    pngfilename <- paste(png_basename, toString(i), png_extension, sep='')
+    png(filename=pngfilename, width=1200, height=800)
+    plot(fit.coda)
+    dev.off()
+
+    extracted_data <- as.data.frame(rstan::extract(fit))
+    for (column_name in names(extracted_data)) {
+        names(extracted_data)[names(extracted_data) == column_name] <- make_column_name(column_name, i)
+    }
+    diff_column_name <- make_column_name('difference', i)
+
+    if (is.null(all_data)) {
+       all_data <- extracted_data
+       diff_column_names <- c(diff_column_name)
+    } else {
+       all_data <- cbind(all_data, extracted_data)
+       diff_column_names <- cbind(diff_column_names, diff_column_name)
+    }
+}
+
+all_diffs <- all_data[, diff_column_names]
+g <- ggplot(all_diffs)
+g <- g + geom_density(aes(x=difference_1), colour='firebrick', show.legend = FALSE)
+g <- g + stat_density(aes(x=difference_1), colour='firebrick', geom='line')
+g <- g + geom_density(aes(x=difference_2), colour='goldenrod3', show.legend = FALSE)
+g <- g + stat_density(aes(x=difference_2), colour='goldenrod3', geom='line')
+g <- g + geom_density(aes(x=difference_3), colour='dodgerblue4', show.legend = FALSE)
+g <- g + stat_density(aes(x=difference_3), colour='dodgerblue4', geom='line')
+g <- g + geom_density(aes(x=difference_4), colour='black', show.legend = FALSE)
+g <- g + stat_density(aes(x=difference_4), colour='black', geom='line')
+g <- g + labs(x='log(difference)') #  + scale_shape_manual(labels = diff_column_names)
+plot(g)
