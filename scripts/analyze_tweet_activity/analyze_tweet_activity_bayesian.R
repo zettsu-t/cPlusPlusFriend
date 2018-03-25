@@ -6,6 +6,7 @@ library(rstan)
 library(ggplot2)
 
 infilename <- 'data/converted2.csv'
+all_png_filename <- 'data/converted2_all.png'
 png_basename <- 'data/converted2_'
 png_extension <- '.png'
 
@@ -58,13 +59,15 @@ for(i in time_indexes) {
 
 all_diffs <- all_data[, diff_column_names]
 g <- ggplot(all_diffs)
-g <- g + geom_density(aes(x=difference_1), colour='firebrick', show.legend = FALSE)
-g <- g + stat_density(aes(x=difference_1), colour='firebrick', geom='line')
-g <- g + geom_density(aes(x=difference_2), colour='goldenrod3', show.legend = FALSE)
-g <- g + stat_density(aes(x=difference_2), colour='goldenrod3', geom='line')
-g <- g + geom_density(aes(x=difference_3), colour='dodgerblue4', show.legend = FALSE)
-g <- g + stat_density(aes(x=difference_3), colour='dodgerblue4', geom='line')
-g <- g + geom_density(aes(x=difference_4), colour='black', show.legend = FALSE)
-g <- g + stat_density(aes(x=difference_4), colour='black', geom='line')
-g <- g + labs(x='log(difference)') #  + scale_shape_manual(labels = diff_column_names)
+g <- g + stat_density(aes(x=difference_1, colour='11:00'), position='identity', geom='line', size=1.25)
+g <- g + stat_density(aes(x=difference_2, colour='15:00'), position='identity', geom='line', size=1.25)
+g <- g + stat_density(aes(x=difference_3, colour='19:00'), position='identity', geom='line', size=1.25)
+g <- g + stat_density(aes(x=difference_4, colour='23:00'), position='identity', geom='line', size=1.25)
+g <- g + labs(x='difference(log(tweet impressions)')
+g <- g + theme(legend.position='top')
+g <- g + labs(colour='Posted time (base 7:00)')
+g <- g + scale_color_manual(values=c('firebrick', 'goldenrod3', 'dodgerblue4', 'black'))
+g <- g + geom_vline(xintercept=0.0, size=2, linetype='dashed', color='black')
+png(filename=all_png_filename, width=600, height=400)
 plot(g)
+dev.off()
