@@ -45,7 +45,7 @@ for(i in time_indexes) {
     fit <- stan(file='analyze_tweet_activity_bayesian.stan', data=input_data, seed=123)
     fit.coda <- mcmc.list(lapply(1:ncol(fit),function(x) mcmc(as.array(fit)[,x,])))
 
-    pngfilename <- paste(png_basename, toString(i), png_extension, sep='')
+    pngfilename <- paste(png_basename, '_', toString(i), png_extension, sep='')
     png(filename=pngfilename, width=1200, height=800)
     plot(fit.coda)
     dev.off()
