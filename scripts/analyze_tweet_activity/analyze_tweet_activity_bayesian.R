@@ -1,14 +1,22 @@
 ## Analyze tweet impressions by posted timestamps
+## and write charts for differences of tweet impressions
+## Usage:
+## $ Rscript analyze_tweet_activity_bayesian.R [input-csv-filename [output-file-basename]]
 
 library(coda)
 library(data.table)
 library(rstan)
 library(ggplot2)
 
-infilename <- 'data/converted2.csv'
-all_png_filename <- 'data/converted2_all.png'
-png_basename <- 'data/converted2_'
+default_infilename <- 'data/converted2.csv'
+default_out_basename <- 'data/converted2'
 png_extension <- '.png'
+
+args <- commandArgs(trailingOnly=TRUE)
+infilename <- ifelse(length(args) >= 1, args[1], default_infilename)
+out_basename <- ifelse(length(args) >= 2, args[2], default_out_basename)
+png_basename <- out_basename
+all_png_filename <- paste(out_basename, '', '_all.png', sep='')
 
 make_column_name <- function(prefix, index) {
     paste(prefix, '_', toString(index), sep='')
@@ -29,7 +37,7 @@ all_data <- NULL
 diff_column_names <- NULL
 
 for(i in time_indexes) {
-    # Posted at 19:00
+    # Posted at after 07:00
     tweets_alt <- tweets[time_index == i]
 
     input_data <- list(N_base=nrow(tweets_base), N_alt=nrow(tweets_alt),
