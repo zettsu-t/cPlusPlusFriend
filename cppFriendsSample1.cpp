@@ -1145,11 +1145,11 @@ public:
     }
 
     void Increment(void) {
-        incrementImpl();
+        (this->*inc_)();
     }
 
     void Decrement(void) {
-        decrementImpl();
+        (this->*dec_)();
     }
 };
 
