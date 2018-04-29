@@ -1120,6 +1120,64 @@ TEST_F(TestNullFuncPtr, Write) {
     EXPECT_EQ(message, g_globalLogStream.str());
 };
 
+template <typename T>
+class MyCounter {
+private:
+    void incrementImpl(void) {
+        ++count_;
+    }
+
+    void decrementImpl(void) {
+        --count_;
+    }
+
+    using funcType = void(MyCounter::*)(void);
+    T count_;
+    funcType inc_;
+    funcType dec_;
+
+public:
+    MyCounter(void) : count_(0), inc_(&incrementImpl), dec_(&decrementImpl) {}
+    virtual ~MyCounter(void) {}
+
+    const T& Get(void) const {
+        return count_;
+    }
+
+    void Increment(void) {
+        incrementImpl();
+    }
+
+    void Decrement(void) {
+        decrementImpl();
+    }
+};
+
+class TestFuncPtr : public ::testing::Test {
+protected:
+    static int myIncrement(int n) {
+        return n + 1;
+    }
+};
+
+TEST_F(TestFuncPtr, Write) {
+    int(*func)(int) = &myIncrement;
+    EXPECT_EQ(12, func(11));
+
+    MyCounter<uint64_t> counter;
+    counter.Increment();
+
+    auto actual = counter.Get();
+    decltype(actual) expected = 1;
+    EXPECT_EQ(expected, actual);
+
+    counter.Decrement();
+    counter.Decrement();
+    actual = counter.Get();
+    expected = std::numeric_limits<decltype(actual)>::max();
+    EXPECT_EQ(expected, actual);
+};
+
 class TestMaxSize : public ::testing::Test{};
 
 TEST_F(TestMaxSize, Print) {
