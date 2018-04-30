@@ -503,6 +503,37 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
     EXPECT_EQ(expected, solution);
 }
 
+TEST_F(TestPrimalityTesting, NegativeZero) {
+    using RealNumber = double;
+    boost::random::random_device seed;
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<RealNumber> dist(1.0, 2.0);
+    // コンパイル時に計算しない
+    auto number = -1.0 * dist(gen);
+
+    constexpr int radix = std::numeric_limits<RealNumber>::radix;
+    constexpr int loop = -2 * radix * std::numeric_limits<RealNumber>::min_exponent;
+    EXPECT_LT(1, radix);
+    EXPECT_LT(100, loop);
+
+    for (int i=0; i<loop; ++i) {
+        number /= std::numeric_limits<RealNumber>::radix + 0.1;
+        EXPECT_TRUE(number <= 0.0);
+    }
+
+    uint8_t octets[sizeof(number)] {0};
+    static_assert(sizeof(octets) == sizeof(number), "Must have same size");
+    std::memmove(octets, &number, sizeof(octets));
+
+    uint8_t sum = 0;
+    for (decltype(octets[0]) octet : octets) {
+        sum |= octet;
+    }
+
+    // Sign for negative zero is 1 in my environment
+    EXPECT_TRUE(sum);
+}
+
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
 TEST_F(TestPrimalityTesting, ToBigNumber) {
     using BigNumber = boost::multiprecision::int1024_t;
@@ -1302,6 +1333,8 @@ TEST_F(TestMultiIndex, OrderedDic) {
     EXPECT_EQ("Fennec FoxRaccoonServal Cat", osKey.str());
     EXPECT_EQ("Vulpes zerdaProcyon lotorLeptailurus serval", osValue.str());
 }
+
+
 
 /*
 Local Variables:
