@@ -15,6 +15,7 @@
 #include <vector>
 #include <boost/any.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/icl/interval_set.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/date_time/time_facet.hpp>
@@ -1334,7 +1335,27 @@ TEST_F(TestMultiIndex, OrderedDic) {
     EXPECT_EQ("Vulpes zerdaProcyon lotorLeptailurus serval", osValue.str());
 }
 
+// 以下を元に作成
+// https://stackoverflow.com/questions/28217179/iterating-boosticlinterval-set
+class TestInterval : public ::testing::Test {};
 
+TEST_F(TestInterval, SplitBySubtraction) {
+    using RangeSet = boost::icl::interval_set<double>;
+    using Range = RangeSet::interval_type;
+
+    // 一区間を下記のように二区間で引き算すると、三区間に分かれる
+    RangeSet ranges;
+    ranges += Range::right_open(1.5, 16.5);
+    ranges -= Range::right_open(2.5, 4.5);
+    ranges -= Range::right_open(7.5, 11.5);
+
+    std::ostringstream os;
+    for(auto&& i = ranges.begin(); i != ranges.end(); ++i){
+        os << "[" << i->lower() << "," << i->upper() << "]";
+    }
+
+    EXPECT_EQ("[1.5,2.5][4.5,7.5][11.5,16.5]", os.str());
+}
 
 /*
 Local Variables:
