@@ -9,6 +9,7 @@
 #include <functional>
 #include <fstream>
 #include <iomanip>
+#include <list>
 #include <memory>
 #include <regex>
 #include <sstream>
@@ -395,8 +396,12 @@ TEST_F(TestMinMax, Vector) {
 
     auto iMin = std::min_element(numbers.begin(), numbers.end());
     EXPECT_EQ(-3, *iMin);
+    EXPECT_EQ(5, std::distance(numbers.begin(), iMin));
+
     auto iMax = std::max_element(numbers.begin(), numbers.end());
     EXPECT_EQ(3, *iMax);
+    EXPECT_EQ(4, std::distance(numbers.begin(), iMax));
+    EXPECT_EQ(6, std::distance(numbers.begin(), numbers.end()));
 
     auto iMinMax = std::minmax_element(numbers.begin(), numbers.end());
     EXPECT_EQ(-3, *(iMinMax.first));
@@ -408,6 +413,22 @@ TEST_F(TestMinMax, Vector) {
         result = (result < n) ? result : n;
     }
     EXPECT_EQ(-3, result);
+}
+
+TEST_F(TestMinMax, List) {
+    std::list<int> numbers;
+    numbers.push_back(10);
+    numbers.push_back(-10);
+    numbers.push_back(40);
+    numbers.push_back(-40);
+    numbers.push_back(20);
+
+    auto iMax = std::max_element(numbers.begin(), numbers.end());
+    EXPECT_EQ(40, *iMax);
+    EXPECT_EQ(2, std::distance(numbers.begin(), iMax));
+    // distanceを測っても変わらない
+    EXPECT_EQ(40, *iMax);
+    EXPECT_EQ(5, std::distance(numbers.begin(), numbers.end()));
 }
 
 TEST_F(TestMinMax, Empty) {
