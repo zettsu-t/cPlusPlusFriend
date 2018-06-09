@@ -597,47 +597,46 @@ void LongestInstruction(void) {
 }
 
 namespace {
-    uint8_t calculate2ndDigit(uint8_t num) {
+    uint8_t calculate2ndOrGreaterDigits(uint8_t num) {
         uint8_t result = 0;
+        // min(255, (num + 1)) * 51 / 512
         asm volatile (
-            // (num + 1) * 51 / 512
+            // min(255, (num + 1))
+            "add    $1, %%al \n\t"
+            "sbb    $0, %%al \n\t"
             // += num
-            "inc    %%al \n\t"
             "xor    %%bl, %%bl \n\t"
             "mov    %%al, %%cl \n\t"
             "xor    %%dl, %%dl \n\t"
-
             // += num * 2
             "add    %%al, %%al \n\t"
             "adc    %%bl, %%bl \n\t"
             "add    %%al, %%cl \n\t"
             "adc    %%bl, %%dl \n\t"
-
-            // += num * 16
+            // num * 48 = num * 3 << 4
+            "mov    %%cl, %%al \n\t"
+            "mov    %%dl, %%bl \n\t"
             "add    %%al, %%al \n\t"
             "adc    %%bl, %%bl \n\t"
             "add    %%al, %%al \n\t"
             "adc    %%bl, %%bl \n\t"
             "add    %%al, %%al \n\t"
             "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            // += num * 48
             "add    %%al, %%cl \n\t"
             "adc    %%bl, %%dl \n\t"
-
-            // += num * 32
-            "add    %%al, %%al \n\t"
-            "adc    %%bl, %%bl \n\t"
-            "add    %%al, %%cl \n\t"
-            "adc    %%bl, %%dl \n\t"
-
+            // /= 512
             "shr    %%dl \n\t"
             :"=d"(result),"+a"(num)::"rbx", "rcx");
        return result;
     }
 
-    uint8_t calculate1stDigit(uint8_t num, uint8_t secondDigit) {
+    uint8_t calculate1stDigit(uint8_t num, uint8_t secondOrGreaterDigits) {
         uint8_t result = 0;
         asm volatile (
-            // num - (secondDigit * 10)
+            // num - (secondOrGreaterDigits * 10)
             "mov    %%al, %%dl \n\t"
             "mov    %%bl, %%cl \n\t"
             "shl    %%bl \n\t"
@@ -645,7 +644,7 @@ namespace {
             "add    %%cl, %%bl \n\t"
             "shl    %%bl \n\t"
             "sub    %%bl, %%dl \n\t"
-            :"=d"(result),"+a"(num),"+b"(secondDigit)::"rcx");
+            :"=d"(result),"+a"(num),"+b"(secondOrGreaterDigits)::"rcx");
        return result;
     }
 }
@@ -653,18 +652,31 @@ namespace {
 class TestSplitDigits : public ::testing::Test{};
 
 TEST_F(TestSplitDigits, All) {
-     for(uint8_t i=0; i<100; ++i) {
-         uint32_t expected = i;
-         expected /= 10;
-         expected = expected % 10;
-         uint32_t actual2ndDigit = calculate2ndDigit(i);
-         EXPECT_EQ(expected, actual2ndDigit);
+    // Calclulate digits for uint8_t
+    uint8_t i=0;
+    for(;;) {
+        const auto digits23 = calculate2ndOrGreaterDigits(i);
+        const auto digits1 = calculate1stDigit(i, digits23);
+        const auto digits3 = calculate2ndOrGreaterDigits(digits23);
+        const auto digits2 = calculate1stDigit(digits23, digits3);
+        const uint32_t actualDigits1 = digits1;
+        const uint32_t actualDigits2 = digits2;
+        const uint32_t actualDigits3 = digits3;
 
-         uint32_t actual1stDigit = calculate1stDigit(i, actual2ndDigit);
-         expected = i;
-         expected = expected % 10;
-         EXPECT_EQ(expected, actual1stDigit);
-     }
+        uint32_t expected = i;
+        const auto expectedDigits1 = expected % 10;
+        expected /= 10;
+        const auto expectedDigits2 = expected % 10;
+        const auto expectedDigits3 = expected / 10;
+
+        // uint32_tにすると、値が文字ではなく数値として表示される
+        EXPECT_EQ(expectedDigits1, actualDigits1);
+        EXPECT_EQ(expectedDigits2, actualDigits2);
+        EXPECT_EQ(expectedDigits3, actualDigits3);
+        if (!++i) {
+            break;
+        }
+    }
 }
 
 /*
