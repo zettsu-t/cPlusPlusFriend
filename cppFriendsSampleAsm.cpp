@@ -596,6 +596,77 @@ void LongestInstruction(void) {
 #endif
 }
 
+namespace {
+    uint8_t calculate2ndDigit(uint8_t num) {
+        uint8_t result = 0;
+        asm volatile (
+            // (num + 1) * 51 / 512
+            // += num
+            "inc    %%al \n\t"
+            "xor    %%bl, %%bl \n\t"
+            "mov    %%al, %%cl \n\t"
+            "xor    %%dl, %%dl \n\t"
+
+            // += num * 2
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%cl \n\t"
+            "adc    %%bl, %%dl \n\t"
+
+            // += num * 16
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%cl \n\t"
+            "adc    %%bl, %%dl \n\t"
+
+            // += num * 32
+            "add    %%al, %%al \n\t"
+            "adc    %%bl, %%bl \n\t"
+            "add    %%al, %%cl \n\t"
+            "adc    %%bl, %%dl \n\t"
+
+            "shr    %%dl \n\t"
+            :"=d"(result),"+a"(num)::"rbx", "rcx");
+       return result;
+    }
+
+    uint8_t calculate1stDigit(uint8_t num, uint8_t secondDigit) {
+        uint8_t result = 0;
+        asm volatile (
+            // num - (secondDigit * 10)
+            "mov    %%al, %%dl \n\t"
+            "mov    %%bl, %%cl \n\t"
+            "shl    %%bl \n\t"
+            "shl    %%bl \n\t"
+            "add    %%cl, %%bl \n\t"
+            "shl    %%bl \n\t"
+            "sub    %%bl, %%dl \n\t"
+            :"=d"(result),"+a"(num),"+b"(secondDigit)::"rcx");
+       return result;
+    }
+}
+
+class TestSplitDigits : public ::testing::Test{};
+
+TEST_F(TestSplitDigits, All) {
+     for(uint8_t i=0; i<100; ++i) {
+         uint32_t expected = i;
+         expected /= 10;
+         expected = expected % 10;
+         uint32_t actual2ndDigit = calculate2ndDigit(i);
+         EXPECT_EQ(expected, actual2ndDigit);
+
+         uint32_t actual1stDigit = calculate1stDigit(i, actual2ndDigit);
+         expected = i;
+         expected = expected % 10;
+         EXPECT_EQ(expected, actual1stDigit);
+     }
+}
+
 /*
   Local Variables:
   mode: c++
