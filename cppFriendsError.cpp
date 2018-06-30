@@ -121,6 +121,18 @@ struct YieldIsMacro {
     void Yield() { return; }
 };
 
+namespace {
+    int my_max(int l, int r) {
+        if (l > r) {
+            auto value = l;
+        } else {
+            auto value = r;
+        }
+        // ブロックスコープの中にあるvalueを見ることはできない
+        std::cout << value;
+    }
+}
+
 /*
 Local Variables:
 mode: c++
