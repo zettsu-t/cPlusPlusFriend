@@ -1398,6 +1398,18 @@ int MyMaxTest4(int l, int r) {
 }
 #endif
 
+class TestOneEqualsTwo : public ::testing::Test {};
+
+// 1=2を証明せよ
+TEST_F(TestOneEqualsTwo, StringPtr) {
+    bool eq = false;
+    if ("1=2") {
+        eq = true;
+//      std::cout << "YES";
+    }
+    EXPECT_TRUE(eq);
+}
+
 /*
 Local Variables:
 mode: c++
