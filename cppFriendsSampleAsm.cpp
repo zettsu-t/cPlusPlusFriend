@@ -679,6 +679,23 @@ TEST_F(TestSplitDigits, All) {
     }
 }
 
+class TestInstructionBytes : public ::testing::Test{};
+
+TEST_F(TestInstructionBytes, Coffee) {
+    uint32_t arg = 0x8000;
+    uint32_t result = 0;
+    constexpr uint32_t expected = 0xff00;
+
+    // sar bh, 0xee = c0h, ffh, eeh
+    asm volatile (
+//      ".byte 0xc0, 0xff, 0xee \n\t"
+        "sarb  $0xee, %%bh \n\t"
+        "mov   %%ebx, %%eax \n\t"
+        :"=a"(result),"+b"(arg)::);
+    EXPECT_EQ(expected, arg);
+    EXPECT_EQ(expected, result);
+}
+
 /*
   Local Variables:
   mode: c++
