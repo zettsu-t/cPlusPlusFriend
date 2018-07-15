@@ -27,7 +27,7 @@ class MagicNumberConverter
 
   # Converts "abc" to [[0x0a, 0xbc], [0xab, 0xc0]]
   def get_code_seq_set(arg)
-    phrase = arg.strip().downcase().tr("ilo", "110")
+    phrase = arg.strip().downcase().tr("ilosz", "11052")
     matched = phrase.match(/\A([\da-f])+\z/)
     unless matched
       warn("#{arg} is not a HEX number")
@@ -123,7 +123,7 @@ class MagicNumberConverter
 
   # Compiles, links and disassembles with code_seq
   def get_disassembly(code_seq)
-    command = "gcc -mavx2 -O0 -g -o #{OUTPUT_EXE_FILENAME} #{INPUT_C_FILENAME}"
+    command = "gcc -mavx2 -O0 -g -c -o #{OUTPUT_EXE_FILENAME} #{INPUT_C_FILENAME}"
     command += ' -DMY_INSTRUCTIONS=\\"' + code_seq + '\\"'
     exec(command)
     command = "objdump -d -M intel #{OUTPUT_EXE_FILENAME}"

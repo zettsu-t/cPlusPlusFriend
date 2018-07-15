@@ -1,5 +1,5 @@
 int main(int argc, char* argv[]) {
-    // Assuming the max length of x86 instructions is 15
+    /* Assuming the max length of x86 instructions is 15 */
     asm volatile (
         "int3 \n\t"
         ".byte " MY_INSTRUCTIONS " \n\t"
