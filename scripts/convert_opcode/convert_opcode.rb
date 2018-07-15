@@ -8,7 +8,7 @@
 # > c0,ff,ee  sar bh,0xee
 #
 # This scripts
-# - treats o as 0 and i,l as 1
+# - treats o as 0 and i,l as 1 and applies less common rules
 # - writes convert_opcode.out and does not delete it automatically
 
 require 'open3'
@@ -16,9 +16,10 @@ require 'open3'
 INPUT_C_FILENAME = 'convert_opcode.c'
 OUTPUT_EXE_FILENAME = 'convert_opcode.out'
 
-class MagicNumberConverter
+class HexspeakToOpcodes
   def initialize(phrase)
-    code_seq_set = get_code_seq_set(phrase)
+    title, code_seq_set = get_code_seq_set(phrase)
+    puts(title)
     code_seq_set.each do |code_seq|
       mnemonics = get_mnemonic(code_seq)
       puts(mnemonics, "---")
@@ -27,7 +28,13 @@ class MagicNumberConverter
 
   # Converts "abc" to [[0x0a, 0xbc], [0xab, 0xc0]]
   def get_code_seq_set(arg)
-    phrase = arg.strip().downcase().tr("ilosz", "11052")
+    # Common rules
+    phrase = arg.strip().downcase().tr("ilo", "110")
+    # Less common rules
+    phrase = phrase.strip().tr("gstz", "6572")
+    phrase = phrase.strip().gsub("r", "12")
+    title = "#{phrase.upcase()} as #{arg.upcase()}"
+
     matched = phrase.match(/\A([\da-f])+\z/)
     unless matched
       warn("#{arg} is not a HEX number")
@@ -35,7 +42,8 @@ class MagicNumberConverter
     end
 
     hex_digit_strs = phrase.size.even?() ? [phrase] : ['0' + phrase, phrase + '0']
-    hex_digit_strs.map{ |digit_str| get_byte_seq(digit_str) }
+    code_seq_set = hex_digit_strs.map{ |digit_str| get_byte_seq(digit_str) }
+    return title, code_seq_set
   end
 
   # Converts "0abc" to [0x0a, 0xbc]
@@ -142,5 +150,5 @@ class MagicNumberConverter
 end
 
 arg = ARGV.empty? ? "coffee" : ARGV[0]
-MagicNumberConverter.new(arg)
+HexspeakToOpcodes.new(arg)
 0
