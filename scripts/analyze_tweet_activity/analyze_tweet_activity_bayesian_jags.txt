@@ -1,0 +1,15 @@
+model {
+  mu_7am ~ dnorm(0, 0.001)
+  tau_7am ~ dgamma(0.001, 0.001)
+  for (i in 1:N_7am) {
+    Y_7am[i] ~ dt(mu_7am, tau_7am, 4)
+  }
+
+  mu_7pm ~ dnorm(0, 0.001)
+  tau_7pm ~ dgamma(0.001, 0.001)
+  for (i in 1:N_7pm) {
+      Y_7pm[i] ~ dt(mu_7pm, tau_7pm, 4)
+  }
+
+  diff <- mu_7pm - mu_7am
+}
