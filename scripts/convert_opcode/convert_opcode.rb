@@ -7,7 +7,7 @@
 # $ ruby convert_opcode.rb coffee
 # > c0,ff,ee  sar bh,0xee
 #
-# This scripts
+# This script
 # - treats o as 0 and i,l as 1 and applies less common rules
 # - writes convert_opcode.out and does not delete it automatically
 
