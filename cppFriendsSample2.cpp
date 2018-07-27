@@ -123,8 +123,8 @@ TEST_F(TestRegex, Boost) {
     EXPECT_EQ(expected_, osIter.str());
 }
 
-// MinGW 64だと処理が終わらなくなる
-#if !defined(__MINGW32__) && !defined(__MINGW64__)
+// MinGW 64だと処理が終わらなくなるが、最近のCygwinでも処理が終わらない
+#if 0
 namespace {
     void parseComplexRegex(void) {
         // https://www.checkmarx.com/wp-content/uploads/2015/03/ReDoS-Attacks.pdf

@@ -679,9 +679,9 @@ TEST_F(TestSplitDigits, All) {
     }
 }
 
-class TestInstructionBytes : public ::testing::Test{};
+class TestAsmInstructions : public ::testing::Test{};
 
-TEST_F(TestInstructionBytes, Coffee) {
+TEST_F(TestAsmInstructions, Coffee) {
     uint32_t arg = 0x8000;
     uint32_t result = 0;
     constexpr uint32_t expected = 0xff00;
@@ -694,6 +694,58 @@ TEST_F(TestInstructionBytes, Coffee) {
         :"=a"(result),"+b"(arg)::);
     EXPECT_EQ(expected, arg);
     EXPECT_EQ(expected, result);
+}
+
+TEST_F(TestAsmInstructions, Div3_16bit) {
+    uint16_t arg = 0;
+    do {
+        uint16_t expected = (arg % 3) ? 0 : 1;
+        uint16_t result = 0;
+        asm volatile (
+            "mov   $0x5555, %%ax \n\t"
+            "mul   %%bx \n\t"
+            "mov   %%dx, %%ax \n\t"
+            "add   %%ax, %%dx \n\t"
+            "add   %%ax, %%dx \n\t"
+            "mov   %%bx, %%ax \n\t"
+            "sub   %%dx, %%ax \n\t"
+            "mov   %%ax, %%dx \n\t"
+            "shr   $1, %%ax \n\t"
+            "xor   %%dx, %%ax \n\t"
+            "not   %%ax \n\t"
+            "and   $1, %%ax \n\t"
+            :"=a"(result):"b"(arg):"rdx");
+        if (expected != result) {
+            std::cerr << arg;
+        }
+        ASSERT_EQ(expected, result);
+    } while(++arg);
+}
+
+TEST_F(TestAsmInstructions, Div3_32bit) {
+    uint32_t arg = 0;
+    do {
+        uint32_t expected = (arg % 3) ? 0 : 1;
+        uint32_t result = 0;
+        asm volatile (
+            "mov   $0x55555555, %%eax \n\t"
+            "mul   %%ebx \n\t"
+            "mov   %%edx, %%eax \n\t"
+            "add   %%eax, %%edx \n\t"
+            "add   %%eax, %%edx \n\t"
+            "mov   %%ebx, %%eax \n\t"
+            "sub   %%edx, %%eax \n\t"
+            "mov   %%eax, %%edx \n\t"
+            "shr   $1, %%eax \n\t"
+            "xor   %%edx, %%eax \n\t"
+            "not   %%eax \n\t"
+            "and   $1, %%eax \n\t"
+            :"=a"(result):"b"(arg):"rdx");
+        if (expected != result) {
+            std::cerr << arg;
+        }
+        ASSERT_EQ(expected, result);
+    } while(++arg);
 }
 
 /*
