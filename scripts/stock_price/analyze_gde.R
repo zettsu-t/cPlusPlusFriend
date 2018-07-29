@@ -30,18 +30,21 @@ df$log_gdes <- log(gdes)
 
 png(filename=out_chart_filename, width=800, height=400)
 g <- ggplot(df, aes(x=seq(1:nrow(df)), y=log_gdes))
-g <- g + geom_line()
+g <- g + geom_line(lwd=2)
 g <- g + scale_x_continuous(breaks = seq(1, nrow(df), 4))
 g <- g + ggtitle('Gross Domestic Expenditure')
 g <- g + xlab('quarter year') + ylab('log(GDE)')
 g <- g + theme(plot.title = element_text(hjust = 0.5),
-               panel.grid.major.x = element_line(size=.1, color='orchid', linetype='dashed'),
+               panel.grid.major.x = element_line(size=1.5, color='orchid', linetype='dashed'),
                panel.grid.major.y = element_blank())
 plot(g)
 dev.off()
 
 png(filename=out_acf_filename, width=800, height=400)
 par(mfrow=c(1,2))
-acf(df$log_gdes, main=data_description)
-pacf(df$log_gdes, main=data_description)
+acf(df$log_gdes, main=data_description, lwd=3)
+pacf(df$log_gdes, main=data_description, lwd=3)
 dev.off()
+
+Box.test(df$log_gdes)
+Box.test(diff(df$log_gdes))

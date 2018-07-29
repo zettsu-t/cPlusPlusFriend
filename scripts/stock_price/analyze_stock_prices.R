@@ -38,15 +38,15 @@ df_diffs <- df[-c(1),]
 day_seq <- 1:nrow(df_diffs)
 
 png(filename=out_chart_filename, width=600, height=600)
-twoord.plot(day_seq, df_diffs$Close,
-            day_seq, df_diffs$log_diff,
-            xlab=data_description, ylab='Price', rylab='diff(log(Price))',
-            type=c('l', 'l'), lcol=c('blue', 'blue'), rcol=c('darkorchid2', 'darkorchid2'),
+twoord.plot(day_seq, df_diffs$log_diff,
+            day_seq, df_diffs$Close,
+            xlab=data_description, ylab='diff(log(Price))', rylab='Price',
+            type=c('l', 'l'), lwd=3, lcol=c('darkorchid2', 'darkorchid2'), rcol=c('blue', 'blue'),
             xticklab=c(df_diffs$day))
 dev.off()
 
 png(filename=out_acf_filename, width=800, height=400)
 par(mfrow=c(1,2))
-acf(df$Close)
-pacf(df$Close)
+acf(df$Close, lwd=3)
+pacf(df$Close, lwd=3)
 dev.off()

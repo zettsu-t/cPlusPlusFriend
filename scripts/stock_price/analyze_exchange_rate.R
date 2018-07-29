@@ -42,15 +42,15 @@ df_diffs <- df[-c(1),]
 month_seq <- 1:nrow(df_diffs)
 
 png(filename=out_chart_filename, width=800, height=600)
-twoord.plot(month_seq, df_diffs$Rate,
-            month_seq, df_diffs$log_diff,
-            xlab=data_description, ylab='Rate', rylab='diff(log(Rate))',
-            type=c('l', 'l'), lcol=c('blue', 'blue'), rcol=c('darkorchid2', 'darkorchid2'),
+twoord.plot(month_seq, df_diffs$log_diff,
+            month_seq, df_diffs$Rate,
+            xlab=data_description, ylab='diff(log(Rate))', rylab='Rate',
+            type=c('l', 'l'), lwd=3, lcol=c('darkorchid2', 'darkorchid2'), rcol=c('blue', 'blue'),
             xticklab=c(df_diffs$Month))
 dev.off()
 
 png(filename=out_acf_filename, width=800, height=400)
 par(mfrow=c(1,2))
-acf(df$Rate, main=data_description)
-pacf(df$Rate, main=data_description)
+acf(df$Rate, main=data_description, lwd=3)
+pacf(df$Rate, main=data_description, lwd=3)
 dev.off()
