@@ -12,8 +12,6 @@ parameters {
 model {
   for (i in 1:N-T) {
     real s = dot_product(weight, X[i:i+T-1]);
-    for (t in 1:T) {
-      target += normal_lpdf(X[i+T] | s, sigma);
-    }
+    target += normal_lpdf(X[i+T] | s, sigma);
   }
 }

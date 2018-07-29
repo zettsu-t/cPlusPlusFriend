@@ -47,6 +47,6 @@ dev.off()
 
 png(filename=out_acf_filename, width=800, height=400)
 par(mfrow=c(1,2))
-acf(df$Close, lwd=3)
-pacf(df$Close, lwd=3)
+acf(df$Close, main=data_description, lwd=3)
+pacf(df$Close, main=data_description, lwd=3)
 dev.off()
