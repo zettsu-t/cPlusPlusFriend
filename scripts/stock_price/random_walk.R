@@ -17,7 +17,6 @@ g1 <- ggplot(df, aes(x=index, y=white_noise))
 g1 <- g1 + geom_line(color='blue', lwd=2)
 g1 <- g1 + ggtitle('White noise')
 g1 <- g1 + theme(plot.title = element_text(hjust = 0.5))
-plot(g)
 
 g2 <- ggplot(df, aes(x=index, y=random_walk))
 g2 <- g2 + geom_line(color='orchid', lwd=2)
