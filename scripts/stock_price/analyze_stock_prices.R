@@ -17,7 +17,7 @@ out_chart_filename <- paste(out_basename, '', '_chart.png', sep='')
 out_acf_filename <- paste(out_basename, '', '_acf.png', sep='')
 
 ## Read a CSV file and reverses it
-df_base <- df <- read.csv(in_filename)
+df_base <- read.csv(in_filename)
 df <- df_base[nrow(df_base):1,]
 
 ## Differences of log(prices)

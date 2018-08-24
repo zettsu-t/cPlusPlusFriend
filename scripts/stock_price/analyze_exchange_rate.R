@@ -17,7 +17,7 @@ out_chart_filename <- paste(out_basename, '', '_chart.png', sep='')
 out_acf_filename <- paste(out_basename, '', '_acf.png', sep='')
 
 ## Read a CSV file
-df_base <- df <- read.csv(in_filename, skip=1, header=T)
+df <- read.csv(in_filename, skip=1, header=T)
 
 ## Differences of log(rates)
 rate_log_diff <- diff(log(df$Rate))
