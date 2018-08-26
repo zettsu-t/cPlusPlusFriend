@@ -64,6 +64,18 @@ namespace Devirtualization {
     extern std::string GetStringOutline(void);
 }
 
+namespace ConditionalMove {
+    using SudokuCandidates = unsigned int;
+    struct SudokuCell {
+        SudokuCandidates candidates_ {0};
+        void filter_by_candidates_1(const SudokuCell& rhs);
+        void filter_by_candidates_2(const SudokuCell& rhs);
+        bool has_unique_candidate(void);
+        bool has_no_or_unique_candidates(void);
+    };
+    static constexpr SudokuCandidates MaskBits = 0x1ffu;
+}
+
 namespace ProcessorException {
     extern int32_t may_divide_by_zero(int32_t dividend, int32_t divisor, int32_t special);
     extern int abs_int(int src);

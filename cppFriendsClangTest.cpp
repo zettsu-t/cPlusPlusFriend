@@ -228,6 +228,41 @@ TEST_F(TestCompoundStatement, Loop) {
     EXPECT_EQ(expected, err.str());
 }
 
+class TestConditionalMove : public ::testing::Test{};
+
+TEST_F(TestConditionalMove, All) {
+    ConditionalMove::SudokuCell cell;
+    ConditionalMove::SudokuCell other;
+    EXPECT_FALSE(cell.candidates_);
+    EXPECT_FALSE(other.candidates_);
+
+    cell.candidates_ = 3;
+    other.candidates_ = 0;
+    EXPECT_FALSE(cell.has_unique_candidate());
+    EXPECT_FALSE(cell.has_no_or_unique_candidates());
+    EXPECT_FALSE(other.has_unique_candidate());
+    EXPECT_TRUE(other.has_no_or_unique_candidates());
+    cell.filter_by_candidates_1(other);
+    EXPECT_EQ(3, cell.candidates_);
+
+    cell.candidates_ = 3;
+    other.candidates_ = 0;
+    cell.filter_by_candidates_2(other);
+    EXPECT_EQ(3, cell.candidates_);
+
+    cell.candidates_ = 3;
+    other.candidates_ = 2;
+    EXPECT_TRUE(other.has_unique_candidate());
+    EXPECT_TRUE(other.has_no_or_unique_candidates());
+    cell.filter_by_candidates_1(other);
+    EXPECT_EQ(1, cell.candidates_);
+
+    cell.candidates_ = 3;
+    other.candidates_ = 2;
+    cell.filter_by_candidates_2(other);
+    EXPECT_EQ(1, cell.candidates_);
+}
+
 /*
 Local Variables:
 mode: c++

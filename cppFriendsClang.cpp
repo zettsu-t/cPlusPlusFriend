@@ -148,6 +148,26 @@ namespace ConditionalMove {
         snd = (expr) ? gen() : static_cast<uint_fast32_t>(::time(nullptr));
         return;
     }
+
+    // Sudoku Rustてきなコード(分岐あり)
+    void SudokuCell::filter_by_candidates_1(const SudokuCell& rhs) {
+        auto new_candidates = has_unique_candidate() ? MaskBits : ~rhs.candidates_;
+        candidates_ &= new_candidates;
+    }
+
+    // Sudoku Rustてきなコード(分岐なし)
+    void SudokuCell::filter_by_candidates_2(const SudokuCell& rhs) {
+        auto new_candidates = has_no_or_unique_candidates() ? MaskBits : ~rhs.candidates_;
+        candidates_ &= new_candidates;
+    }
+
+    bool SudokuCell::has_unique_candidate(void) {
+        return (candidates_ > 0) && ((candidates_ & (candidates_ - 1)) == 0);
+    }
+
+    bool SudokuCell::has_no_or_unique_candidates(void) {
+        return ((candidates_ & (candidates_ - 1)) == 0);
+    }
 }
 
 namespace ProcessorException {
