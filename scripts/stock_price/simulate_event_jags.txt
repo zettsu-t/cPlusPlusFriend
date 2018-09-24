@@ -1,0 +1,21 @@
+model {
+  for (d in 1:7) {
+    mu_week[d] ~ dunif(0.0, 2.0)
+    tau_week[d] ~ dgamma(0.1, 0.1)
+  }
+
+  ## Too Narrow!
+  mu_event ~ dunif(0, MAX_MU_EVENT)
+  tau_event ~ dgamma(0.1, 0.1)
+
+  for (w in 1:W) {
+    for (d in 1:7) {
+       mu_local[w,d] <- ifelse(E[w,d] == 0, 0, mu_event)
+       tau_local[w,d] <- ifelse(E[w,d] == 0, 1E+10, tau_event)
+       c[w,d] ~ dnorm(mu_week[d], tau_week[d])
+       vd[w,d] ~ dnorm(0, tau_local[w,d])
+       v[w,d] <- mu_local[w,d] * exp(vd[w,d])
+       Y[w,d] ~ sum(c[w,d], v[w,d])
+    }
+  }
+}

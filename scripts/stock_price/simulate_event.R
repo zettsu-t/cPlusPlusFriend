@@ -1,5 +1,7 @@
 library(ggplot2)
+library(KFAS)
 library(raster)
+library(rjags)
 library(rstan)
 
 ## Fix the random seed to reproduce results
@@ -54,6 +56,30 @@ write.csv(df, 'visitors.csv')
 g <- ggplot(df)
 g <- g + geom_line(aes(x=day, y=visitor), size = 0.5, color="black", linetype="solid")
 plot(g)
+
+df_weekday <- df[df[,'day_of_week'] <= 5,]
+df_holiday <- df[df[,'day_of_week'] > 5,]
+summary(df_weekday)
+summary(df_holiday)
+df_open <- df[df[,'event'] == 1,]
+df_close <- df[df[,'event'] == 0,]
+summary(df_open)
+summary(df_close)
+
+## Actually, event visitors are not in a normal distribution
+model <- SSModel(data = df, distribution="gaussian", H = NA,
+                 formula = visitor ~ SSMseasonal(period = 7, sea.type = "dummy", Q = NA)
+                 + event)
+fit.kfas <- fitSSM(model, inits = c(1, 1))
+result.kfas <- KFS(fit.kfas$model, filtering = c("state", "mean"), smoothing = c("state", "mean"))
+print(result.kfas)
+
+# Fits event visitors to a log normal distribution
+input_data <- list(W=n_weeks, MAX_MU_EVENT=0.2, Y=t(matrix(visitors, nrow=7)), E=t(matrix(event_opens, nrow=7)))
+fit.jags <- jags.model(file='simulate_event_jags.txt', data=input_data, n.chains=3, n.adapt=10000)
+update(fit.jags, n.iter=5000)
+result.jags <- coda.samples(fit.jags, variable.names = c('mu_week', 'tau_week', 'mu_event', 'tau_event'), n.iter=10000)
+summary(result.jags)
 
 input_data <- list(T=length(visitors), W=n_weeks, Y=visitors, E=event_opens)
 fit.stan <- stan(file='simulate_event.stan', data=input_data, iter=5000, warmup=2500, chains=1, seed=common_seed)
