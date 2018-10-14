@@ -6,6 +6,7 @@ df$date <- as.Date(df$date)
 df$diff_pop_ratio <- 100.0 * df$diff_population / (df$population - df$diff_population)
 
 df.sum <- df[df['region'] == 'A',]
+df.wards <- df[df['region'] != 'A',]
 df.north <- df[df['region'] == 'N', ]
 df.south <- df[df['region'] == 'S',]
 
@@ -24,3 +25,12 @@ draw_chart <- function(df_arg) {
 
 draw_chart(df.north)
 draw_chart(df.south)
+
+g <- ggplot(df.wards, aes(x=date, y=pop_ratio, color=ward_jp))
+g <- g + geom_line(size=1)
+g <- g + scale_x_date(date_breaks='3 months')
+g <- g + theme(axis.text.x=element_text(angle=-90, vjust=0.5), legend.title=element_blank())
+g <- g + xlab('Date')
+g <- g + ylab('Population (initial=1.0)')
+g <- g + geom_dl(aes(label=ward_jp), method=list(dl.combine('last.points'), color='black', cex=1.0))
+plot(g)
