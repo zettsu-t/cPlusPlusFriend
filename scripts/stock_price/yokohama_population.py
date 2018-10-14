@@ -10,6 +10,7 @@ http://www.city.yokohama.lg.jp/ex/stat/opendata/suikei01.html
 import glob
 import os
 import re
+import numpy as np
 import pandas
 from collections import OrderedDict
 
@@ -71,7 +72,10 @@ for filename in sorted(glob.glob('yokohama/*.csv')):
 
     if out_table is None:
         out_table = df
+        base_population = df.loc[:, 'population']
+        df.loc[:,'pop_ratio'] = np.full(df.shape[0], 1.0, dtype=float)
     else:
+        df.loc[:,'pop_ratio'] = df.loc[:, 'population'] / base_population
         out_table = pandas.concat([out_table, df], ignore_index=True)
 
 out_table.to_csv('incoming/yokohama.csv', index=None)
