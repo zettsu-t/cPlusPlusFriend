@@ -114,7 +114,7 @@ TEST_F(TestSpaceSet, PosixClass) {
     PrintCodePoints(SpaceSet, os);
     ScanSpaces(SpaceSet, PosixSpacePattern, os);
 
-#if defined(__MINGW32__) || defined(__MINGW64__)
+#if defined(__MINGW32__) || defined(__MINGW64__) || (defined(__GNUC__) && __GNUC__ >= 7)
     // MinGW GCC 7.1.0 の出力結果
     std::string expected = "20:a0:1680:2002:2003:2002:2003:2004:2005:"
         "2006:2007:2008:2009:200a:202f:205f:3000:"
@@ -134,7 +134,7 @@ TEST_F(TestSpaceSet, PosixClass) {
 
 TEST_F(TestSpaceSet, MetaSpace) {
     std::ostringstream os;
-#if defined(__MINGW32__) || defined(__MINGW64__)
+#if defined(__MINGW32__) || defined(__MINGW64__) || (defined(__GNUC__) && __GNUC__ >= 7)
     constexpr size_t expected = 15;
 #else
     constexpr size_t expected = 12;

@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include "cFriends.h"
@@ -190,6 +191,11 @@ int main(int argc, char* argv[]) {
 
 /* Aはポインタだが、Bは違う */
 int* g_confusingVarA, g_confusingVarB;
+
+void literal_sizeof_double(void) {
+    free(malloc(sizeof(3.14)));
+    _Static_assert(sizeof(double) == sizeof(3.14), "");
+}
 
 /*
 Local Variables:

@@ -1,6 +1,7 @@
 // やめるのだフェネックで学ぶC++の実証コード(ライブラリの使い方)
 #include <cctype>
 #include <ctime>
+#include <cstdlib>
 #include <codecvt>
 #include <fstream>
 #include <iomanip>
@@ -1355,6 +1356,28 @@ TEST_F(TestInterval, SplitBySubtraction) {
     }
 
     EXPECT_EQ("[1.5,2.5][4.5,7.5][11.5,16.5]", os.str());
+}
+
+namespace {
+    template <typename T, typename std::enable_if_t<std::numeric_limits<T>::has_infinity, std::nullptr_t> = nullptr>
+    size_t literal_sizeof(void) {
+        if (std::numeric_limits<T>::has_infinity) {
+            auto p = malloc(sizeof(std::numeric_limits<T>::infinity()));
+            free(p);
+        }
+        return sizeof(T);
+    }
+}
+
+class TestLiteralSizeof : public ::testing::Test {};
+
+TEST_F(TestLiteralSizeof, Double) {
+    EXPECT_EQ(sizeof(float), literal_sizeof<float>());
+    EXPECT_EQ(sizeof(double), literal_sizeof<double>());
+    free(malloc(sizeof(3.14)));
+    free(malloc(sizeof(std::numeric_limits<double>::quiet_NaN())));
+    static_assert(std::is_same<size_t, decltype(sizeof(3.14))>::value, "");
+    static_assert(sizeof(double) == sizeof(3.14), "");
 }
 
 /*
