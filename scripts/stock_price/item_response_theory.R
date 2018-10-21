@@ -61,8 +61,12 @@ fit.stan <- stan(file='item_response_theory.stan', data=input_data,
 elapsed_time <- proc.time() - start_time
 
 summary(fit.stan)
-stan_hist(fit.stan)
+stan_hist(fit.stan, pars=c('difficulty'))
 get_posterior_mean(fit.stan)
 print(fit.stan, pars=c('discrimination'))
 print(fit.stan, pars=c('difficulty'))
 print(elapsed_time)
+
+png(filename='difficulties.png', width=1024, height=1024)
+stan_hist(fit.stan, pars=c('difficulty'))
+dev.off()
