@@ -36,9 +36,9 @@ transformed parameters {
 model {
     mu_e ~ normal(0, 10000);
     mu_l ~ normal(0, 10000);
-    sigma_e ~ exponential(1000);
-    sigma_l ~ exponential(200);
-    trend_l ~ normal(0, 1000);
+    sigma_e ~ cauchy(0, 1000);
+    sigma_l ~ cauchy(0, 100);
+    trend_l ~ normal(0, 500);
     target += log_sum_exp(log_p);
 }
 

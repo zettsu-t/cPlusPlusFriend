@@ -4,14 +4,11 @@
 model {
   mu_e ~ dunif(0.0, 10000.0)
   mu_l ~ dunif(0.0, 10000.0)
-  sigma_e ~ dexp(1000.0)
-  sigma_l ~ dexp(200.0)
-  trend_l ~ dnorm(0.0, 1000.0)
-  tau ~ dunif(1, T)
+  tau_e ~ dlnorm(0, 1/50.0)
+  tau_l ~ dlnorm(0, 1/50.0)
+  cp ~ dunif(1, T)
 
   for (n in 1:T) {
-    mu[n] <- ifelse(n < tau, mu_e, mu_l + (n - tau) * trend_l)
-    sigma[n] <- ifelse(n < tau, sigma_e, sigma_l)
-    Y[n] ~ dnorm(mu[n], sigma[n])
+    Y[n] ~ dnorm(ifelse(n < cp, mu_e, mu_l), ifelse(n < cp, tau_e, tau_l))
   }
 }
