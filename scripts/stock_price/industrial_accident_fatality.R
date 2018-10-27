@@ -14,16 +14,29 @@ library(timeSeries)
 ## http://www.aichi-c.ed.jp/digitalcontents/Web_koug/zenpan/anzen/anzen_top.htm
 
 common_seed <- 123
+
+## Set numbers of iterations in testing
+n_jags_chains <- 3
+n_stan_chains <- 3
+jags_adapt <- 1000
+jags_burn <- 10000
+jags_iter <- 20000
+stan_warmup <- 500
+stan_iter <- 1000
+
+## Reads data
 df <- read.csv('industrial_accident_fatality.csv')
 years_tick_width <- 10
 years_min <- floor(min(df$year) / years_tick_width) * years_tick_width
 years_max <- floor(max(df$year) / years_tick_width) * years_tick_width
 year_breaks <- seq(years_min, years_max, years_tick_width)
 
-png(filename='changepoints_base.png', width=1200, height=600)
+## Plots the input data and adds a linear regression
+png(filename='changepoints_base.png', width=2000, height=1000)
 g <- ggplot(df)
-g <- g + geom_line(aes(x=year, y=fatality), size=2, color='black', linetype='solid')
-g <- g + stat_smooth(aes(x=year, y=fatality), method = "lm", se = FALSE, colour = "orange", linetype='dashed', size = 2)
+g <- g + geom_line(aes(x=year, y=fatality), size=3, color='black', linetype='solid')
+g <- g + stat_smooth(aes(x=year, y=fatality), method = 'lm', se = FALSE, colour = 'darkgoldenrod2', linetype='dashed', size=4)
+g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
 plot(g)
 dev.off()
 
@@ -35,11 +48,11 @@ years <- df$year[points[-length(points)]]
 ## Estimates with JAGS
 input_data <- list(T=nrow(df), Y=df$fatality)
 fit.jags <- jags.model(file='industrial_accident_fatality_jags.txt', data=input_data,
-                       n.chains=3, n.adapt=20000)
-update(fit.jags, n.iter=1000)
+                       n.chains=n_jags_chains, n.adapt=jags_adapt)
+update(fit.jags, n.iter=jags_burn)
 result.jags <- jags.samples(fit.jags,
                             variable.names = c('mu_e', 'mu_l', 'tau_e', 'tau_l', 'cp'),
-                            n.iter=20000)
+                            n.iter=jags_iter)
 summary(result.jags)
 jags_cp <- round(mean(result.jags$cp))
 year_jags <- df$year[jags_cp]
@@ -47,7 +60,8 @@ year_jags <- df$year[jags_cp]
 ## Estimates with Stan
 input_data <- list(T=nrow(df), X=df$year, Y=df$fatality)
 fit.stan <- stan(file='industrial_accident_fatality.stan', data=input_data,
-                 iter=10000, warmup=5000, chains=1, seed=common_seed)
+                 iter=stan_iter+stan_warmup, warmup=stan_warmup,
+                 chains=n_stan_chains, seed=common_seed)
 summary(fit.stan)
 stan_tau <- round(mean(extract(fit.stan)$tau))
 year_stan <- df$year[stan_tau]
@@ -70,22 +84,17 @@ draw_estimation <- function(filename, base_df, mu_e, sigma_e, mu_l, sigma_l, tre
     df$estimated_ymin <- c(ys_min_e, ys_min_l)
     df$estimated_ymax <- c(ys_max_e, ys_max_l)
 
-    png(filename=filename, width=1200, height=600)
+    png(filename=filename, width=2000, height=1000)
     g <- ggplot(df)
     g <- g + geom_line(aes(x=year, y=fatality), size=2, color='black', linetype='solid')
     g <- g + geom_line(aes(x=year, y=estimated_y), size=2, color='red', linetype='solid')
-    g <- g + geom_ribbon(aes(x=year, ymin=estimated_ymin, ymax=estimated_ymax), fill = "grey70", alpha=0.5)
+    g <- g + geom_ribbon(aes(x=year, ymin=estimated_ymin, ymax=estimated_ymax), fill = 'grey70', alpha=0.5)
+    g <- g + labs(title='Industrial Accident Fatalities (yearly)')
+    g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
     plot(g)
     dev.off()
 }
 
-draw_estimation('changepoints_stan.png', df,
-                get_posterior_mean(fit.stan)['mu_e',],
-                get_posterior_mean(fit.stan)['sigma_e',],
-                get_posterior_mean(fit.stan)['mu_l',],
-                get_posterior_mean(fit.stan)['sigma_l',],
-                get_posterior_mean(fit.stan)['trend_l',],
-                stan_tau)
 
 estemated_sigma_e <- 1.0 / sqrt(result.jags$tau_e[1])
 estemated_sigma_l <- 1.0 / sqrt(result.jags$tau_l[1])
@@ -97,33 +106,49 @@ draw_estimation('changepoints_jags.png', df,
                 estemated_sigma_l,
                 0.0, jags_cp)
 
+## Use means of all chains if available
+if (n_stan_chains == 1) {
+    draw_estimation('changepoints_stan.png', df,
+                    get_posterior_mean(fit.stan)['mu_e',],
+                    get_posterior_mean(fit.stan)['sigma_e',],
+                    get_posterior_mean(fit.stan)['mu_l',],
+                    get_posterior_mean(fit.stan)['sigma_l',],
+                    get_posterior_mean(fit.stan)['trend_l',],
+                    stan_tau)
+} else {
+    index <- n_stan_chains + 1
+    draw_estimation('changepoints_stan.png', df,
+                    get_posterior_mean(fit.stan)['mu_e',][index],
+                    get_posterior_mean(fit.stan)['sigma_e',][index],
+                    get_posterior_mean(fit.stan)['mu_l',][index],
+                    get_posterior_mean(fit.stan)['sigma_l',][index],
+                    get_posterior_mean(fit.stan)['trend_l',][index],
+                    stan_tau)
+}
 
 ## Draw the detected change points
-png(filename='changepoints_timeseries.png', width=1200, height=600)
+draw_changepoint <- function(g, years, text_str, color_str, vjust) {
+    if (length(years) > 1) {
+        text <- sapply(years, function(x) {paste(x, text_str, sep=' ')})
+    } else {
+        text <- paste(years, text_str, sep=' ')
+    }
+    g <- g + geom_vline(xintercept=years, colour=color_str, linetype='solid', size=2)
+    g <- g + geom_text(aes(x=years, y=0), label=text, colour=color_str, hjust=1.2, vjust=vjust, size=14)
+    g
+}
+
+png(filename='changepoints_timeseries.png', width=2000, height=1000)
 g <- ggplot(df)
 g <- g + geom_line(aes(x=year, y=fatality), size=2, color='black', linetype='solid')
-
-color_str <- 'slateblue'
-texts <- sapply(years, function(x) {paste(x, '(CP)', sep=' ')})
-g <- g + geom_text(aes(x=years, y=0), label=texts, colour=color_str, hjust=1.2, vjust=0.1, size=8)
-g <- g + geom_vline(xintercept=years, colour=color_str, linetype='solid', size=2)
-
-color_str <- 'brown'
-text <- paste(year_jags, '(JAGS)', sep=' ')
-g <- g + geom_vline(xintercept=year_jags, colour=color_str, linetype='solid', size=2)
-g <- g + geom_text(aes(x=year_jags, y=0), label=text, colour=color_str, hjust=1.2, vjust=-3.1, size=8)
-
-color_str <- 'violet'
-text <- paste(year_stan, '(Stan)', sep=' ')
-g <- g + geom_vline(xintercept=year_stan, colour=color_str, linetype='solid', size=2)
-g <- g + geom_text(aes(x=year_stan, y=0), label=text, colour=color_str, hjust=1.2, vjust=-1.6, size=8)
-
+g <- draw_changepoint(g, years, '(CP)', 'slateblue', -0.1)
+g <- draw_changepoint(g, year_jags, '(JAGS)', 'darkgoldenrod3', -3.1)
+g <- draw_changepoint(g, year_stan, '(Stan)', 'darkmagenta', -1.6)
 g <- g + scale_x_continuous(breaks=year_breaks)
-g <- g + theme(axis.text=element_text(size=24), axis.title=element_text(size=24), plot.title=element_text(size=24))
+g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
 g <- g + labs(title='Industrial Accident Fatalities (yearly)')
 plot(g)
 dev.off()
-
 
 ## Draw the posterior distribution
 ## https://rpubs.com/uri-sy/iwanami_ds1
@@ -132,10 +157,10 @@ patterns <- c('^mu_(e|l)', '^sigma_', '^(trend_|tau)')
 postfixes <- c('mu', 'sigma', 'tau')
 for (i in 1:length(patterns)) {
     fit <- df_param %>% dplyr::filter(grepl(patterns[i], Parameter))
-    filename = paste('changepoint_', postfixes[i], '.png', sep='')
-    png(filename=filename, width=800, height=1200)
+    filename <- paste('changepoint_', postfixes[i], '.png', sep='')
+    png(filename=filename, width=1000, height=1500)
     g <- ggs_histogram(fit)
-    g <- g + theme(axis.text=element_text(size=24), axis.title=element_text(size=24), strip.text=element_text(size=24))
+    g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), strip.text=element_text(size=32))
     plot(g)
     dev.off()
 }
