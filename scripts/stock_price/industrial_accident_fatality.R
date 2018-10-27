@@ -32,11 +32,19 @@ years_max <- floor(max(df$year) / years_tick_width) * years_tick_width
 year_breaks <- seq(years_min, years_max, years_tick_width)
 
 ## Plots the input data and adds a linear regression
+set_font_size <- function(g, font_size) {
+    g + theme(axis.text=element_text(family='sans', size=font_size),
+              axis.title=element_text(family='sans', size=font_size),
+              strip.text=element_text(family='sans', size=font_size),
+              plot.title=element_text(family='sans', size=font_size))
+}
+
 png(filename='changepoints_base.png', width=2000, height=1000)
 g <- ggplot(df)
 g <- g + geom_line(aes(x=year, y=fatality), size=3, color='black', linetype='solid')
-g <- g + stat_smooth(aes(x=year, y=fatality), method = 'lm', se = FALSE, colour = 'darkgoldenrod2', linetype='dashed', size=4)
-g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+g <- g + stat_smooth(aes(x=year, y=fatality), method='lm', se=FALSE,
+                     colour='darkgoldenrod2', linetype='dashed', size=4)
+g <- set_font_size(g, 32)
 plot(g)
 dev.off()
 
@@ -90,7 +98,7 @@ draw_estimation <- function(filename, base_df, mu_e, sigma_e, mu_l, sigma_l, tre
     g <- g + geom_line(aes(x=year, y=estimated_y), size=2, color='red', linetype='solid')
     g <- g + geom_ribbon(aes(x=year, ymin=estimated_ymin, ymax=estimated_ymax), fill = 'grey70', alpha=0.5)
     g <- g + labs(title='Industrial Accident Fatalities (yearly)')
-    g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+    g <- set_font_size(g, 32)
     plot(g)
     dev.off()
 }
@@ -135,7 +143,6 @@ draw_changepoint <- function(g, years, text_str, color_str, vjust) {
     }
     g <- g + geom_vline(xintercept=years, colour=color_str, linetype='solid', size=2)
     g <- g + geom_text(aes(x=years, y=0), label=text, colour=color_str, hjust=1.2, vjust=vjust, size=14)
-    g
 }
 
 png(filename='changepoints_timeseries.png', width=2000, height=1000)
@@ -145,7 +152,7 @@ g <- draw_changepoint(g, years, '(CP)', 'slateblue', -0.1)
 g <- draw_changepoint(g, year_jags, '(JAGS)', 'darkgoldenrod3', -3.1)
 g <- draw_changepoint(g, year_stan, '(Stan)', 'darkmagenta', -1.6)
 g <- g + scale_x_continuous(breaks=year_breaks)
-g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+g <- set_font_size(g, 32)
 g <- g + labs(title='Industrial Accident Fatalities (yearly)')
 plot(g)
 dev.off()
@@ -155,12 +162,13 @@ dev.off()
 df_param <- ggs(fit.stan)
 patterns <- c('^mu_(e|l)', '^sigma_', '^(trend_|tau)')
 postfixes <- c('mu', 'sigma', 'tau')
+
 for (i in 1:length(patterns)) {
     fit <- df_param %>% dplyr::filter(grepl(patterns[i], Parameter))
     filename <- paste('changepoint_', postfixes[i], '.png', sep='')
     png(filename=filename, width=1000, height=1500)
     g <- ggs_histogram(fit)
-    g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), strip.text=element_text(size=32))
+    g <- set_font_size(g, 32)
     plot(g)
     dev.off()
 }

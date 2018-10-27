@@ -62,13 +62,28 @@ for (i in 1:k) {
 data.df$x <- xs
 data.df <- melt(data.df, id.vars='x', variable.name='difficulty')
 
+## Sets ggplot2 and mcmc_intervals fonts to sans
+set_font_size <- function(g, font_size) {
+    g + theme(axis.text=element_text(family='sans', size=font_size),
+              axis.title=element_text(family='sans', size=font_size),
+              strip.text=element_text(family='sans', size=font_size),
+              plot.title=element_text(family='sans', size=font_size))
+}
+
+set_font_size_no_xticks <- function(g, font_size) {
+    g + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+              axis.text=element_text(family='sans', size=font_size),
+              axis.title=element_text(family='sans', size=font_size),
+              plot.title=element_text(family='sans', size=font_size))
+}
+
 png(filename='itr_probability.png', width=2000, height=800)
 g <- ggplot(data.df, aes(x=x, y=value))
 g <- g + geom_line(aes(colour=difficulty), size=2)
 g <- g + theme(legend.position='none')
 g <- g + xlab('Difficulty')
 g <- g + ylab('Probability to choose correct answers')
-g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+g <- set_font_size(g, 32)
 plot(g)
 dev.off()
 
@@ -89,11 +104,10 @@ if (n_stan_chains == 1) {
 }
 df_fit <- as.data.frame(fit.stan.means)
 
-## Print summary and draws a chart of difficulties of questions
-summary(fit.stan)
-print(fit.stan, pars=c('discrimination', 'difficulty'))
+
+## Draws a chart of difficulties of questions
 png(filename='irt_all_difficulty_hist.png', width=1200, height=800)
-stan_hist(fit.stan, pars=c('difficulty'), nrow=4, ncol=6)
+stan_hist(fit.stan, pars=c('difficulty'), nrow=4, ncol=6, fill='slateblue')
 dev.off()
 
 draw_charts <- function(actual, param_name, display_name, ylab_text) {
@@ -112,7 +126,7 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
     g <- g + labs(title=title)
     g <- g + xlab('Difference')
     g <- g + ylab('Frequency')
-    g <- g + theme(axis.text=element_text(size=24), axis.title=element_text(size=24), plot.title=element_text(size=24))
+    g <- set_font_size(g, 24)
     plot(g)
     dev.off()
 
@@ -125,7 +139,7 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
     g <- g + labs(title=title)
     g <- g + xlab('Index')
     g <- g + ylab(ylab_text)
-    g <- g + theme(axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+    g <- set_font_size(g, 32)
     plot(g)
     dev.off()
 
@@ -134,12 +148,15 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
     g <- mcmc_intervals(fit.stan.array, rev(fit.stan.names[grepl(param_name_regex, fit.stan.names)]))
     g <- g + coord_flip()
     g <- g + labs(title=ylab_text)
-    g <- g + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
-                   axis.text=element_text(size=32), axis.title=element_text(size=32), plot.title=element_text(size=32))
+    g <- set_font_size_no_xticks(g, 32)
     plot(g)
     dev.off()
 }
 
 draw_charts(difficulties, 'difficulty', 'difficulty', 'Difficulty')
 draw_charts(theta, 'theta', 'ability', 'Ability')
+
+## Print summary
+summary(fit.stan)
+print(fit.stan, pars=c('discrimination', 'difficulty'))
 print(elapsed_time)
