@@ -37,7 +37,7 @@ sigma_discrimination <- 3.0
 ## Generates samples
 theta <- clamp(sort(rnorm(n, mu_theta, sigma_theta)), 0.001, 0.999)
 difficulties <- seq(difficulty_min, difficulty_max, length.out=k)
-discriminations <- clamp(rnorm(n, mu_discrimination, sigma_discrimination), 0.001, mu_discrimination * 2)
+discriminations <- clamp(rnorm(k, mu_discrimination, sigma_discrimination), 0.001, mu_discrimination * 2)
 
 ## Draws a chart of difficulties of questions
 data <- matrix(0, n, k)
