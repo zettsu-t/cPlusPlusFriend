@@ -1380,6 +1380,32 @@ TEST_F(TestLiteralSizeof, Double) {
     static_assert(sizeof(double) == sizeof(3.14), "");
 }
 
+class TestTypeDeduction : public ::testing::Test {};
+
+TEST_F(TestTypeDeduction, Constant) {
+    size_t count = 0;
+    constexpr size_t n = 0x80000000u;
+#if 0
+    // n>=0x80000000のときに、iがnを超えることはないので無限ループ
+    for(auto i=0; i<n; ++i) {
+        static_assert(std::is_same<size_t, std::remove_const_t<decltype(n)>>::value, "");
+        static_assert(std::is_const<decltype(n)>::value, "");
+        static_assert(std::is_same<int, decltype(i)>::value, "");
+        static_assert(!std::is_const<decltype(i)>::value, "");
+        static_assert(!std::is_same<decltype(i), std::remove_const_t<decltype(n)>>::value, "");
+        ++count;
+    }
+#endif
+    for(auto i=static_cast<decltype(n)>(0); i<n; ++i) {
+        static_assert(std::is_same<size_t, decltype(i)>::value, "");
+        static_assert(!std::is_const<decltype(i)>::value, "");
+        static_assert(std::is_same<decltype(i), std::remove_const_t<decltype(n)>>::value, "");
+        ++count;
+    }
+
+    EXPECT_EQ(n, count);
+}
+
 /*
 Local Variables:
 mode: c++
