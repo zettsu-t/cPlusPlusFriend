@@ -13,6 +13,8 @@ https://www.hellocybernetics.tech/entry/2018/11/09/231817
 import time
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas
+import seaborn
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
@@ -22,93 +24,142 @@ tfd = tfp.distributions
 ## Size of MCMC iterations
 N_RESULTS = 1000
 N_BURNIN = 500
+## Choose an appropriate step size or states are converged irregularly
+HMC_STEP_SIZE = 0.001
+HMC_LEAPFRON_STEPS = 5
 
-## Number of respondents(n) and questions(k)
-N = 500
-K = 200
+## Number of respondents and questions
+N_RESPONDENTS = 500
+N_QUESTIONS = 200
+
+## Chart filenames
+ANSWER_ABILITY_FILANAME = 'answer_ability.png'
+ACTUAL_ABILITY_FILANAME = 'actual_ability.png'
+ESTIMATED_ABILITY_BOX_FILANAME = 'estimated_ability_box.png'
+ESTIMATED_ABILITY_SCATTER_FILANAME = 'estimated_ability_scatter.png'
 
 ## Assuming four-choice questions
 CHANCE = 0.25
+## Distribution of respondent abilities
 MU_THETA = 0.5
 SIGMA_THETA = 0.17
+## Distribution of  questions difficulties
 DIFFICULTY_MIN = 0.1
 DIFFICULTY_MAX = 0.9
 MU_DISCRIMINATION = 16.0
 SIGMA_DISCRIMINATION = 3.0
 
-## Explanatory variable(s)
-abilities = tf.clip_by_value(tf.contrib.framework.sort(tf.random.normal(shape=[N], mean=MU_THETA, stddev=SIGMA_THETA)),
-                             clip_value_min=0.001, clip_value_max=0.999, name="abilities")
-delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (K - 1)
-difficulties = tf.range(start=DIFFICULTY_MIN, limit=DIFFICULTY_MAX+1e-4, delta=delta, name="difficulties")
-discriminations = tf.random.normal(shape=[K], mean=MU_DISCRIMINATION, stddev=SIGMA_DISCRIMINATION, name="discrimination")
+class QuestionAbility(object):
+    '''Estimate abilities under the item response theory'''
+    def __init__(self, n_respondents, n_questions):
+        self.n_respondents = n_respondents
+        self.n_questions = n_questions
 
-## Fills normaized sigmoid parameters with broadcasting
-locs = tf.broadcast_to(input=abilities, shape=[K,N])
-locs = tf.transpose(locs)
-diffs = tf.broadcast_to(input=difficulties, shape=[N,K])
-locs = locs - diffs
-scales = tf.broadcast_to(input=discriminations, shape=[N,K])
-correct_probs = tf.nn.sigmoid(locs * scales)
+        ## Explanatory variables
+        self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
+            tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
+                             clip_value_min=0.001, clip_value_max=0.999, name='abilities')
 
-## Explanatory variables
-x_abilities = tf.random_uniform([N], minval=0.0, maxval=1.0)
+        ## Is there a n-ranges splitter in TensorFlow?
+        delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
+        self.difficulties = tf.range(start=DIFFICULTY_MIN, limit=DIFFICULTY_MAX+1e-7, delta=delta, name='difficulties')
+        self.discriminations = tf.random.normal(shape=[self.n_questions],
+                                                mean=MU_DISCRIMINATION, stddev=SIGMA_DISCRIMINATION, name='discrimination')
 
-## Observed data
-## https://stackoverflow.com/questions/35487598/sampling-bernoulli-random-variables-in-tensorflow
-answers = tf.nn.relu(tf.sign(correct_probs - tf.random_uniform(tf.shape(correct_probs))))
+        ## Makes normalized sigmoid parameters with broadcasting
+        locs = tf.transpose(tf.broadcast_to(input=self.abilities, shape=[self.n_questions, self.n_respondents]))
+        diffs = tf.broadcast_to(input=self.difficulties, shape=[self.n_respondents, self.n_questions])
+        ## Inflection points of sigmoid functions
+        locs = locs - diffs
+        scales = tf.broadcast_to(input=self.discriminations, shape=[self.n_respondents, self.n_questions])
+        probabilities = tf.nn.sigmoid(locs * scales)
 
-with tf.Session() as sess:
-    sess.run(answers)
-    plt.figure(figsize=(6, 6))
-    plt.title("Abilities and answers")
-    plt.xlabel("Rank of abilities")
-    plt.ylabel("Number of correct answers")
-    plt.scatter(list(range(N)), np.sum(answers.eval(), 1))
-    plt.tight_layout()
-    plt.savefig("answer_ability.png", dpi=160)
+        ## Observed data
+        ## https://stackoverflow.com/questions/35487598/sampling-bernoulli-random-variables-in-tensorflow
+        ## Must be float, not int (see get_dist())
+        self.y_answers = tf.nn.relu(tf.sign(probabilities - tf.random_uniform(tf.shape(probabilities))))
+        ## Explanatory variable(s)
+        self.x_abilities = tf.random_uniform(shape=[self.n_respondents], minval=0.0, maxval=1.0)
 
-def get_dist():
-    abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=N, name="abilities")
-    locs = tf.broadcast_to(input=abilities, shape=[K,N])
-    locs = tf.transpose(locs)
-    diffs = tf.broadcast_to(input=difficulties, shape=[N,K])
-    locs = locs - diffs
-    scales = tf.broadcast_to(input=discriminations, shape=[N,K])
-    logits = locs * scales
-    ## Must be float, not int
-    answers = ed.Bernoulli(logits=logits, name="answers", dtype=tf.float32)
-    return answers
+        self.plot_actual(self.y_answers, self.abilities)
 
-log_joint = ed.make_log_joint_fn(get_dist)
+    def plot_actual(self, answers, abilities):
+       '''Plots the synthetic input data and check they are correct'''
+       with tf.Session() as sess:
+           sess.run(answers)
+           plt.figure(figsize=(6, 6))
+           plt.hist(abilities.eval(), bins=25, color='royalblue')
+           plt.savefig(ACTUAL_ABILITY_FILANAME, dpi=160)
 
-# def target_log_prob_fn(abilities, difficulties, discriminations):
-def target_log_prob_fn(abilities):
-    return log_joint(abilities=abilities,
-                     answers=answers)
+           plt.figure(figsize=(6, 6))
+           plt.title('Abilities and answers')
+           plt.xlabel('Rank of abilities')
+           plt.ylabel('Number of correct answers')
+           n_correct_answers = np.sum(answers.eval(), 1)
+           plt.scatter(list(range(n_correct_answers.shape[0])), n_correct_answers, color='mediumblue', alpha=0.7)
+           plt.tight_layout()
+           plt.savefig(ANSWER_ABILITY_FILANAME, dpi=160)
 
-hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
-    target_log_prob_fn=target_log_prob_fn,
-    step_size=0.003,
-    num_leapfrog_steps=5)
+    def get_sample(self):
+        '''Returns an observation at a MCMC sample'''
+        ## Relaxed from the actual distribution
+        abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=self.n_respondents, name='abilities')
+        ## Same as the input data
+        locs = tf.transpose(tf.broadcast_to(input=abilities, shape=[self.n_questions, self.n_respondents]))
+        diffs = tf.broadcast_to(input=self.difficulties, shape=[self.n_respondents, self.n_questions])
+        locs = locs - diffs
+        scales = tf.broadcast_to(input=self.discriminations, shape=[self.n_respondents, self.n_questions])
+        logits = locs * scales
 
-states, kernels_results = tfp.mcmc.sample_chain(
-    num_results=N_RESULTS,
-    current_state=[x_abilities],
-    kernel=hmc_kernel,
-    num_burnin_steps=N_BURNIN)
+        ## The support of Bernoulli distributions takes 0 or 1 but
+        ## this function must return float not int to differentiate
+        answers = ed.Bernoulli(logits=logits, name='answers', dtype=tf.float32)
+        return answers
 
-start_time = time.time()
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    states_, results_ = sess.run([states, kernels_results])
-    plt.figure(figsize=(6, 6))
-    plt.title("Abilities")
-    plt.xlabel("Actual")
-    plt.ylabel("Estimated")
-    plt.scatter(abilities.eval(), np.median(states_[0], 0))
-    plt.tight_layout()
-    plt.savefig("estimated_ability.png", dpi=160)
+    def target_log_prob_fn(self, abilities):
+        '''Applies observations partially to calculate their log likelihood'''
+        log_joint = ed.make_log_joint_fn(self.get_sample)
+        return log_joint(abilities=abilities,
+                         answers=self.y_answers)
 
-elapsed_time = time.time() - start_time
-print(elapsed_time)
+    def estimate(self):
+        '''Estimates abilities by a HMC solver'''
+        hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=self.target_log_prob_fn,
+            step_size=HMC_STEP_SIZE,
+            num_leapfrog_steps=HMC_LEAPFRON_STEPS)
+
+        states, kernels_results = tfp.mcmc.sample_chain(
+            num_results=N_RESULTS,
+            current_state=[self.x_abilities],
+            kernel=hmc_kernel,
+            num_burnin_steps=N_BURNIN)
+
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            states_, results_ = sess.run([states, kernels_results])
+            self.plot_estimated(states_[0])
+
+    def plot_estimated(self, ability_samples):
+        medians = np.median(ability_samples, 0)
+        plt.figure(figsize=(6, 6))
+        seaborn.boxplot(data=pandas.DataFrame(ability_samples), color='magenta', saturation=0.8, width=0.5, notch=True)
+        plt.title('Abilities')
+        plt.xlabel('Actual')
+        plt.ylabel('Estimated')
+        plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        plt.savefig(ESTIMATED_ABILITY_BOX_FILANAME, dpi=160)
+
+        plt.figure(figsize=(6, 6))
+        plt.title('Abilities')
+        plt.xlabel('Actual')
+        plt.ylabel('Estimated')
+        plt.scatter(self.abilities.eval(), medians, color='darkmagenta', alpha=0.7)
+        plt.tight_layout()
+        plt.savefig(ESTIMATED_ABILITY_SCATTER_FILANAME, dpi=160)
+
+if __name__ == '__main__':
+    start_time = time.time()
+    QuestionAbility(N_RESPONDENTS, N_QUESTIONS).estimate()
+    elapsed_time = time.time() - start_time
+    print(elapsed_time)
