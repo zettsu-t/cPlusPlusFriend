@@ -25,17 +25,18 @@ tfd = tfp.distributions
 N_RESULTS = 1000
 N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
-HMC_STEP_SIZE = 0.001
+HMC_STEP_SIZE = 0.003
 HMC_LEAPFRON_STEPS = 5
 
 ## Number of respondents and questions
-N_RESPONDENTS = 500
+N_RESPONDENTS = 100 #500
 N_QUESTIONS = 200
 
 ## Chart filenames
 ANSWER_ABILITY_FILANAME = 'answer_ability.png'
 ACTUAL_ABILITY_FILANAME = 'actual_ability.png'
-ESTIMATED_ABILITY_BOX_FILANAME = 'estimated_ability_box.png'
+ESTIMATED_ABILITY_BOX1_FILANAME = 'estimated_ability_box1.png'
+ESTIMATED_ABILITY_BOX2_FILANAME = 'estimated_ability_box2.png'
 ESTIMATED_ABILITY_SCATTER_FILANAME = 'estimated_ability_scatter.png'
 
 ## Assuming four-choice questions
@@ -142,19 +143,32 @@ class QuestionAbility(object):
 
     def plot_estimated(self, ability_samples):
         medians = np.median(ability_samples, 0)
+        abilities = self.abilities.eval()
+
         plt.figure(figsize=(6, 6))
-        seaborn.boxplot(data=pandas.DataFrame(ability_samples), color='magenta', saturation=0.8, width=0.5, notch=True)
-        plt.title('Abilities')
-        plt.xlabel('Actual')
-        plt.ylabel('Estimated')
+        seaborn.boxplot(data=pandas.DataFrame(ability_samples), color='magenta', width=0.8)
+        plt.title('Estimated abilities with ranges')
+        plt.xlabel('Actual rank of abilities')
+        plt.ylabel('Estimated ability')
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-        plt.savefig(ESTIMATED_ABILITY_BOX_FILANAME, dpi=160)
+        plt.savefig(ESTIMATED_ABILITY_BOX1_FILANAME, dpi=160)
+
+        plt.figure(figsize=(6, 6))
+        data=pandas.DataFrame(ability_samples)
+        data.boxplot(positions=abilities, widths=np.full(abilities.shape, 0.02))
+        plt.xlim(0.0, 1.0)
+        plt.plot([0.0, 1.0], [0.0, 1.0], color='magenta', lw=2, linestyle='--')
+        plt.title('Estimated and actual abilities with ranges')
+        plt.xlabel('Actual ability')
+        plt.ylabel('Estimated ability')
+        plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        plt.savefig(ESTIMATED_ABILITY_BOX2_FILANAME, dpi=160)
 
         plt.figure(figsize=(6, 6))
         plt.title('Abilities')
         plt.xlabel('Actual')
         plt.ylabel('Estimated')
-        plt.scatter(self.abilities.eval(), medians, color='darkmagenta', alpha=0.7)
+        plt.scatter(abilities, medians, color='darkmagenta', alpha=0.7)
         plt.tight_layout()
         plt.savefig(ESTIMATED_ABILITY_SCATTER_FILANAME, dpi=160)
 
