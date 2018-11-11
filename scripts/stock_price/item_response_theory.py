@@ -25,7 +25,7 @@ tfd = tfp.distributions
 N_RESULTS = 1000
 N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
-HMC_STEP_SIZE = 0.003
+HMC_STEP_SIZE = 0.002
 HMC_LEAPFRON_STEPS = 5
 
 ## Number of respondents and questions
@@ -44,13 +44,13 @@ CHANCE = 0.25
 ## Distribution of respondent abilities
 MU_THETA = 0.5
 SIGMA_THETA = 0.17
-## Distribution of  questions difficulties
+## Distribution of questions difficulties
 DIFFICULTY_MIN = 0.1
 DIFFICULTY_MAX = 0.9
 MU_DISCRIMINATION = 16.0
 SIGMA_DISCRIMINATION = 3.0
 
-class QuestionAbility(object):
+class QuestionAndAbility(object):
     '''Estimate abilities under the item response theory'''
     def __init__(self, n_respondents, n_questions):
         self.n_respondents = n_respondents
@@ -60,10 +60,8 @@ class QuestionAbility(object):
         self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
             tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
                              clip_value_min=0.001, clip_value_max=0.999, name='abilities')
-
-        ## Is there a n-ranges splitter in TensorFlow?
         delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
-        self.difficulties = tf.range(start=DIFFICULTY_MIN, limit=DIFFICULTY_MAX+1e-7, delta=delta, name='difficulties')
+        self.difficulties = tf.convert_to_tensor(np.append(np.arange(DIFFICULTY_MIN, DIFFICULTY_MAX, delta), DIFFICULTY_MAX), dtype=tf.float32)
         self.discriminations = tf.random.normal(shape=[self.n_questions],
                                                 mean=MU_DISCRIMINATION, stddev=SIGMA_DISCRIMINATION, name='discrimination')
 
@@ -77,7 +75,7 @@ class QuestionAbility(object):
 
         ## Observed data
         ## https://stackoverflow.com/questions/35487598/sampling-bernoulli-random-variables-in-tensorflow
-        ## Must be float, not int (see get_dist())
+        ## Must be float, not int (see get_sample())
         self.y_answers = tf.nn.relu(tf.sign(probabilities - tf.random_uniform(tf.shape(probabilities))))
         ## Explanatory variable(s)
         self.x_abilities = tf.random_uniform(shape=[self.n_respondents], minval=0.0, maxval=1.0)
@@ -85,7 +83,7 @@ class QuestionAbility(object):
         self.plot_actual(self.y_answers, self.abilities)
 
     def plot_actual(self, answers, abilities):
-       '''Plots the synthetic input data and check they are correct'''
+       '''Plots the synthetic input data and we can check they are correct'''
        with tf.Session() as sess:
            sess.run(answers)
            plt.figure(figsize=(6, 6))
@@ -98,11 +96,10 @@ class QuestionAbility(object):
            plt.ylabel('Number of correct answers')
            n_correct_answers = np.sum(answers.eval(), 1)
            plt.scatter(list(range(n_correct_answers.shape[0])), n_correct_answers, color='mediumblue', alpha=0.7)
-           plt.tight_layout()
            plt.savefig(ANSWER_ABILITY_FILANAME, dpi=160)
 
     def get_sample(self):
-        '''Returns an observation at a MCMC sample'''
+        '''Returns an observation as an MCMC sample'''
         ## Relaxed from the actual distribution
         abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=self.n_respondents, name='abilities')
         ## Same as the input data
@@ -124,7 +121,7 @@ class QuestionAbility(object):
                          answers=self.y_answers)
 
     def estimate(self):
-        '''Estimates abilities by a HMC solver'''
+        '''Estimates abilities by an HMC sampler'''
         hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=self.target_log_prob_fn,
             step_size=HMC_STEP_SIZE,
@@ -142,9 +139,11 @@ class QuestionAbility(object):
             self.plot_estimated(states_[0])
 
     def plot_estimated(self, ability_samples):
+        '''Plots results'''
         medians = np.median(ability_samples, 0)
         abilities = self.abilities.eval()
 
+        ## Plot estimated abilities ordered by actual abilities
         plt.figure(figsize=(6, 6))
         seaborn.boxplot(data=pandas.DataFrame(ability_samples), color='magenta', width=0.8)
         plt.title('Estimated abilities with ranges')
@@ -153,6 +152,7 @@ class QuestionAbility(object):
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
         plt.savefig(ESTIMATED_ABILITY_BOX1_FILANAME, dpi=160)
 
+        ## Plot confidential intervals for abilities of the respondents ordered by actual abilities
         plt.figure(figsize=(6, 6))
         data=pandas.DataFrame(ability_samples)
         data.boxplot(positions=abilities, widths=np.full(abilities.shape, 0.02))
@@ -164,6 +164,7 @@ class QuestionAbility(object):
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
         plt.savefig(ESTIMATED_ABILITY_BOX2_FILANAME, dpi=160)
 
+        ## Plot actual and estimated abilities to check whether they are on a diagonal line
         plt.figure(figsize=(6, 6))
         plt.title('Abilities')
         plt.xlabel('Actual')
@@ -174,6 +175,6 @@ class QuestionAbility(object):
 
 if __name__ == '__main__':
     start_time = time.time()
-    QuestionAbility(N_RESPONDENTS, N_QUESTIONS).estimate()
+    QuestionAndAbility(N_RESPONDENTS, N_QUESTIONS).estimate()
     elapsed_time = time.time() - start_time
     print(elapsed_time)
