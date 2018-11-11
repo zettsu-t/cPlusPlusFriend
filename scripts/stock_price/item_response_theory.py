@@ -26,7 +26,7 @@ N_RESULTS = 1000
 N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
 HMC_STEP_SIZE = 0.002
-HMC_LEAPFRON_STEPS = 5
+HMC_LEAPFROG_STEPS = 5
 
 ## Number of respondents and questions
 N_RESPONDENTS = 100 #500
@@ -125,7 +125,7 @@ class QuestionAndAbility(object):
         hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=self.target_log_prob_fn,
             step_size=HMC_STEP_SIZE,
-            num_leapfrog_steps=HMC_LEAPFRON_STEPS)
+            num_leapfrog_steps=HMC_LEAPFROG_STEPS)
 
         states, kernels_results = tfp.mcmc.sample_chain(
             num_results=N_RESULTS,
