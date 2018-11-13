@@ -22,10 +22,10 @@ from tensorflow_probability import edward2 as ed
 tfd = tfp.distributions
 
 ## Size of MCMC iterations
-N_RESULTS = 1000
-N_BURNIN = 500
+N_RESULTS = 1500
+N_BURNIN = 1500
 ## Choose an appropriate step size or states are converged irregularly
-HMC_STEP_SIZE = 0.002
+HMC_STEP_SIZE = 0.001
 HMC_LEAPFROG_STEPS = 5
 
 ## Number of respondents and questions
@@ -59,11 +59,12 @@ class QuestionAndAbility(object):
         ## Explanatory variables
         self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
             tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
-                             clip_value_min=0.001, clip_value_max=0.999, name='abilities')
+                             clip_value_min=0.001, clip_value_max=0.999, name='abilities_original')
         delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
-        self.difficulties = tf.convert_to_tensor(np.append(np.arange(DIFFICULTY_MIN, DIFFICULTY_MAX, delta), DIFFICULTY_MAX), dtype=tf.float32)
-        self.discriminations = tf.random.normal(shape=[self.n_questions],
-                                                mean=MU_DISCRIMINATION, stddev=SIGMA_DISCRIMINATION, name='discrimination')
+        difficulties = np.append(np.arange(DIFFICULTY_MIN, DIFFICULTY_MAX, delta), DIFFICULTY_MAX)
+        difficulties = difficulties[(len(difficulties)-self.n_questions):]
+        self.difficulties = tf.constant(difficulties, dtype=tf.float32)
+        self.discriminations = tf.constant(np.random.normal(loc=MU_DISCRIMINATION, scale=SIGMA_DISCRIMINATION, size=[self.n_questions]), dtype=tf.float32)
 
         ## Makes normalized sigmoid parameters with broadcasting
         locs = tf.transpose(tf.broadcast_to(input=self.abilities, shape=[self.n_questions, self.n_respondents]))
@@ -71,7 +72,8 @@ class QuestionAndAbility(object):
         ## Inflection points of sigmoid functions
         locs = locs - diffs
         scales = tf.broadcast_to(input=self.discriminations, shape=[self.n_respondents, self.n_questions])
-        probabilities = tf.nn.sigmoid(locs * scales)
+        probabilities = tf.add(tf.constant(CHANCE, shape=[self.n_respondents, self.n_questions]),
+                               tf.multiply(tf.constant(1.0-CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(locs * scales)))
 
         ## Observed data
         ## https://stackoverflow.com/questions/35487598/sampling-bernoulli-random-variables-in-tensorflow
@@ -111,7 +113,9 @@ class QuestionAndAbility(object):
 
         ## The support of Bernoulli distributions takes 0 or 1 but
         ## this function must return float not int to differentiate
-        answers = ed.Bernoulli(logits=logits, name='answers', dtype=tf.float32)
+        probs = tf.add(tf.constant(CHANCE, shape=[self.n_respondents, self.n_questions]),
+                       tf.multiply(tf.constant(1.0-CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(locs * scales)))
+        answers = ed.Bernoulli(logits=tf.log(probs), name='answers', dtype=tf.float32)
         return answers
 
     def target_log_prob_fn(self, abilities):
