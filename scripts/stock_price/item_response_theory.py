@@ -22,14 +22,14 @@ from tensorflow_probability import edward2 as ed
 tfd = tfp.distributions
 
 ## Size of MCMC iterations
-N_RESULTS = 1500
-N_BURNIN = 1500
+N_RESULTS = 500
+N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
 HMC_STEP_SIZE = 0.001
 HMC_LEAPFROG_STEPS = 5
 
 ## Number of respondents and questions
-N_RESPONDENTS = 100 #500
+N_RESPONDENTS = 50 #500
 N_QUESTIONS = 200
 
 ## Chart filenames
@@ -103,7 +103,9 @@ class QuestionAndAbility(object):
     def get_sample(self):
         '''Returns an observation as an MCMC sample'''
         ## Relaxed from the actual distribution
-        abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=self.n_respondents, name='abilities')
+##      abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=self.n_respondents, name='abilities')
+        ## Same as the actual distribution
+        abilities = ed.Normal(loc=MU_THETA, scale=SIGMA_THETA, sample_shape=self.n_respondents, name='abilities')
         ## Same as the input data
         locs = tf.transpose(tf.broadcast_to(input=abilities, shape=[self.n_questions, self.n_respondents]))
         diffs = tf.broadcast_to(input=self.difficulties, shape=[self.n_respondents, self.n_questions])
@@ -114,8 +116,9 @@ class QuestionAndAbility(object):
         ## The support of Bernoulli distributions takes 0 or 1 but
         ## this function must return float not int to differentiate
         probs = tf.add(tf.constant(CHANCE, shape=[self.n_respondents, self.n_questions]),
-                       tf.multiply(tf.constant(1.0-CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(locs * scales)))
-        answers = ed.Bernoulli(logits=tf.log(probs), name='answers', dtype=tf.float32)
+                       tf.multiply(tf.constant(1.0-CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(logits)))
+        odds = tf.divide(probs, tf.subtract(tf.constant(1.0, shape=[self.n_respondents, self.n_questions], dtype=tf.float32), probs))
+        answers = ed.Bernoulli(logits=tf.log(odds), name='answers', dtype=tf.float32)
         return answers
 
     def target_log_prob_fn(self, abilities):

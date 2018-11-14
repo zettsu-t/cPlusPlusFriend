@@ -33,11 +33,11 @@ N_RESPONDENTS = 100
 N_QUESTIONS = 500
 
 ## Chart filenames
-ANSWER_ABILITY_FILANAME = 'answer_ability.png'
-ACTUAL_ABILITY_FILANAME = 'actual_ability.png'
-ESTIMATED_ABILITY_BOX1_FILANAME = 'estimated_ability_box1.png'
-ESTIMATED_ABILITY_BOX2_FILANAME = 'estimated_ability_box2.png'
-ESTIMATED_ABILITY_SCATTER_FILANAME = 'estimated_ability_scatter.png'
+ANSWER_ABILITY_FILANAME = 'answer_ability_2.png'
+ACTUAL_ABILITY_FILANAME = 'actual_ability_2.png'
+ESTIMATED_ABILITY_BOX1_FILANAME = 'estimated_ability_box1_2.png'
+ESTIMATED_ABILITY_BOX2_FILANAME = 'estimated_ability_box2_2.png'
+ESTIMATED_ABILITY_SCATTER_FILANAME = 'estimated_ability_scatter_2.png'
 
 ## Assuming four-choice questions
 CHANCE = 0.25
@@ -120,7 +120,7 @@ class QuestionAndAbility(object):
                            tf.multiply(tf.constant(1.0-CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(locs * scales)))
             ## tfd.Bernoulli(probs=probs) does not work
 ##          log_prob_parts = tfd.Bernoulli(probs=probs).log_prob(self.y_answers)
-            log_prob_parts = tfd.Bernoulli(logits=tf.log(probs)).log_prob(self.y_answers)
+            log_prob_parts = tfd.Bernoulli(logits=tf.log(probs/(1.0-probs))).log_prob(self.y_answers)
 
         sum_log_prob = tf.reduce_sum(log_prob_parts)
         return sum_log_prob
