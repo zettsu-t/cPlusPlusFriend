@@ -22,11 +22,11 @@ from tensorflow_probability import edward2 as ed
 tfd = tfp.distributions
 
 ## Size of MCMC iterations
-N_RESULTS = 5000
-N_BURNIN = 5000
+N_RESULTS = 500
+N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
 HMC_STEP_SIZE = 0.001
-HMC_LEAPFROG_STEPS = 5
+HMC_LEAPFROG_STEPS = 20
 
 ## Number of respondents and questions
 N_RESPONDENTS = 100
@@ -60,7 +60,7 @@ class QuestionAndAbility(object):
         ## Explanatory variables
         self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
             tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
-                             clip_value_min=0.001, clip_value_max=0.999, name='abilities')
+                             clip_value_min=0.001, clip_value_max=0.999, name='actual_abilities')
 
         ## Constants (can be variables in models of the item response theory)
         delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
@@ -83,7 +83,7 @@ class QuestionAndAbility(object):
         ## Must be float, not int (see get_sample())
         self.y_answers = tf.nn.relu(tf.sign(probabilities - tf.random_uniform(tf.shape(probabilities))))
         ## Explanatory variable(s)
-        self.x_abilities = ed.Uniform(low=0.0, high=1.0, sample_shape=self.n_respondents, name='abilities')
+        self.x_abilities = ed.Normal(sample_shape=[self.n_respondents], loc=MU_THETA, scale=SIGMA_THETA, name='abilities')
 
         self.plot_actual(self.y_answers, self.abilities)
 

@@ -26,11 +26,11 @@ N_RESULTS = 500
 N_BURNIN = 500
 ## Choose an appropriate step size or states are converged irregularly
 HMC_STEP_SIZE = 0.001
-HMC_LEAPFROG_STEPS = 5
+HMC_LEAPFROG_STEPS = 10
 
 ## Number of respondents and questions
 N_RESPONDENTS = 50 #500
-N_QUESTIONS = 200
+N_QUESTIONS = 500
 
 ## Chart filenames
 ANSWER_ABILITY_FILANAME = 'answer_ability.png'
@@ -59,7 +59,7 @@ class QuestionAndAbility(object):
         ## Explanatory variables
         self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
             tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
-                             clip_value_min=0.001, clip_value_max=0.999, name='abilities_original')
+                             clip_value_min=0.001, clip_value_max=0.999, name='actual_abilities')
         delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
         difficulties = np.append(np.arange(DIFFICULTY_MIN, DIFFICULTY_MAX, delta), DIFFICULTY_MAX)
         difficulties = difficulties[(len(difficulties)-self.n_questions):]
@@ -80,7 +80,7 @@ class QuestionAndAbility(object):
         ## Must be float, not int (see get_sample())
         self.y_answers = tf.nn.relu(tf.sign(probabilities - tf.random_uniform(tf.shape(probabilities))))
         ## Explanatory variable(s)
-        self.x_abilities = tf.random_uniform(shape=[self.n_respondents], minval=0.0, maxval=1.0)
+        self.x_abilities = tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)
 
         self.plot_actual(self.y_answers, self.abilities)
 
