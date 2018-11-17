@@ -19,12 +19,15 @@ from collections import namedtuple
 import datetime
 from optparse import OptionParser
 import errno
+import math
 import os
+import pandas
 import time
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
+import pickle
 import seaborn
 from scipy.stats import rankdata
 from sklearn.metrics import mean_squared_error
@@ -219,9 +222,10 @@ class QuestionAndAbility(object):
             min_set = np.max(ability_samples, 0).reshape(1,-1)
             max_set = np.max(ability_samples, 0).reshape(1,-1)
             masks = np.unique(np.sort(np.concatenate([np.where(min_set < 0.0), np.where(max_set > 1.0)])))
-            ability_parts = np.delete(abilities.reshape(1,-1), masks)
-            medians_parts = np.delete(medians.reshape(1,-1), masks)
-            distance = mean_squared_error(ability_parts, medians_parts)
+            if masks.shape[0] < min_set.shape[0]:
+                ability_parts = np.delete(abilities.reshape(1,-1), masks)
+                medians_parts = np.delete(medians.reshape(1,-1), masks)
+                distance = mean_squared_error(ability_parts, medians_parts)
 
         result = FittingResult(similarity=similarity, converged=converged, distance=distance)
 
@@ -293,23 +297,70 @@ class QuestionAndAbilityLauncher(object):
         if not os.path.isdir(options.outputdir):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), options.outputdir)
 
-        param_set = ParamSet(outputdir=options.outputdir,
-                             n_respondents=options.n_respondents,
-                             use_sum=options.use_sum,
-                             n_questions=options.n_questions,
-                             n_draws=options.n_draws,
-                             n_burnin=options.n_burnin,
-                             hmc_stepsize=options.hmc_stepsize,
-                             hmc_leapfrog_steps=options.hmc_leapfrog_steps)
+        n_trial = max(0, options.n_trials)
+        if n_trial:
+            param_set = ParamSet(outputdir=options.outputdir,
+                                 n_respondents=options.n_respondents,
+                                 use_sum=options.use_sum,
+                                 n_questions=options.n_questions,
+                                 n_draws=options.n_draws,
+                                 n_burnin=options.n_burnin,
+                                 hmc_stepsize=options.hmc_stepsize,
+                                 hmc_leapfrog_steps=options.hmc_leapfrog_steps)
 
-        n_trial = max(1, options.n_trials)
-        format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '{0:0' + str(len(str(n_trial))) + 'd}'
-        for trial in range(n_trial):
-            start_time = time.time()
-            result = QuestionAndAbility(param_set, format_trial.format(trial + 1)).estimate()
-            elapsed_time = time.time() - start_time
-            print(result)
-            print(elapsed_time, "seconds")
+            format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '{0:0' + str(len(str(n_trial))) + 'd}'
+            for trial in range(n_trial):
+                start_time = time.time()
+                result = QuestionAndAbility(param_set, format_trial.format(trial + 1)).estimate()
+                elapsed_time = time.time() - start_time
+                print(result)
+                print(elapsed_time, "seconds")
+        else:
+            format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '_{}'
+            trial = 0
+            df = None
+            while True:
+                trial = trial + 1
+                hmc_stepsize = math.pow(10.0, np.random.uniform(low=-5.0, high=0.0, size=1)[0])
+                hmc_leapfrog_steps = max(1, int(math.pow(2.0, np.random.uniform(low=0.0, high=7.0, size=1)[0])))
+                n_draws = max(1, (options.n_draws * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
+                n_burnin = max(1, (options.n_burnin * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
+                print(hmc_stepsize, hmc_leapfrog_steps, n_draws, n_burnin)
+                param_set = ParamSet(outputdir=options.outputdir,
+                                     n_respondents=options.n_respondents,
+                                     use_sum=options.use_sum,
+                                     n_questions=options.n_questions,
+                                     n_draws=n_draws,
+                                     n_burnin=n_burnin,
+                                     hmc_stepsize=hmc_stepsize,
+                                     hmc_leapfrog_steps=hmc_leapfrog_steps)
+                start_time = time.time()
+                result = QuestionAndAbility(param_set, format_trial.format(trial)).estimate()
+                elapsed_time = time.time() - start_time
+
+                print(result)
+                print(elapsed_time, "seconds")
+                data = {'trial':[trial], 'elapsed_time':[elapsed_time], 'hmc_stepsize':[hmc_stepsize],
+                        'hmc_leapfrog_steps':[hmc_leapfrog_steps], 'n_draws':[n_draws], 'n_burnin':[n_burnin],
+                        'similarity':[result.similarity], 'converged':[result.converged], 'distance':[result.distance]}
+                new_df = pandas.DataFrame(data)
+
+                if df is None:
+                    df = new_df
+                else:
+                    df = df.append(new_df)
+                print(df)
+
+                dump_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.pickle')
+                with open(dump_filename, 'wb') as f:
+                    pickle.dump(obj=df, file=f)
+
+## You can restore df as below
+##              import pickle
+##              from collections import namedtuple
+##              import pandas
+##              with open("summary_201811172251161.pickle", "rb") as f:
+##                  d = pickle.load(f)
 
 if __name__ == '__main__':
     QuestionAndAbilityLauncher(sys.argv)
