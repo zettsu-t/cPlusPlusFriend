@@ -26,6 +26,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import seaborn
+from scipy.stats import rankdata
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics.pairwise import cosine_similarity
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
@@ -62,10 +65,16 @@ DIFFICULTY_MAX = 0.9
 MU_DISCRIMINATION = 16.0
 SIGMA_DISCRIMINATION = 3.0
 
+## Checks if HCM sampling is converged in the cosine similarity of
+## ranks of actual and estimated abilities
+MIN_SIMILARITY = 0.95
+
 ParamSet = namedtuple(
     'ParamSet', (
         'outputdir', 'n_respondents', 'use_sum', 'n_questions',
         'n_draws', 'n_burnin', 'hmc_stepsize', 'hmc_leapfrog_steps'))
+
+FittingResult = namedtuple('FittingResult', ('similarity', 'converged', 'distance'))
 
 class QuestionAndAbility(object):
     '''Estimate abilities under the item response theory'''
@@ -189,15 +198,32 @@ class QuestionAndAbility(object):
             kernel=hmc_kernel,
             num_burnin_steps=self.param_set.n_burnin)
 
+        result = None
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             states_, results_ = sess.run([states, kernels_results])
-            self.plot_estimated(states_[0])
+            result = self.plot_estimated(states_[0])
+
+        return result
 
     def plot_estimated(self, ability_samples):
         '''Plots results'''
         medians = np.median(ability_samples, 0)
         abilities = self.abilities.eval()
+
+        similarity = cosine_similarity(rankdata(medians).reshape(1,-1), rankdata(abilities).reshape(1,-1))[0,0]
+        converged = similarity > MIN_SIMILARITY
+        distance = mean_squared_error(abilities, medians)
+        ## Exclude outliers
+        if converged:
+            min_set = np.max(ability_samples, 0).reshape(1,-1)
+            max_set = np.max(ability_samples, 0).reshape(1,-1)
+            masks = np.unique(np.sort(np.concatenate([np.where(min_set < 0.0), np.where(max_set > 1.0)])))
+            ability_parts = np.delete(abilities.reshape(1,-1), masks)
+            medians_parts = np.delete(medians.reshape(1,-1), masks)
+            distance = mean_squared_error(ability_parts, medians_parts)
+
+        result = FittingResult(similarity=similarity, converged=converged, distance=distance)
 
         ## Plot estimated abilities ordered by actual abilities
         plt.figure(figsize=(6, 6))
@@ -228,6 +254,8 @@ class QuestionAndAbility(object):
         plt.scatter(abilities, medians, color='darkmagenta', alpha=0.7)
         plt.tight_layout()
         plt.savefig(self.get_png_filename(ESTIMATED_ABILITY_SCATTER_BASENAME), dpi=160)
+
+        return result
 
 class QuestionAndAbilityLauncher(object):
     '''Launch QuestionAndAbility'''
@@ -278,9 +306,10 @@ class QuestionAndAbilityLauncher(object):
         format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '{0:0' + str(len(str(n_trial))) + 'd}'
         for trial in range(n_trial):
             start_time = time.time()
-            QuestionAndAbility(param_set, format_trial.format(trial + 1)).estimate()
+            result = QuestionAndAbility(param_set, format_trial.format(trial + 1)).estimate()
             elapsed_time = time.time() - start_time
-            print(elapsed_time)
+            print(result)
+            print(elapsed_time, "seconds")
 
 if __name__ == '__main__':
     QuestionAndAbilityLauncher(sys.argv)
