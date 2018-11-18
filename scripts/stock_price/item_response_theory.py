@@ -17,14 +17,12 @@ It writes PNG files on ./images/ on the default setting.
 
 from collections import namedtuple
 import datetime
-from optparse import OptionParser
 import errno
 import math
+from optparse import OptionParser
 import os
-import pandas
 import time
 import sys
-
 import GPy
 import GPyOpt
 import matplotlib.pyplot as plt
@@ -44,8 +42,8 @@ tfd = tfp.distributions
 DEFAULT_N_DRAWS = 5000
 DEFAULT_N_BURNIN = 10000
 ## Choose an appropriate step size or states are converged irregularly
-DEFAULT_HMC_STEP_SIZE = 0.001
-DEFAULT_HMC_LEAPFROG_STEPS = 10
+DEFAULT_HMC_STEP_SIZE = 0.004
+DEFAULT_HMC_LEAPFROG_STEPS = 8
 
 ## Number of respondents and questions
 DEFAULT_N_RESPONDENTS = 50 #500
@@ -62,6 +60,8 @@ ESTIMATED_ABILITY_SCATTER_BASENAME = 'estimated_ability_scatter'
 CHANCE = 0.25
 SLIM_CHANCE_EPSILON = 1e-7
 ## Distribution of respondent abilities
+MIN_ABILITIY = 0.001
+MAX_ABILITIY = 0.999
 MU_THETA = 0.5
 SIGMA_THETA = 0.17
 ## Distribution of questions difficulties
@@ -73,6 +73,9 @@ SIGMA_DISCRIMINATION = 3.0
 ## Checks if HCM sampling is converged in correlation coefficient of
 ## ranks of actual and estimated abilities
 MIN_CORRELATION = 0.95
+## Exclude outliers to calculate correlation coefficients
+MIN_ABILITIY_IN_CORRELATION = 0.001
+MAX_ABILITIY_IN_CORRELATION = 1 - MIN_ABILITIY_IN_CORRELATION
 
 ParamSet = namedtuple(
     'ParamSet', (
@@ -92,7 +95,8 @@ class QuestionAndAbility(object):
         ## Explanatory variables
         self.abilities = tf.clip_by_value(tf.contrib.framework.sort(
             tf.random.normal(shape=[self.n_respondents], mean=MU_THETA, stddev=SIGMA_THETA)),
-                             clip_value_min=0.001, clip_value_max=0.999, name='actual_abilities')
+                             clip_value_min=MIN_ABILITIY, clip_value_max=MAX_ABILITIY,
+                             name='actual_abilities')
         delta = (DIFFICULTY_MAX - DIFFICULTY_MIN) / (self.n_questions - 1)
 
         difficulties = np.append(np.arange(DIFFICULTY_MIN, DIFFICULTY_MAX, delta), DIFFICULTY_MAX)
@@ -133,11 +137,11 @@ class QuestionAndAbility(object):
            plt.savefig(self.get_png_filename(ACTUAL_ABILITY_BASENAME), dpi=160)
            plt.close()
 
+           n_correct_answers = np.sum(answers.eval(), 1)
            plt.figure(figsize=(6, 6))
            plt.title('Abilities and answers')
            plt.xlabel('Rank of abilities')
            plt.ylabel('Number of correct answers')
-           n_correct_answers = np.sum(answers.eval(), 1)
            plt.scatter(list(range(n_correct_answers.shape[0])), n_correct_answers, color='mediumblue', alpha=0.7)
            plt.savefig(self.get_png_filename(ANSWER_ABILITY_BASENAME), dpi=160)
            plt.close()
@@ -165,8 +169,10 @@ class QuestionAndAbility(object):
             ## tfd.Bernoulli(probs=probs) does not work
             ## You can use broadcasting instead of tf.ops and tf.constant
             probs = tf.add(tf.constant(CHANCE, shape=[self.n_respondents, self.n_questions]),
-                           tf.multiply(tf.constant(1.0 - CHANCE, shape=[self.n_respondents, self.n_questions]), tf.nn.sigmoid(logits)))
-            odds = tf.divide(probs, tf.subtract(tf.constant(1.0, shape=[self.n_respondents, self.n_questions], dtype=tf.float32), probs))
+                           tf.multiply(tf.constant(1.0 - CHANCE, shape=[self.n_respondents, self.n_questions]),
+                                       tf.nn.sigmoid(logits)))
+            odds = tf.divide(probs, tf.subtract(tf.constant(1.0, shape=[self.n_respondents, self.n_questions],
+                                                            dtype=tf.float32), probs))
             answers = ed.Bernoulli(logits=tf.log(odds), name='answers', dtype=tf.float32)
         return answers
 
@@ -192,7 +198,9 @@ class QuestionAndAbility(object):
 
     def estimate(self):
         '''Estimates abilities by an HMC sampler'''
-        target_log_prob_fn = self.target_log_prob_fn_reduce_sum if self.param_set.use_sum else self.target_log_prob_fn_joint
+        target_log_prob_fn = self.target_log_prob_fn_joint
+        if self.param_set.use_sum:
+            target_log_prob_fn = self.target_log_prob_fn_reduce_sum
 
         hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
@@ -215,29 +223,38 @@ class QuestionAndAbility(object):
 
     def plot_estimated(self, ability_samples):
         '''Plots results'''
-        medians = np.median(ability_samples, 0)
-        abilities = self.abilities.eval()
+        medians = np.median(ability_samples, axis=0).reshape(-1)
+        abilities_actual = self.abilities.eval().reshape(-1)
+        result = self.calculate_results(ability_samples, medians, abilities_actual)
+        self.plot_charts_for_estimations(ability_samples, medians, abilities_actual)
+        return result
 
-        correlation = np.corrcoef(rankdata(medians).reshape(-1), rankdata(abilities).reshape(-1))[1, 0]
+    ## ability_samples:2D, medians:1D, abilities_actual:1D
+    def calculate_results(self, ability_samples, medians, abilities_actual):
+        ## Correlation coefficient between actual and estimated ranks
+        correlation = np.corrcoef(rankdata(medians), rankdata(abilities_actual))[1, 0]
         converged = correlation > MIN_CORRELATION
-        distance = mean_squared_error(abilities, medians)
+        distance = mean_squared_error(abilities_actual, medians)
 
         ## Exclude outliers
         min_set = np.min(ability_samples, axis=0).reshape(-1)
         max_set = np.max(ability_samples, axis=0).reshape(-1)
-        min_pos = np.where(min_set < 0.1)[0]
-        max_pos = np.where(max_set > 0.9)[0]
+        ## Extract positions from tuples
+        min_pos = np.where(min_set < MIN_ABILITIY_IN_CORRELATION)[0]
+        max_pos = np.where(max_set > MAX_ABILITIY_IN_CORRELATION)[0]
         minmax_pos = np.concatenate([min_pos, max_pos], axis=0)
+        ## Can be empty
         masks = np.unique(np.sort(minmax_pos))
 
-        if converged:
-            if masks.shape[0] < min_set.shape[0]:
-                ability_parts = np.delete(abilities.reshape(-1), masks)
-                medians_parts = np.delete(medians.reshape(-1), masks)
-                distance = mean_squared_error(ability_parts, medians_parts)
+        if converged and masks.shape[0] < min_set.shape[0]:
+            ability_parts = np.delete(abilities_actual, masks)
+            medians_parts = np.delete(medians, masks)
+            distance = mean_squared_error(ability_parts, medians_parts)
 
-        result = FittingResult(correlation=correlation, converged=converged, distance=distance)
+        return FittingResult(correlation=correlation, converged=converged, distance=distance)
 
+    ## ability_samples:2D, medians:1D, abilities_actual:1D
+    def plot_charts_for_estimations(self, ability_samples, medians, abilities_actual):
         ## Plot estimated abilities ordered by actual abilities
         plt.figure(figsize=(6, 6))
         seaborn.boxplot(data=pandas.DataFrame(ability_samples), color='magenta', width=0.8)
@@ -250,8 +267,8 @@ class QuestionAndAbility(object):
 
         ## Plot confidential intervals for abilities of the respondents ordered by actual abilities
         plt.figure(figsize=(6, 6))
-        data=pandas.DataFrame(ability_samples)
-        data.boxplot(positions=abilities, widths=np.full(abilities.shape, 0.02))
+        data = pandas.DataFrame(ability_samples)
+        data.boxplot(positions=abilities_actual, widths=np.full(abilities_actual.shape, 0.02))
         plt.xlim(0.0, 1.0)
         plt.plot([0.0, 1.0], [0.0, 1.0], color='magenta', lw=2, linestyle='--')
         plt.title('Estimated and actual abilities with ranges')
@@ -266,16 +283,26 @@ class QuestionAndAbility(object):
         plt.title('Abilities')
         plt.xlabel('Actual')
         plt.ylabel('Estimated')
-        plt.scatter(abilities, medians, color='darkmagenta', alpha=0.7)
+        plt.scatter(abilities_actual, medians, color='darkmagenta', alpha=0.7)
         plt.tight_layout()
         plt.savefig(self.get_png_filename(ESTIMATED_ABILITY_SCATTER_BASENAME), dpi=160)
         plt.close()
 
-        return result
-
 class QuestionAndAbilityLauncher(object):
     '''Launch QuestionAndAbility'''
     def __init__(self, args):
+        (options, args) = self.parse_options(args)
+        if not os.path.isdir(options.outputdir):
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), options.outputdir)
+
+        format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        format_trial += '_{0:0' + str(len(str(options.n_trials))) + 'd}'
+        if options.optimize:
+            self.optimize(options, format_trial)
+        else:
+            self.iterate(options, format_trial)
+
+    def parse_options(self, args):
         parser = OptionParser()
         parser.add_option('-z', '--optimize', action="store_true", dest='optimize',
                           help='Use an optimzer to search HMC parameters', default=False)
@@ -306,18 +333,7 @@ class QuestionAndAbilityLauncher(object):
 
         parser.add_option('-l', '--leapfrog', type='int', dest='hmc_leapfrog_steps',
                           help=' Number of HMC leapfrog steps', default=DEFAULT_HMC_LEAPFROG_STEPS)
-
-        (options, args) = parser.parse_args()
-
-        if not os.path.isdir(options.outputdir):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), options.outputdir)
-
-        format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        format_trial += '_{0:0' + str(len(str(options.n_trials))) + 'd}'
-        if options.optimize:
-            self.optimize(options, format_trial)
-        else:
-            self.iterate(options, format_trial)
+        return parser.parse_args(args)
 
     @staticmethod
     def get_hmc_leapfrog_steps(x):
@@ -339,9 +355,10 @@ class QuestionAndAbilityLauncher(object):
             merged_df = input_df.append(new_df)
         print(merged_df)
 
+        filename = format_trial.format(trial)
         csv_common_filename = os.path.join(param_set.outputdir, 'summary.csv')
-        csv_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.csv')
-        dump_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.pickle')
+        csv_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + filename + '.csv')
+        dump_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + filename + '.pickle')
         for out_filename in [csv_common_filename, csv_snapshot_filename]:
             merged_df.to_csv(out_filename)
 
@@ -382,10 +399,12 @@ class QuestionAndAbilityLauncher(object):
 
         bounds = [{'name': 'hmc_stepsize', 'type': 'continuous', 'domain': (0.00008, 0.005)},
                   {'name': 'hmc_leapfrog_steps', 'type': 'continuous', 'domain': (1.0, 7.0)}]
-        opt = GPyOpt.methods.BayesianOptimization(f=fit, domain=bounds, initial_design_numdata=5, acquisition_type='MPI')
+        opt = GPyOpt.methods.BayesianOptimization(f=fit, domain=bounds, initial_design_numdata=10, acquisition_type='MPI')
         opt.run_optimization(max_iter=options.n_trials)
+
         hmc_stepsize_opt, hmc_leapfrog_steps_opt = opt.x_opt
-        print(hmc_stepsize_opt, hmc_leapfrog_steps_opt)
+        hmc_leapfrog_steps_opt = self.get_hmc_leapfrog_steps(hmc_leapfrog_steps_opt)
+        print("Optimal stepsize=", hmc_stepsize_opt, ", Optimal leapfrog_steps=", hmc_leapfrog_steps_opt)
 
     def iterate(self, options, format_trial):
         param_set = ParamSet(outputdir=options.outputdir,
