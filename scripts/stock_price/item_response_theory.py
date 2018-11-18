@@ -24,6 +24,9 @@ import os
 import pandas
 import time
 import sys
+
+import GPy
+import GPyOpt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
@@ -31,7 +34,6 @@ import pickle
 import seaborn
 from scipy.stats import rankdata
 from sklearn.metrics import mean_squared_error
-from sklearn.metrics.pairwise import cosine_similarity
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
@@ -68,16 +70,16 @@ DIFFICULTY_MAX = 0.9
 MU_DISCRIMINATION = 16.0
 SIGMA_DISCRIMINATION = 3.0
 
-## Checks if HCM sampling is converged in the cosine similarity of
+## Checks if HCM sampling is converged in correlation coefficient of
 ## ranks of actual and estimated abilities
-MIN_SIMILARITY = 0.95
+MIN_CORRELATION = 0.95
 
 ParamSet = namedtuple(
     'ParamSet', (
         'outputdir', 'n_respondents', 'use_sum', 'n_questions',
         'n_draws', 'n_burnin', 'hmc_stepsize', 'hmc_leapfrog_steps'))
 
-FittingResult = namedtuple('FittingResult', ('similarity', 'converged', 'distance'))
+FittingResult = namedtuple('FittingResult', ('correlation', 'converged', 'distance'))
 
 class QuestionAndAbility(object):
     '''Estimate abilities under the item response theory'''
@@ -129,6 +131,7 @@ class QuestionAndAbility(object):
            plt.figure(figsize=(6, 6))
            plt.hist(abilities.eval(), bins=25, color='royalblue')
            plt.savefig(self.get_png_filename(ACTUAL_ABILITY_BASENAME), dpi=160)
+           plt.close()
 
            plt.figure(figsize=(6, 6))
            plt.title('Abilities and answers')
@@ -137,6 +140,7 @@ class QuestionAndAbility(object):
            n_correct_answers = np.sum(answers.eval(), 1)
            plt.scatter(list(range(n_correct_answers.shape[0])), n_correct_answers, color='mediumblue', alpha=0.7)
            plt.savefig(self.get_png_filename(ANSWER_ABILITY_BASENAME), dpi=160)
+           plt.close()
 
     def get_logit_odds(self, abilities):
         ## Same as the input data
@@ -214,20 +218,25 @@ class QuestionAndAbility(object):
         medians = np.median(ability_samples, 0)
         abilities = self.abilities.eval()
 
-        similarity = cosine_similarity(rankdata(medians).reshape(1,-1), rankdata(abilities).reshape(1,-1))[0,0]
-        converged = similarity > MIN_SIMILARITY
+        correlation = np.corrcoef(rankdata(medians).reshape(-1), rankdata(abilities).reshape(-1))[1, 0]
+        converged = correlation > MIN_CORRELATION
         distance = mean_squared_error(abilities, medians)
+
         ## Exclude outliers
+        min_set = np.min(ability_samples, axis=0).reshape(-1)
+        max_set = np.max(ability_samples, axis=0).reshape(-1)
+        min_pos = np.where(min_set < 0.1)[0]
+        max_pos = np.where(max_set > 0.9)[0]
+        minmax_pos = np.concatenate([min_pos, max_pos], axis=0)
+        masks = np.unique(np.sort(minmax_pos))
+
         if converged:
-            min_set = np.max(ability_samples, 0).reshape(1,-1)
-            max_set = np.max(ability_samples, 0).reshape(1,-1)
-            masks = np.unique(np.sort(np.concatenate([np.where(min_set < 0.0), np.where(max_set > 1.0)])))
             if masks.shape[0] < min_set.shape[0]:
-                ability_parts = np.delete(abilities.reshape(1,-1), masks)
-                medians_parts = np.delete(medians.reshape(1,-1), masks)
+                ability_parts = np.delete(abilities.reshape(-1), masks)
+                medians_parts = np.delete(medians.reshape(-1), masks)
                 distance = mean_squared_error(ability_parts, medians_parts)
 
-        result = FittingResult(similarity=similarity, converged=converged, distance=distance)
+        result = FittingResult(correlation=correlation, converged=converged, distance=distance)
 
         ## Plot estimated abilities ordered by actual abilities
         plt.figure(figsize=(6, 6))
@@ -237,6 +246,7 @@ class QuestionAndAbility(object):
         plt.ylabel('Estimated ability')
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
         plt.savefig(self.get_png_filename(ESTIMATED_ABILITY_BOX1_BASENAME), dpi=160)
+        plt.close()
 
         ## Plot confidential intervals for abilities of the respondents ordered by actual abilities
         plt.figure(figsize=(6, 6))
@@ -249,6 +259,7 @@ class QuestionAndAbility(object):
         plt.ylabel('Estimated ability')
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
         plt.savefig(self.get_png_filename(ESTIMATED_ABILITY_BOX2_BASENAME), dpi=160)
+        plt.close()
 
         ## Plot actual and estimated abilities to check whether they are on a diagonal line
         plt.figure(figsize=(6, 6))
@@ -258,6 +269,7 @@ class QuestionAndAbility(object):
         plt.scatter(abilities, medians, color='darkmagenta', alpha=0.7)
         plt.tight_layout()
         plt.savefig(self.get_png_filename(ESTIMATED_ABILITY_SCATTER_BASENAME), dpi=160)
+        plt.close()
 
         return result
 
@@ -265,6 +277,9 @@ class QuestionAndAbilityLauncher(object):
     '''Launch QuestionAndAbility'''
     def __init__(self, args):
         parser = OptionParser()
+        parser.add_option('-z', '--optimize', action="store_true", dest='optimize',
+                          help='Use an optimzer to search HMC parameters', default=False)
+
         parser.add_option('-n', '--trials', type='int', dest='n_trials',
                           help='Number of trials', default=1)
 
@@ -297,70 +312,97 @@ class QuestionAndAbilityLauncher(object):
         if not os.path.isdir(options.outputdir):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), options.outputdir)
 
-        n_trial = max(0, options.n_trials)
-        if n_trial:
+        format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        format_trial += '_{0:0' + str(len(str(options.n_trials))) + 'd}'
+        if options.optimize:
+            self.optimize(options, format_trial)
+        else:
+            self.iterate(options, format_trial)
+
+    @staticmethod
+    def get_hmc_leapfrog_steps(x):
+        return int(math.pow(2.0, x))
+
+    def merge_write_result(self, format_trial, trial, elapsed_time, param_set, result, input_df):
+        print(elapsed_time, "seconds")
+
+        data = {'trial':[trial], 'elapsed_time':[elapsed_time],
+                'hmc_stepsize':[param_set.hmc_stepsize], 'hmc_leapfrog_steps':[param_set.hmc_leapfrog_steps],
+                'n_draws':[param_set.n_draws], 'n_burnin':[param_set.n_burnin],
+                'correlation':[result.correlation], 'converged':[result.converged], 'distance':[result.distance]}
+
+        merged_df = input_df
+        new_df = pandas.DataFrame(data)
+        if merged_df is None:
+            merged_df = new_df
+        else:
+            merged_df = input_df.append(new_df)
+        print(merged_df)
+
+        csv_common_filename = os.path.join(param_set.outputdir, 'summary.csv')
+        csv_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.csv')
+        dump_snapshot_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.pickle')
+        for out_filename in [csv_common_filename, csv_snapshot_filename]:
+            merged_df.to_csv(out_filename)
+
+        with open(dump_snapshot_filename, 'wb') as f:
+            pickle.dump(obj=merged_df, file=f)
+
+        return merged_df
+
+    def optimize(self, options, format_trial):
+        trial = 0
+        df = None
+
+        def fit(args):
+            nonlocal options
+            nonlocal format_trial
+            nonlocal trial
+            nonlocal df
+
+            hmc_stepsize = args[0][0]
+            hmc_leapfrog_steps = self.get_hmc_leapfrog_steps(args[0][1])
+            trial = trial + 1
+            n_draws = max(2, (options.n_draws * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
+            n_burnin = max(2, (options.n_burnin * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
             param_set = ParamSet(outputdir=options.outputdir,
                                  n_respondents=options.n_respondents,
                                  use_sum=options.use_sum,
                                  n_questions=options.n_questions,
-                                 n_draws=options.n_draws,
-                                 n_burnin=options.n_burnin,
-                                 hmc_stepsize=options.hmc_stepsize,
-                                 hmc_leapfrog_steps=options.hmc_leapfrog_steps)
+                                 n_draws=n_draws,
+                                 n_burnin=n_burnin,
+                                 hmc_stepsize=hmc_stepsize,
+                                 hmc_leapfrog_steps=hmc_leapfrog_steps)
 
-            format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '{0:0' + str(len(str(n_trial))) + 'd}'
-            for trial in range(n_trial):
-                start_time = time.time()
-                result = QuestionAndAbility(param_set, format_trial.format(trial + 1)).estimate()
-                elapsed_time = time.time() - start_time
-                print(result)
-                print(elapsed_time, "seconds")
-        else:
-            format_trial = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + '_{}'
-            trial = 0
-            df = None
-            while True:
-                trial = trial + 1
-                hmc_stepsize = math.pow(10.0, np.random.uniform(low=-5.0, high=0.0, size=1)[0])
-                hmc_leapfrog_steps = max(1, int(math.pow(2.0, np.random.uniform(low=0.0, high=7.0, size=1)[0])))
-                n_draws = max(1, (options.n_draws * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
-                n_burnin = max(1, (options.n_burnin * options.hmc_leapfrog_steps) // hmc_leapfrog_steps)
-                print(hmc_stepsize, hmc_leapfrog_steps, n_draws, n_burnin)
-                param_set = ParamSet(outputdir=options.outputdir,
-                                     n_respondents=options.n_respondents,
-                                     use_sum=options.use_sum,
-                                     n_questions=options.n_questions,
-                                     n_draws=n_draws,
-                                     n_burnin=n_burnin,
-                                     hmc_stepsize=hmc_stepsize,
-                                     hmc_leapfrog_steps=hmc_leapfrog_steps)
-                start_time = time.time()
-                result = QuestionAndAbility(param_set, format_trial.format(trial)).estimate()
-                elapsed_time = time.time() - start_time
+            start_time = time.time()
+            result = QuestionAndAbility(param_set, format_trial.format(trial)).estimate()
+            elapsed_time = time.time() - start_time
+            df = self.merge_write_result(format_trial, trial, elapsed_time, param_set, result, df)
+            return result.distance
 
-                print(result)
-                print(elapsed_time, "seconds")
-                data = {'trial':[trial], 'elapsed_time':[elapsed_time], 'hmc_stepsize':[hmc_stepsize],
-                        'hmc_leapfrog_steps':[hmc_leapfrog_steps], 'n_draws':[n_draws], 'n_burnin':[n_burnin],
-                        'similarity':[result.similarity], 'converged':[result.converged], 'distance':[result.distance]}
-                new_df = pandas.DataFrame(data)
+        bounds = [{'name': 'hmc_stepsize', 'type': 'continuous', 'domain': (0.00008, 0.005)},
+                  {'name': 'hmc_leapfrog_steps', 'type': 'continuous', 'domain': (1.0, 7.0)}]
+        opt = GPyOpt.methods.BayesianOptimization(f=fit, domain=bounds, initial_design_numdata=5, acquisition_type='MPI')
+        opt.run_optimization(max_iter=options.n_trials)
+        hmc_stepsize_opt, hmc_leapfrog_steps_opt = opt.x_opt
+        print(hmc_stepsize_opt, hmc_leapfrog_steps_opt)
 
-                if df is None:
-                    df = new_df
-                else:
-                    df = df.append(new_df)
-                print(df)
+    def iterate(self, options, format_trial):
+        param_set = ParamSet(outputdir=options.outputdir,
+                             n_respondents=options.n_respondents,
+                             use_sum=options.use_sum,
+                             n_questions=options.n_questions,
+                             n_draws=options.n_draws,
+                             n_burnin=options.n_burnin,
+                             hmc_stepsize=options.hmc_stepsize,
+                             hmc_leapfrog_steps=options.hmc_leapfrog_steps)
 
-                dump_filename = os.path.join(param_set.outputdir, 'summary_' + format_trial.format(trial) + '.pickle')
-                with open(dump_filename, 'wb') as f:
-                    pickle.dump(obj=df, file=f)
-
-## You can restore df as below
-##              import pickle
-##              from collections import namedtuple
-##              import pandas
-##              with open("summary_201811172251161.pickle", "rb") as f:
-##                  d = pickle.load(f)
+        df = None
+        for trial in range(1, options.n_trials+1):
+            start_time = time.time()
+            result = QuestionAndAbility(param_set, format_trial.format(trial)).estimate()
+            elapsed_time = time.time() - start_time
+            df = self.merge_write_result(format_trial, trial, elapsed_time, param_set, result, df)
 
 if __name__ == '__main__':
     QuestionAndAbilityLauncher(sys.argv)
