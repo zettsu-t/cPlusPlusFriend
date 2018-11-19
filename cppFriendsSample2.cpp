@@ -1406,6 +1406,57 @@ TEST_F(TestTypeDeduction, Constant) {
     EXPECT_EQ(n, count);
 }
 
+// #define CAUSE_COMPILATION_ERROR
+namespace {
+    class MyBaseClass {
+    public:
+        virtual ~MyBaseClass(void) = default;
+        virtual int GetA(void) = 0;
+        virtual int GetB(void) = 0;
+    };
+
+    class MyIntermediateClass : public MyBaseClass {
+    public:
+        virtual ~MyIntermediateClass(void) = default;
+        virtual int GetA(void) final { return 1; };
+        virtual int GetB(void) override { return 2; };
+        virtual int final(void) { return 3; };
+    };
+
+    class MyFinalClass final : public MyIntermediateClass {
+    public:
+        constexpr MyFinalClass(int arg) { final = arg; }
+        virtual ~MyFinalClass(void) = default;
+#ifdef CAUSE_COMPILATION_ERROR
+        virtual int GetA(void) { return 4; };
+#endif
+        virtual int GetB(void) override { return final; }
+        virtual int override(void) { return 5; };
+    private:
+        int final {0};
+    };
+
+#ifdef CAUSE_COMPILATION_ERROR
+    class MySuperClass : public MyFinalClass {};
+#endif
+}
+
+class TestFinalKeyword : public ::testing::Test {};
+
+TEST_F(TestFinalKeyword, All) {
+    MyIntermediateClass intermediate;
+    EXPECT_EQ(1, intermediate.GetA());
+    EXPECT_EQ(2, intermediate.GetB());
+    EXPECT_EQ(3, intermediate.final());
+
+    constexpr int n = 6;
+    MyFinalClass final(n);
+    EXPECT_EQ(1, final.GetA());
+    EXPECT_EQ(n, final.GetB());
+    auto override = final.override();
+    EXPECT_EQ(5, override);
+}
+
 /*
 Local Variables:
 mode: c++
