@@ -2,6 +2,7 @@
 // https://twitter.com/CTak_S/status/1064819923195580417
 
 #include <cstdlib>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -31,12 +32,12 @@ namespace {
     constexpr Index N_WINNERS = N_PLAYERS;
     constexpr Index ALIVE = 1;
     const std::vector<double> HIT_RATE {0.3, 0.5, 1.0};
-    constexpr double INITIAL_VALUE = 1.0 / static_cast<double>(N_ACTIONS - 1);
 
-    // Hyper parameter(s)
-    constexpr double LEARNING_RATE = 0.00001;
+    // Hyper parameters
+    constexpr double LEARNING_RATE = 0.001;
     constexpr double EXPLORATION_EPSILON = 0.1;
     constexpr bool IID_CHOICE = false;
+    constexpr bool USE_SOFTMAX = false;  // I got unstable results with Softmax.
     constexpr Index MAX_DEPTH = 30;
     constexpr Count N_TRIALS = 10000000ll;
 }
@@ -107,7 +108,7 @@ public:
         return os.str();
     }
 
-    // Convers an array to a bitmap
+    // Converts an array to a bitmap
     State survivorsToState(const Survivors& survivors) {
         State state = 0;
         State index = 1;
@@ -188,22 +189,53 @@ public:
         return targets;
     }
 
-    Index getActionTarget(Index player, State state, const Survivors& survivors, const std::vector<Index>& targets) {
+    std::vector<double> getProportions(Index player, State state) {
+        // Number of targets = number of survivors - player(1) + nobody(1)
+        std::vector<double> proportions(N_ACTIONS, 0.0);
+
         // Epsilon-greedy
         const auto rand_proportional = unit_distribution_(rand_gen_);
         const bool proportional = (rand_proportional < EXPLORATION_EPSILON);
-        // Number of targets = number of survivors - player(1) + nobody(1)
-        const auto population = checkAliveOrNobody(player, state);
-        const double proportion = (population > 0) ? (1.0 / static_cast<double>(population)) : 0.0;
 
+        if (proportional) {
+            // Number of targets = number of survivors - player(1) + nobody(1)
+            const auto population = checkPlayerAlive(player, state);
+            const double proportion = (population > 0) ? (1.0 / static_cast<double>(population)) : 0.0;
+            for (Index action = 0; action < N_ACTIONS; ++action) {
+                proportions.at(action) = (checkPlayerAlive(player, state) &&
+                                          checkAliveOrNobody(action, state) &&
+                                          (player != action)) ? proportion : 0.0;
+            }
+        } else {
+            if (USE_SOFTMAX) {
+                std::vector<double> exp_proportions(N_ACTIONS, 0.0);
+                double sum = 0.0;
+                for (Index action = 0; action < N_ACTIONS; ++action) {
+                    const auto value = ::exp(value_[player][state][action]);
+                    exp_proportions.at(action) = value;
+                    sum += value;
+                }
+
+                for (Index action = 0; action < N_ACTIONS; ++action) {
+                    proportions.at(action) = exp_proportions.at(action) / sum;
+                }
+            } else {
+                for (Index action = 0; action < N_ACTIONS; ++action) {
+                    proportions.at(action) = value_[player][state][action];
+                }
+            }
+        }
+
+        return proportions;
+    }
+
+    Index getActionTarget(Index player, State state, const Survivors& survivors, const std::vector<Index>& targets) {
+        const auto proportions = getProportions(player, state);
         auto rand_value = unit_distribution_(rand_gen_);
         Index target = 0;
-        while(rand_value >= 0.0) {
-            const auto value = (proportional) ?
-                ((checkPlayerAlive(player, state) && checkAliveOrNobody(target, state) && (player != target)) ?
-                 proportion : 0.0) : value_[player][state][target];
 
-            rand_value -= value;
+        while(rand_value >= 0.0) {
+            rand_value -= proportions.at(target);
             target += 1;
             if (target >= N_ACTIONS) {
                 break;
