@@ -34,7 +34,7 @@ namespace {
     const std::vector<double> HIT_RATE {0.3, 0.5, 1.0};
 
     // Hyper parameters
-    constexpr double LEARNING_RATE = 0.001;
+    constexpr double LEARNING_RATE = 0.00001;
     constexpr double EXPLORATION_EPSILON = 0.1;
     constexpr bool IID_CHOICE = false;
     constexpr bool USE_SOFTMAX = false;  // I got unstable results with Softmax.
