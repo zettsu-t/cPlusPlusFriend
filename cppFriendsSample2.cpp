@@ -26,6 +26,7 @@
 #include <boost/locale.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/multi_array.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -1455,6 +1456,39 @@ TEST_F(TestFinalKeyword, All) {
     EXPECT_EQ(n, final.GetB());
     auto override = final.override();
     EXPECT_EQ(5, override);
+}
+
+class TestMultiArray : public ::testing::Test {};
+
+TEST_F(TestMultiArray, Iteration) {
+    using MyArray = boost::multi_array<int, 3>;
+    constexpr int size = 3;
+    MyArray mat(boost::extents[size][size][size]);
+
+    int value = 0;
+    for(int indexA = 0; indexA < size; ++indexA) {
+        for(int indexB = 0; indexB < size; ++indexB) {
+            for(int indexC = 0; indexC < size; ++indexC) {
+                mat[indexA][indexB][indexC] = ++value;
+            }
+        }
+    }
+
+    MyArray::index_range full_range;
+    MyArray::array_view<1>::type view = mat[boost::indices[full_range][0][0]];
+
+    int index = 0;
+    for(auto&& e : view) {
+        EXPECT_EQ(index * size * size + 1, e);
+        ++e;
+        ++index;
+    }
+
+    index = 0;
+    for(auto i = view.begin(); i != view.end(); ++i) {
+        EXPECT_EQ(index * size * size + 2, *i);
+        ++index;
+    }
 }
 
 /*
