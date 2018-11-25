@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <string>
@@ -33,13 +34,31 @@ namespace {
     constexpr Index ALIVE = 1;
     const std::vector<double> HIT_RATE {0.3, 0.5, 1.0};
 
+    // Optimal actions (responses)
+    enum class ExpectedAction {
+        A,
+        B,
+        C,
+        Nobody,
+        Undefined,
+    };
+
+    const ExpectedAction ExpectedActions[N_PLAYERS][N_STATES] = {
+        {ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::B,
+         ExpectedAction::Undefined, ExpectedAction::C, ExpectedAction::Undefined, ExpectedAction::Nobody},
+        {ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::A,
+         ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::C, ExpectedAction::C},
+        {ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::Undefined, ExpectedAction::Undefined,
+         ExpectedAction::Undefined, ExpectedAction::A, ExpectedAction::B, ExpectedAction::B}};
+
     // Hyper parameters
-    constexpr double LEARNING_RATE = 0.00001;
-    constexpr double EXPLORATION_EPSILON = 0.1;
+    constexpr double LEARNING_RATE = 0.0001;
+    constexpr double EXPLORATION_EPSILON = 0.2;
     constexpr bool IID_CHOICE = false;
-    constexpr bool USE_SOFTMAX = false;  // I got unstable results with Softmax.
-    constexpr Index MAX_DEPTH = 30;
-    constexpr Count N_TRIALS = 10000000ll;
+    constexpr bool USE_SOFTMAX = true;
+    constexpr Index MAX_DEPTH = 15;
+    constexpr Count N_SAMPLES = 1000000ll;
+    constexpr Count N_TRIALS = 1ll;
 }
 
 class OptimalAction {
@@ -49,12 +68,7 @@ public:
         value_(boost::extents[N_PLAYERS][N_STATES][N_ACTIONS]) {
         for (Index player = 0; player < N_PLAYERS; ++player) {
             for (Index state = 0; state < N_STATES; ++state) {
-                for (Index action = 0; action < N_ACTIONS; ++action) {
-                    // Do not shoot yourself!
-                    auto count = checkAliveOrNobody(player, state);
-                    value_[player][state][action] = count && checkAliveOrNobody(action, state) &&
-                        (player != action) ? (1.0 / static_cast<double>(count)) : 0.0;
-                }
+                initialize(player, state);
             }
         }
         return;
@@ -62,13 +76,66 @@ public:
 
     virtual ~OptimalAction(void) = default;
 
-    void Exec(Count n_trials) {
-        for (Count i = 0; i < n_trials; ++i) {
+    void Exec(Count n_samples) {
+        for (Count i = 0; i < n_samples; ++i) {
             exec();
         }
+        return;
+    }
 
+    void Print(void) {
         for (Index player = 0; player < N_PLAYERS; ++player) {
             std::cout << printValue(player);
+        }
+        return;
+    }
+
+    bool Check(void) {
+        bool result = true;
+
+        for (Index player = 0; player < N_PLAYERS; ++player) {
+            for (Index state = 0; state < N_STATES; ++state) {
+                const auto expectedAction = ExpectedActions[player][state];
+                if (expectedAction == ExpectedAction::Undefined) {
+                    continue;
+                }
+
+                Index actual = N_ACTIONS;
+                double maxValue = -std::numeric_limits<double>::infinity();
+                for (Index action = 0; action < N_ACTIONS; ++action) {
+                    auto value = value_[player][state][action];
+                    if (maxValue < value) {
+                        actual = action;
+                        maxValue = value;
+                    }
+                }
+
+                const auto expected = static_cast<decltype(actual)>(expectedAction);
+                if (static_cast<decltype(actual)>(expected) != actual) {
+                    result = false;
+                    std::cout << "! Player=" << player << ", State=" << state;
+                    std::cout << ", Expected=" << expected << ", Actual=" << actual << "\n";
+                }
+            }
+        }
+        return result;
+    }
+
+    void initialize(Index player, State state) {
+        for (Index action = 0; action < N_ACTIONS; ++action) {
+            // Do not shoot yourself!
+            auto count = checkAliveOrNobody(player, state);
+            if (USE_SOFTMAX) {
+                value_[player][state][action] = count && checkAliveOrNobody(action, state) &&
+                    (player != action) ? 0.0 : -std::numeric_limits<double>::infinity();
+            } else {
+                value_[player][state][action] = count && checkAliveOrNobody(action, state) &&
+                    (player != action) ? (1.0 / static_cast<double>(count)) : 0.0;
+            }
+        }
+
+        if (USE_SOFTMAX) {
+            normalizeSoftmaxProbabilities(player, state);
         }
         return;
     }
@@ -134,6 +201,37 @@ public:
         return (state & (1 << player)) ? countPopulation(state) : 0;
     }
 
+    // exp(elements) /= exp(max(elements)) to avoid overflow
+    void normalizeSoftmaxProbabilities(Index player, State state) {
+        double max_log = -std::numeric_limits<double>::infinity();
+        for (Index action = 0; action < N_ACTIONS; ++action) {
+            max_log = std::max(max_log, value_[player][state][action]);
+        }
+
+        // Adjust max(log(probabilities)) to zero
+        for (Index action = 0; action < N_ACTIONS; ++action) {
+            value_[player][state][action] -= max_log;
+        }
+        return;
+    }
+
+    std::vector<double> getSoftmaxProbabilities(Index player, State state) {
+        std::vector<double> probabilities(N_ACTIONS, 0.0);
+        double sum = 0.0;
+
+        for (Index action = 0; action < N_ACTIONS; ++action) {
+            const auto value = ::exp(value_[player][state][action]);
+            probabilities.at(action) = value;
+            sum += value;
+        }
+
+        for (Index action = 0; action < N_ACTIONS; ++action) {
+            probabilities.at(action) /= sum;
+        }
+
+        return probabilities;
+    }
+
     // Overwrites survivors
     void aimAndShoot(Index player, Index depth, Survivors& survivors, const ActionChain& actionChain) {
         if (depth >= MAX_DEPTH) {
@@ -159,11 +257,11 @@ public:
                 auto index = std::min(nextActionChain.size() - 1,
                                       static_cast<decltype(nextActionChain.size())>(
                                           std::max(0, static_cast<int>(raw_index))));
-                propagate(nextActionChain.at(index), winner);
+                backpropagate(nextActionChain.at(index), winner);
             } else {
                 // Reverse if you deduct rewards
                 for(const auto& action : nextActionChain) {
-                    propagate(action, winner);
+                    backpropagate(action, winner);
                 }
             }
         } else {
@@ -208,17 +306,7 @@ public:
             }
         } else {
             if (USE_SOFTMAX) {
-                std::vector<double> exp_proportions(N_ACTIONS, 0.0);
-                double sum = 0.0;
-                for (Index action = 0; action < N_ACTIONS; ++action) {
-                    const auto value = ::exp(value_[player][state][action]);
-                    exp_proportions.at(action) = value;
-                    sum += value;
-                }
-
-                for (Index action = 0; action < N_ACTIONS; ++action) {
-                    proportions.at(action) = exp_proportions.at(action) / sum;
-                }
+                proportions = getSoftmaxProbabilities(player, state);
             } else {
                 for (Index action = 0; action < N_ACTIONS; ++action) {
                     proportions.at(action) = value_[player][state][action];
@@ -256,19 +344,27 @@ public:
         return;
     }
 
-    void propagate(const Action& action, Index final_surviver) {
-        // No deduction
-        const auto target_value = value_[action.player][action.state][action.target];
-        const auto delta = target_value * LEARNING_RATE * ((action.player == final_surviver) ? 1.0 : -1.0);
-        value_[action.player][action.state][action.target] += delta;
-
+    void backpropagate(const Action& action, Index final_surviver) {
         // Normalizes such that the sum of values is 1
-        double sum = 0.0;
-        for (Index i = 0; i < N_ACTIONS; ++i) {
-            sum += value_[action.player][action.state][i];
-        }
-        for (Index i = 0; i < N_ACTIONS; ++i) {
-            value_[action.player][action.state][i] /= sum;
+        if (USE_SOFTMAX) {
+            // backpropagate Y-T * delta(error)/delta(y)
+            auto exp_proportions = getSoftmaxProbabilities(action.player, action.state);
+            for (Index i = 0; i < N_ACTIONS; ++i) {
+                const auto delta = (exp_proportions[i] - ((action.player == final_surviver) ? 1.0 : 0.0)) * LEARNING_RATE;
+                value_[action.player][action.state][action.target] -= delta;
+            }
+            normalizeSoftmaxProbabilities(action.player, action.state);
+        } else {
+            const auto target_value = value_[action.player][action.state][action.target];
+            const auto delta = target_value * LEARNING_RATE * ((action.player == final_surviver) ? 1.0 : -1.0);
+            value_[action.player][action.state][action.target] += delta;
+            double sum = 0.0;
+            for (Index i = 0; i < N_ACTIONS; ++i) {
+                sum += value_[action.player][action.state][i];
+            }
+            for (Index i = 0; i < N_ACTIONS; ++i) {
+                value_[action.player][action.state][i] /= sum;
+            }
         }
     }
 
@@ -285,10 +381,30 @@ int main(int argc, char* argv[]) {
     OptimalAction optimalAction;
 
     Count n_trials = N_TRIALS;
+    Count n_samples = N_SAMPLES;
     if (argc > 1) {
         n_trials = ::atoll(argv[1]);
     }
-    optimalAction.Exec(n_trials);
+    if (argc > 2) {
+        n_samples = ::atoll(argv[2]);
+    }
+
+    Count n_correct = 0;
+    Count n_wrong = 0;
+
+    for (Count trial = 0; trial < n_trials; ++trial) {
+        optimalAction.Exec(n_samples);
+        const auto correct = optimalAction.Check();
+        n_correct += (correct ? 1 : 0);
+        n_wrong += (correct ? 0 : 1);
+        if (!trial || !correct) {
+            optimalAction.Print();
+        } else {
+            std::cerr << ".";
+        }
+    }
+
+    std::cout << "Correct cases=" << n_correct << ", Wrong cases" << n_wrong << "\n";
     return 0;
 }
 
