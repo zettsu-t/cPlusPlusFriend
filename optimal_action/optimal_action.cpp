@@ -1,8 +1,9 @@
 // Solving a puzzle below
-// https://twitter.com/CTak_S/status/1064819923195580417
+// https://sist8.com/yougun
 
 #include <cstdlib>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -10,6 +11,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <boost/optional.hpp>
+#include <boost/program_options.hpp>
 #include <boost/multi_array.hpp>
 
 namespace {
@@ -52,33 +55,83 @@ namespace {
          ExpectedAction::Undefined, ExpectedAction::A, ExpectedAction::B, ExpectedAction::B}};
 
     // Hyper parameters
-    constexpr double LEARNING_RATE = 0.0001;
-    constexpr double EXPLORATION_EPSILON = 0.2;
+    constexpr Count DEFAULT_SAMPLES_SOFTMAX = 1000000ll;
+    constexpr Count DEFAULT_SAMPLES_LINEAR = 10000000ll;
+    constexpr double DEFAULT_LEARNING_RATE_LINEAR = 0.00001;
+    constexpr double DEFAULT_LEARNING_RATE_SOFTMAX = 0.0001;
+    constexpr double DEFAULT_EXPLORATION_RATIO_LINEAR = 0.1;
+    constexpr double DEFAULT_EXPLORATION_RATIO_SOFTMAX = 0.2;
+
+    constexpr Count MIN_TRIALS = 1ll;
+    constexpr bool DEFAULT_USE_SOFTMAX = false;
     constexpr bool IID_CHOICE = false;
-    constexpr bool USE_SOFTMAX = true;
     constexpr Index MAX_DEPTH = 15;
-    constexpr Count N_SAMPLES = 1000000ll;
-    constexpr Count N_TRIALS = 1ll;
 }
+
+#define OPTION_NAME_TRIALS "trials"
+#define OPTION_NAME_SAMPLES "samples"
+#define OPTION_NAME_SOFTMAX "softmax"
+#define OPTION_NAME_LEARNING_RATE "learning_rate"
+#define OPTION_NAME_EXPLORATION_RATIO "exploration_ratio"
+#define OPTION_NAME_LOGFILE "logfile"
 
 class OptimalAction {
 public:
-    OptimalAction(void) :
+    struct Setting {
+        bool useSoftmax {DEFAULT_USE_SOFTMAX};
+        boost::optional<Count> numSamples;
+        boost::optional<double> learningRate;
+        boost::optional<double> explorationRatio;
+        std::string logFilename;
+    };
+
+    OptimalAction(const Setting& setting) :
         rand_gen_(rand_dev_()), unit_distribution_(0.0, 1.0),
-        value_(boost::extents[N_PLAYERS][N_STATES][N_ACTIONS]) {
+        value_(boost::extents[N_PLAYERS][N_STATES][N_ACTIONS]),
+        useSoftmax_(setting.useSoftmax) {
+        numSamples_ = (setting.numSamples) ? (*setting.numSamples) :
+            ((useSoftmax_) ? DEFAULT_SAMPLES_SOFTMAX : DEFAULT_SAMPLES_LINEAR);
+        learningRate_ = (setting.learningRate) ? (*setting.learningRate) :
+            ((useSoftmax_) ? DEFAULT_LEARNING_RATE_SOFTMAX : DEFAULT_LEARNING_RATE_LINEAR);
+        explorationRatio_ = (setting.explorationRatio) ? (*setting.explorationRatio) :
+            ((useSoftmax_) ? DEFAULT_EXPLORATION_RATIO_SOFTMAX : DEFAULT_EXPLORATION_RATIO_LINEAR);
+
+        if (!setting.logFilename.empty()) {
+            outStream_ = std::ofstream(setting.logFilename);
+            *outStream_ << "B,C,Nobody\n";
+        }
+
         for (Index player = 0; player < N_PLAYERS; ++player) {
             for (Index state = 0; state < N_STATES; ++state) {
                 initialize(player, state);
             }
         }
+
+        std::cout << "UseSoftmax=" << useSoftmax_ << ", # of Samples=" << numSamples_;
+        std::cout << ", Learning Rate=" << learningRate_;
+        std::cout << ", Exploration Ratio=" << explorationRatio_ << "\n";
         return;
     }
 
     virtual ~OptimalAction(void) = default;
 
-    void Exec(Count n_samples) {
-        for (Count i = 0; i < n_samples; ++i) {
+    void Exec(void) {
+        for (Count i = 0; i < numSamples_; ++i) {
             exec();
+            if (!outStream_) {
+                continue;
+            }
+
+            Index player = static_cast<decltype(player)>(ExpectedAction::A);
+            for (Index action = 0; action < N_ACTIONS; ++action) {
+                if (player != action) {
+                    *outStream_ << value_[player][N_STATES-1][action];
+                    if ((action + 1) < N_ACTIONS) {
+                        *outStream_ << ",";
+                    }
+                }
+            }
+            *outStream_ << "\n";
         }
         return;
     }
@@ -125,7 +178,7 @@ public:
         for (Index action = 0; action < N_ACTIONS; ++action) {
             // Do not shoot yourself!
             auto count = checkAliveOrNobody(player, state);
-            if (USE_SOFTMAX) {
+            if (useSoftmax_) {
                 value_[player][state][action] = count && checkAliveOrNobody(action, state) &&
                     (player != action) ? 0.0 : -std::numeric_limits<double>::infinity();
             } else {
@@ -134,7 +187,7 @@ public:
             }
         }
 
-        if (USE_SOFTMAX) {
+        if (useSoftmax_) {
             normalizeSoftmaxProbabilities(player, state);
         }
         return;
@@ -293,7 +346,7 @@ public:
 
         // Epsilon-greedy
         const auto rand_proportional = unit_distribution_(rand_gen_);
-        const bool proportional = (rand_proportional < EXPLORATION_EPSILON);
+        const bool proportional = (rand_proportional < explorationRatio_);
 
         if (proportional) {
             // Number of targets = number of survivors - player(1) + nobody(1)
@@ -305,7 +358,7 @@ public:
                                           (player != action)) ? proportion : 0.0;
             }
         } else {
-            if (USE_SOFTMAX) {
+            if (useSoftmax_) {
                 proportions = getSoftmaxProbabilities(player, state);
             } else {
                 for (Index action = 0; action < N_ACTIONS; ++action) {
@@ -346,17 +399,17 @@ public:
 
     void backpropagate(const Action& action, Index final_surviver) {
         // Normalizes such that the sum of values is 1
-        if (USE_SOFTMAX) {
+        if (useSoftmax_) {
             // backpropagate Y-T * delta(error)/delta(y)
             auto exp_proportions = getSoftmaxProbabilities(action.player, action.state);
             for (Index i = 0; i < N_ACTIONS; ++i) {
-                const auto delta = (exp_proportions[i] - ((action.player == final_surviver) ? 1.0 : 0.0)) * LEARNING_RATE;
+                const auto delta = (exp_proportions[i] - ((action.player == final_surviver) ? 1.0 : 0.0)) * learningRate_;
                 value_[action.player][action.state][action.target] -= delta;
             }
             normalizeSoftmaxProbabilities(action.player, action.state);
         } else {
             const auto target_value = value_[action.player][action.state][action.target];
-            const auto delta = target_value * LEARNING_RATE * ((action.player == final_surviver) ? 1.0 : -1.0);
+            const auto delta = target_value * learningRate_ * ((action.player == final_surviver) ? 1.0 : -1.0);
             value_[action.player][action.state][action.target] += delta;
             double sum = 0.0;
             for (Index i = 0; i < N_ACTIONS; ++i) {
@@ -369,34 +422,88 @@ public:
     }
 
 private:
-    using CountMatrix = boost::multi_array<Count, 4>;
     using StateActionValue = boost::multi_array<double, 3>;
     std::random_device rand_dev_;
     std::mt19937 rand_gen_;
     std::uniform_real_distribution<double> unit_distribution_;
     StateActionValue value_;
+
+    bool useSoftmax_ {DEFAULT_USE_SOFTMAX};
+    Count numSamples_ {0};
+    double learningRate_ {0.0};
+    double explorationRatio_ {0.0};
+    boost::optional<std::ofstream> outStream_;
 };
 
 int main(int argc, char* argv[]) {
-    OptimalAction optimalAction;
+    Count numTrials = MIN_TRIALS;
+    OptimalAction::Setting setting;
 
-    Count n_trials = N_TRIALS;
-    Count n_samples = N_SAMPLES;
-    if (argc > 1) {
-        n_trials = ::atoll(argv[1]);
-    }
-    if (argc > 2) {
-        n_samples = ::atoll(argv[2]);
+    boost::program_options::options_description description("Options");
+    description.add_options()
+        (OPTION_NAME_TRIALS",t",
+         boost::program_options::value<decltype(numTrials)>(),
+         "Number of searches")
+        (OPTION_NAME_SAMPLES",s",
+         boost::program_options::value<decltype(setting.numSamples)>(),
+         "Number of samples in a search")
+        (OPTION_NAME_SOFTMAX",x",
+         boost::program_options::value<decltype(setting.useSoftmax)>()->default_value(false),
+         "Use softmax instead of linear")
+        (OPTION_NAME_LEARNING_RATE",l",
+         boost::program_options::value<decltype(setting.learningRate)::value_type>(),
+         "Learning rate")
+        (OPTION_NAME_EXPLORATION_RATIO",e",
+         boost::program_options::value<decltype(setting.explorationRatio)::value_type>(),
+         "Probability of explorations")
+        (OPTION_NAME_LOGFILE",o",
+         boost::program_options::value<decltype(setting.logFilename)>(),
+         "Output log file name")
+        ;
+
+    boost::program_options::variables_map varMap;
+    boost::program_options::store(parse_command_line(argc, argv, description), varMap);
+    boost::program_options::notify(varMap);
+
+    if (varMap.count(OPTION_NAME_TRIALS)) {
+        numTrials = std::max(MIN_TRIALS, varMap[OPTION_NAME_TRIALS].
+                             as<decltype(numTrials)>());
     }
 
+    if (varMap.count(OPTION_NAME_SAMPLES)) {
+        setting.numSamples = varMap[OPTION_NAME_SAMPLES].
+            as<decltype(setting.numSamples)>();
+    }
+
+    if (varMap.count(OPTION_NAME_SOFTMAX)) {
+        setting.useSoftmax = varMap[OPTION_NAME_SOFTMAX].
+            as<decltype(setting.useSoftmax)>();
+    }
+
+    if (varMap.count(OPTION_NAME_LEARNING_RATE)) {
+        setting.learningRate = varMap[OPTION_NAME_LEARNING_RATE].
+            as<decltype(setting.learningRate)::value_type>();
+    }
+
+    if (varMap.count(OPTION_NAME_EXPLORATION_RATIO)) {
+        setting.explorationRatio = varMap[OPTION_NAME_EXPLORATION_RATIO]
+            .as<decltype(setting.explorationRatio)::value_type>();
+    }
+
+    if (varMap.count(OPTION_NAME_LOGFILE)) {
+        setting.logFilename = varMap[OPTION_NAME_LOGFILE]
+            .as<decltype(setting.logFilename)>();
+    }
+
+    OptimalAction optimalAction(setting);
     Count n_correct = 0;
     Count n_wrong = 0;
-
-    for (Count trial = 0; trial < n_trials; ++trial) {
-        optimalAction.Exec(n_samples);
+    for (Count trial = 0; trial < numTrials; ++trial) {
+        optimalAction.Exec();
         const auto correct = optimalAction.Check();
         n_correct += (correct ? 1 : 0);
         n_wrong += (correct ? 0 : 1);
+
         if (!trial || !correct) {
             optimalAction.Print();
         } else {
@@ -404,7 +511,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::cout << "Correct cases=" << n_correct << ", Wrong cases" << n_wrong << "\n";
+    std::cout << "Correct cases=" << n_correct << ", Wrong cases=" << n_wrong << "\n";
     return 0;
 }
 
