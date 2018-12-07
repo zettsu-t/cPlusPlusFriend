@@ -97,7 +97,7 @@ public:
             ((useSoftmax_) ? DEFAULT_EXPLORATION_RATIO_SOFTMAX : DEFAULT_EXPLORATION_RATIO_LINEAR);
 
         if (!setting.logFilename.empty()) {
-            outStream_ = std::ofstream(setting.logFilename);
+            outStream_ = std::make_unique<std::ofstream>(setting.logFilename);
             *outStream_ << "B,C,Nobody\n";
         }
 
@@ -432,7 +432,7 @@ private:
     Count numSamples_ {0};
     double learningRate_ {0.0};
     double explorationRatio_ {0.0};
-    boost::optional<std::ofstream> outStream_;
+    std::unique_ptr<std::ofstream> outStream_;
 };
 
 int main(int argc, char* argv[]) {

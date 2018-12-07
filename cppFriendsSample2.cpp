@@ -34,6 +34,7 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/multiprecision/miller_rabin.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/regex.hpp>
@@ -1284,6 +1285,34 @@ TEST_F(TestTriBool, Optional) {
     tb = true;
     ASSERT_TRUE(tb);
     EXPECT_TRUE(*tb);
+}
+
+class TestOptional : public ::testing::Test {};
+
+TEST_F(TestOptional, Print) {
+    boost::optional<int> uninitInt;
+    std::ostringstream osUninitInt;
+    osUninitInt << uninitInt;
+    EXPECT_EQ("--", osUninitInt.str());
+
+    boost::optional<int> initInt {-123};
+    std::ostringstream osInitInt;
+    osInitInt << initInt;
+    EXPECT_EQ(" -123", osInitInt.str());
+
+    std::ostringstream osInt;
+    osInt << uninitInt << initInt.get();
+    EXPECT_EQ("---123", osInt.str());
+
+    boost::optional<std::string> uninitStr;
+    boost::optional<std::string> initStr {"Str"};
+    std::ostringstream osStr;
+    osStr << uninitStr << initStr;
+    EXPECT_EQ("-- Str", osStr.str());
+
+    std::ostringstream osStrValue;
+    osStrValue << uninitStr << *initStr;
+    EXPECT_EQ("--Str", osStrValue.str());
 }
 
 namespace {
