@@ -1,6 +1,11 @@
 # ビルド環境を識別する
 GCC_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3)
+GCC_VERSION_NUMBER:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
 LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\)\\b.*/\\1\\2/" | cut -c 1-2)
+
+# Structured bindingを使う
+GCC_CPP17_VERSION=7.0
+GCC_CPP17_AVAILABLE=$(shell echo "$(GCC_VERSION_NUMBER) >= $(GCC_CPP17_VERSION)" | bc)
 
 ifeq ($(OS),Windows_NT)
 ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
@@ -120,6 +125,7 @@ SOURCE_EXT=cppFriendsExt.cpp
 SOURCE_SINGLETON=cppFriendsSingleton.cpp
 SOURCE_THREAD=cppFriendsThread.cpp
 SOURCE_CPP98=cppFriends98.cpp
+SOURCE_CPP17=cppFriends17.cpp
 SOURCE_SPACE=cppFriendsSpace.cpp
 SOURCE_NET=cppFriendsNet.cpp
 SOURCE_CLANG=cppFriendsClang.cpp
@@ -162,6 +168,7 @@ OBJ_NO_OPT=cppFriendsOpt_no_opt.o
 endif
 
 OBJ_CPP98=cppFriends98.o
+OBJ_CPP17=cppFriends17.o
 OBJ_SPACE=cppFriendsSpace.o
 OBJ_CLANG=cppFriendsClang.o
 OBJ_CLANG_EXT=cppFriendsClangExt.o
@@ -176,6 +183,10 @@ OBJ_CLANG_TEST_GCC_LTO=cppFriendsClangTest_gcc_lto.o
 
 OBJS=$(OBJ_MAIN) $(OBJ_FRIENDS) $(OBJ_SAMPLE_1) $(OBJ_SAMPLE_2) $(OBJ_SAMPLE_ASM) $(OBJ_SAMPLE_SORT)
 OBJS+=$(OBJ_OPT) $(OBJ_EXT) $(OBJ_SINGLETON) $(OBJ_THREAD) $(OBJ_CPP98) $(OBJ_SPACE)
+ifeq ($(GCC_CPP17_AVAILABLE),1)
+OBJS+=$(OBJ_CPP17)
+endif
+
 OBJS+=$(OBJ_NET)
 OBJS+=$(OBJ_CLANG) $(OBJ_CLANG_EXT) $(OBJ_CLANG_TEST)
 OBJS+=$(GTEST_OBJ)
@@ -238,6 +249,7 @@ GXX_CFLAGS=$(INCLUDES_GXX) $(CFLAGS_COMMON)
 CLANGXX_CFLAGS=$(CLANG_TARGET) $(INCLUDES_CLANGXX) $(CFLAGS_COMMON)
 
 CPPFLAGS_CPP98SPEC=-std=gnu++98
+CPPFLAGS_CPP17SPEC=-std=gnu++17
 CPPFLAGS_CPPSPEC=-std=gnu++14
 CPPFLAGS_ARCH=-mavx2 -DCPPFRIENDS_AVX2
 CPPFLAGS_COMMON=$(CFLAGS_WALL) $(GTEST_GMOCK_INCLUDE)
@@ -446,6 +458,9 @@ $(OBJ_THREAD): $(SOURCE_THREAD)
 
 $(OBJ_CPP98): $(SOURCE_CPP98)
 	$(CXX) $(INCLUDES_GXX) $(CPPFLAGS_COMMON) $(CPPFLAGS_CPP98SPEC) -O2 -o $@ -c $<
+
+$(OBJ_CPP17): $(SOURCE_CPP17)
+	$(CXX) $(INCLUDES_GXX) $(CPPFLAGS_COMMON) $(CPPFLAGS_CPP17SPEC) -O2 -o $@ -c $<
 
 $(OBJ_SPACE): $(SOURCE_SPACE)
 	$(CXX) $(GXX_CPPFLAGS) -o $@ -c $<
