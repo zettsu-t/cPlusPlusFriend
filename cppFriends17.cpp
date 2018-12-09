@@ -45,7 +45,7 @@ constexpr std::tuple<DivisionResult, T> MyDiv(const T& numerator, const T& denom
     return {DivisionResult::OK, numerator / denominator};
 }
 
-class TestStructuredBinding  : public ::testing::Test {};
+class TestStructuredBinding : public ::testing::Test {};
 
 TEST_F(TestStructuredBinding, Int) {
     constexpr int n = 7;
@@ -89,7 +89,7 @@ TEST_F(TestStructuredBinding, UnsignedInt) {
 
     {
         constexpr unsigned int zero = 0;
-        auto [result, quotient] = MyDiv(n, zero);
+        const auto [result, quotient] = MyDiv(n, zero);
         EXPECT_EQ(DivisionResult::DIVIDE_BY_ZERO, result);
         EXPECT_FALSE(quotient);
     }
