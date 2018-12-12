@@ -28,12 +28,12 @@ for(actual_prob in c(0.25, 0.4, 0.5, 0.6, 0.75)) {
     }
     df.melt <- melt(df, id.vars='x')
 
-    filename <- paste(gsub('0\\.', '', sprintf('size_%.3f', actual_prob)), '.png', sep=' ')
+    filename <- paste(gsub('0\\.', '', sprintf('size_%.3f', actual_prob)), '.png', sep='')
     png(filename=filename, width=1200, height=600)
     g <- ggplot(df.melt, aes(x=x, y=value, fill=variable, colour=variable))
     g <- g + geom_line() ## linetype=rep(c('dotted','dashed'), length(size_set)))
-    g <- g + xlab('Count')
-    g <- g + ylab('Frequency')
+    g <- g + xlab('X')
+    g <- g + ylab('Density')
     g <- g + theme(legend.position=c(0.8, 0.75))
     g <- g + labs(color='Parameter set')
     plot(g)
