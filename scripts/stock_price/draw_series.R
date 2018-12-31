@@ -19,13 +19,9 @@ for(i in 1:n_series) {
 draw_chart <- function(cols, bg_col, filename) {
     png(filename=filename, width=1024, height=768)
     g <- ggplot()
-    for (series in 1:n_series) {
-        df.series <- df[df$series == series,]
-        for (trial in 1:n_trial) {
-            df.sub <- df.series[df.series$trial == trial,]
-            col <- gradient_n_pal(cols)(series / n_series)
-            g <- g + geom_line(data=df.sub, aes(x=x, y=y), colour=col, alpha=0.6)
-        }
+    for (df.sub in split(df, list(df$series, df$trial))) {
+        col <- gradient_n_pal(cols)(df.sub$series / n_series)
+        g <- g + geom_line(data=df.sub, aes(x=x, y=y), colour=col, alpha=0.6)
     }
     g <- g + theme(panel.background = element_rect(fill=bg_col))
     g <- g + labs(x='Epoch', y='Abs(Value)')
