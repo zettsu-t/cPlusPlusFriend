@@ -19,8 +19,8 @@ check_poisson <- function(mu, prob) {
     list(size=size, pvalue=pchisq(residuals, k, lower.tail=FALSE))
 }
 
-mu_set <- seq(from=0.01, to=20, by=0.005)
-prob_set <- seq(from=0.3, to=0.7, by=0.005)
+mu_set <- seq(from=0.01, to=75, by=0.005)
+prob_set <- seq(from=0.3, to=0.7, by=0.002)
 df <- lapply(mu_set, function (mu) {
     result_set <- sapply(prob_set, function(prob) { check_poisson(mu, prob) })
     size_set <- unlist(result_set['size',])
@@ -28,24 +28,25 @@ df <- lapply(mu_set, function (mu) {
     data.frame(mu=mu, prob=prob_set, size=size_set, pvalue=pvalue_set)
 }) %>% ldply(data.frame)
 
-font_size <- 16
+set_text_size <- function(g) {
+    font_size <- 16
+    g + theme(axis.text=element_text(family='sans', size=font_size),
+              axis.title=element_text(family='sans', size=font_size),
+              strip.text=element_text(family='sans', size=font_size),
+              plot.title=element_text(family='sans', size=font_size))
+}
+
 png(filename='mu_prob.png', width=800, height=600)
 g <- ggplot(df, aes(x=mu, y=prob))
 g <- g + geom_tile(aes(fill=pvalue)) + scale_fill_gradient(low="white", high="royalblue4")
-g <- g + theme(axis.text=element_text(family='sans', size=font_size),
-               axis.title=element_text(family='sans', size=font_size),
-               strip.text=element_text(family='sans', size=font_size),
-               plot.title=element_text(family='sans', size=font_size))
+g <- set_text_size(g)
 plot(g)
 dev.off()
 
 png(filename='size_prob.png', width=800, height=600)
 ## df <- df %>% dplyr::arrange(size, prob)
 g <- ggplot(df, aes(x=size, y=prob))
-g <- g + geom_point(aes(color=pvalue))
-g <- g + theme(axis.text=element_text(family='sans', size=font_size),
-               axis.title=element_text(family='sans', size=font_size),
-               strip.text=element_text(family='sans', size=font_size),
-               plot.title=element_text(family='sans', size=font_size))
+g <- g + geom_point(aes(color=pvalue)) + scale_color_gradient(low="darkorchid2", high="royalblue4")
+g <- set_text_size(g)
 plot(g)
 dev.off()
