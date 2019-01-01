@@ -507,6 +507,39 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
     EXPECT_EQ(expected, solution);
 }
 
+// 指定された数がeに出てくる
+TEST_F(TestPrimalityTesting, YearAny) {
+    using namespace boost::multiprecision;
+    using LongFloat = number<cpp_dec_float<13000>>;
+    using LongInt = cpp_int;
+    const auto str = boost::math::constants::e<LongFloat>().convert_to<std::string>();
+    const std::string target("2019");
+
+    const auto pos = str.find(target);
+    ASSERT_NE(std::string::npos, pos);
+    EXPECT_EQ(6264, pos);
+
+    std::string answer = str.substr(pos, target.size());
+    EXPECT_EQ(target, answer);
+
+    auto value = boost::math::constants::e<LongFloat>();
+    auto len = pos + target.size() - 2;
+    for(auto i=static_cast<decltype(pos)>(0); i < len; ++i) {
+        value *= 10;
+    }
+    LongInt y = LongInt(trunc(value)) % 10000;
+    EXPECT_EQ("2019", y.str());
+}
+
+TEST_F(TestPrimalityTesting, Year2019) {
+    using namespace boost::multiprecision;
+    auto v=boost::math::constants::e<number<cpp_dec_float<13000>>>();
+    for(int i=0;i<6266;++i)v*=10;
+    cpp_int y=cpp_int(trunc(v))%10000;
+    std::cout<<y.str();
+    EXPECT_EQ("2019", y.str());
+}
+
 TEST_F(TestPrimalityTesting, NegativeZero) {
     using RealNumber = double;
     boost::random::random_device seed;
