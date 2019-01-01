@@ -19,5 +19,6 @@ to_num <- function(s) {
 
 gdes <- to_num(df[,2])
 df$log_gdes <- log(gdes)
-input_data <- list(T=4, N=nrow(df), X=df$log_gdes)
+input_data <- list(T=4, N=NROW(df), X=df$log_gdes)
 fit <- stan(file='analyze_gde.stan', data=input_data, chains=3, seed=123)
+summary(fit)

@@ -1,20 +1,21 @@
 library(ggplot2)
 library(RColorBrewer)
 library(scales)
+library(plyr)
+library(dplyr)
 
 n_series <- 12
 n_trial <- 4
 n_epoch <- 1000
 
-df <- data.frame(series=c(integer), trial=(numeric), sigma=c(numeric), x=c(integer), y=c(numeric))
-for(i in 1:n_series) {
-    for(trial in 1:n_trial) {
+df <- lapply(1:n_series, function(i) {
+    lapply(1:n_trial, function(trial) {
         ## Random walk
         sigma <- i
         ys <- abs(cumsum(rnorm(n_epoch, 0, sigma)))
-        df <- rbind(df, data.frame(series=rep(i, n_epoch), trial=rep(trial, n_epoch), sigma=rep(sigma, n_epoch), x=1:n_epoch, y=ys))
-    }
-}
+        data.frame(series=rep(i, n_epoch), trial=rep(trial, n_epoch), sigma=rep(sigma, n_epoch), x=1:n_epoch, y=ys)
+    }) %>% ldply(data.frame)
+}) %>% ldply(data.frame)
 
 draw_chart <- function(cols, bg_col, filename) {
     png(filename=filename, width=1024, height=768)

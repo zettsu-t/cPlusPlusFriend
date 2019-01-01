@@ -54,7 +54,7 @@ points <- cpt.meanvar(df$fatality)@cpts
 years <- df$year[points[-length(points)]]
 
 ## Estimates with JAGS
-input_data <- list(T=nrow(df), Y=df$fatality)
+input_data <- list(T=NROW(df), Y=df$fatality)
 fit.jags <- jags.model(file='industrial_accident_fatality_jags.txt', data=input_data,
                        n.chains=n_jags_chains, n.adapt=jags_adapt)
 update(fit.jags, n.iter=jags_burn)
@@ -66,12 +66,12 @@ jags_cp <- round(mean(result.jags$cp))
 year_jags <- df$year[jags_cp]
 
 ## Estimates with Stan
-input_data <- list(T=nrow(df), X=df$year, Y=df$fatality)
+input_data <- list(T=NROW(df), X=df$year, Y=df$fatality)
 fit.stan <- stan(file='industrial_accident_fatality.stan', data=input_data,
                  iter=stan_iter+stan_warmup, warmup=stan_warmup,
                  chains=n_stan_chains, seed=common_seed)
 summary(fit.stan)
-stan_tau <- round(mean(extract(fit.stan)$tau))
+stan_tau <- base::round(mean(extract(fit.stan)$tau))
 year_stan <- df$year[stan_tau]
 
 
@@ -83,7 +83,7 @@ draw_estimation <- function(filename, base_df, mu_e, sigma_e, mu_l, sigma_l, tre
     ys_e <- rep(mu_e, tau)
     ys_min_e <- ys_e - sigma_e * ribbon_width
     ys_max_e <- ys_e + sigma_e * ribbon_width
-    n_l <- nrow(df) - tau
+    n_l <- NROW(df) - tau
     ys_l <- seq(mu_l, mu_l + trend_l * (n_l - 1), length.out=n_l)
     ys_min_l <- ys_l - sigma_l * ribbon_width
     ys_max_l <- ys_l + sigma_l * ribbon_width
@@ -163,7 +163,7 @@ df_param <- ggs(fit.stan)
 patterns <- c('^mu_(e|l)', '^sigma_', '^(trend_|tau)')
 postfixes <- c('mu', 'sigma', 'tau')
 
-for (i in 1:length(patterns)) {
+sapply(1:length(patterns), function(i) {
     fit <- df_param %>% dplyr::filter(grepl(patterns[i], Parameter))
     filename <- paste('changepoint_', postfixes[i], '.png', sep='')
     png(filename=filename, width=1000, height=1500)
@@ -171,4 +171,5 @@ for (i in 1:length(patterns)) {
     g <- set_font_size(g, 32)
     plot(g)
     dev.off()
-}
+    TRUE
+})

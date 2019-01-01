@@ -2,6 +2,8 @@ library(ggplot2)
 library(tseries)
 library(forecast)
 library(plotrix)
+library(plyr)
+library(dplyr)
 
 ## Reads the Gross Domestic Expenditure (GDE) historical data
 ## Data source
@@ -14,9 +16,9 @@ default_out_basename <- 'out/gde'
 args <- commandArgs(trailingOnly=TRUE)
 in_filename <- ifelse(length(args) >= 1, args[1], default_infilename)
 out_basename <- ifelse(length(args) >= 2, args[2], default_out_basename)
-out_chart_filename <- paste(out_basename, '', '_chart.png', sep='')
-out_diff_filename <- paste(out_basename, '', '_diff.png', sep='')
-out_acf_filename <- paste(out_basename, '', '_acf.png', sep='')
+out_chart_filename <- paste(out_basename, '_chart.png', sep='')
+out_diff_filename <- paste(out_basename, '_diff.png', sep='')
+out_acf_filename <- paste(out_basename, '_acf.png', sep='')
 
 ## Read a CSV file (redundant lines are removed)
 df <- read.csv(in_filename, header=F)
@@ -30,9 +32,9 @@ gdes <- to_num(df[,2])
 df$log_gdes <- log(gdes)
 
 png(filename=out_chart_filename, width=800, height=400)
-g <- ggplot(df, aes(x=seq(1:nrow(df)), y=log_gdes))
+g <- ggplot(df, aes(x=1:NROW(df), y=log_gdes))
 g <- g + geom_line(lwd=2)
-g <- g + scale_x_continuous(breaks = seq(1, nrow(df), 4))
+g <- g + scale_x_continuous(breaks = seq(1, NROW(df), 4))
 g <- g + ggtitle('Gross Domestic Expenditure')
 g <- g + xlab('quarter year') + ylab('log(GDE)')
 g <- g + theme(plot.title = element_text(hjust = 0.5),
@@ -48,20 +50,15 @@ acf(df$log_gdes, main=data_description, lwd=3)
 pacf(df$log_gdes, main=data_description, lwd=3)
 dev.off()
 
-df_diff <- NULL
 n_lag <- 4
-for(lag in seq(1:n_lag)) {
+df_diff <- lapply(1:n_lag, function(lag) {
     df_diff_part <- df
     df_diff_part$log_diff_gdes <- c(diff(df$log_gdes, lag), rep(NA, lag))
     df_diff_part$lag <- as.character(lag)
-    df_diff_part <- df_diff_part[1:(nrow(df)-lag),]
-    df_diff_part$term <- seq(1:nrow(df_diff_part))
-    if (is.null(df_diff)) {
-        df_diff <- df_diff_part
-    } else {
-       df_diff <- rbind(df_diff, df_diff_part)
-    }
-}
+    df_diff_part <- df_diff_part[1:(NROW(df)-lag),]
+    df_diff_part$term <- 1:NROW(df_diff_part)
+    df_diff_part
+}) %>% ldply(data.frame)
 
 png(filename=out_diff_filename, width=800, height=400)
 g <- ggplot(df_diff, aes(x=term, y=log_diff_gdes, color=lag))

@@ -13,8 +13,8 @@ default_out_basename <- 'out/rate'
 args <- commandArgs(trailingOnly=TRUE)
 in_filename <- ifelse(length(args) >= 1, args[1], default_infilename)
 out_basename <- ifelse(length(args) >= 2, args[2], default_out_basename)
-out_chart_filename <- paste(out_basename, '', '_chart.png', sep='')
-out_acf_filename <- paste(out_basename, '', '_acf.png', sep='')
+out_chart_filename <- paste(out_basename, '_chart.png', sep='')
+out_acf_filename <- paste(out_basename, '_acf.png', sep='')
 
 ## Read a CSV file
 df <- read.csv(in_filename, skip=1, header=T)
@@ -27,7 +27,7 @@ add_day <- function(s) {
 }
 
 df$Month <- as.Date(add_day(df$Month), format="%Y/%m/%d")
-df$log_diff[2:nrow(df)] <- rate_log_diff
+df$log_diff[2:NROW(df)] <- rate_log_diff
 
 ## Modeling
 model <- auto.arima(rate_log_diff, ic="aic", trace=F, stepwise=F, approximation=F, seasonal=F,
@@ -38,8 +38,8 @@ print(model)
 result.adf <- adf.test(rate_log_diff)
 print(result.adf)
 
-df_diffs <- df[-c(1),]
-month_seq <- 1:nrow(df_diffs)
+df_diffs <- df[-1,]
+month_seq <- 1:NROW(df_diffs)
 
 png(filename=out_chart_filename, width=800, height=600)
 twoord.plot(month_seq, df_diffs$log_diff,

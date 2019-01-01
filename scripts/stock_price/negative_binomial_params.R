@@ -17,11 +17,10 @@ near_zero <- function(x) {
     ifelse(x > -1e-03 && x < 1e-03, 0, x)
 }
 
-for(actual_prob in c(0.25, 0.4, 0.5, 0.6, 0.75)) {
-    df <- data.frame(x=xs)
-
+sapply(c(0.25, 0.4, 0.5, 0.6, 0.75), function(actual_prob) {
     size_set <- c(1, 2, 3, 4, 5, 8, 10, 12, 15)
-    for(actual_size in size_set) {
+    df <- do.call("cbind", lapply(size_set, function(actual_size) {
+        df <- data.frame(x=xs)
         ys <- dnbinom(xs, size=actual_size, prob=actual_prob)
         col <- paste(sprintf('size=%.3f', actual_size), sprintf('prob=%.3f', actual_prob), sep=' ')
         df[[col]] <- ys
@@ -46,7 +45,8 @@ for(actual_prob in c(0.25, 0.4, 0.5, 0.6, 0.75)) {
             col <- paste(sprintf('Stan estimation size=%.3f', actual_size), sprintf('prob=%.3f', estimated_prob), sep=' ')
             df[[col]] <- dnbinom(xs, size=actual_size, prob=actual_prob) * 0.99
         }
-    }
+        df
+    }))
     df.melt <- melt(df, id.vars='x')
 
     filename <- paste(gsub('0\\.', '', sprintf('prob_%.3f', actual_prob)), '.png', sep='')
@@ -61,4 +61,5 @@ for(actual_prob in c(0.25, 0.4, 0.5, 0.6, 0.75)) {
     g <- g + labs(color='Parameter set')
     plot(g)
     dev.off()
-}
+    TRUE
+})

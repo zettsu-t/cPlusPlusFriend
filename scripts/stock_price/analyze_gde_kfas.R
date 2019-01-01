@@ -22,10 +22,10 @@ to_num <- function(s) {
 
 gdes <- to_num(df[,2])
 df$log_gdes <- log(gdes)
-input_data <- list(T=4, N=nrow(df), X=df$log_gdes)
+input_data <- list(T=4, N=NROW(df), X=df$log_gdes)
 
 n_predict <- 4
-n_train <- nrow(df) - n_predict
+n_train <- NROW(df) - n_predict
 
 ## Fit the GDE time series to a state space model
 model <- SSModel(data = df[1:n_train,], distribution="gaussian", H = NA,
@@ -36,14 +36,14 @@ fit <- fitSSM(model, inits = c(1, 1, 1))
 train_conf <- predict(fit$model, interval = "confidence", level = 0.95, type = "response")
 predict_conf <- predict(fit$model, interval = "prediction", level = 0.95, n.ahead = n_predict)
 df_fit <- rbind(data.frame(conf=train_conf), data.frame(conf=predict_conf))
-df_fit$term <- 1:nrow(df_fit)
-terms_predict <- seq(n_train,n_train+n_predict)
+df_fit$term <- 1:NROW(df_fit)
+terms_predict <- seq(n_train, n_train+n_predict)
 
 g <- ggplot()
-g <- g + geom_line(aes(x=seq(1,nrow(df)), y=df$log_gdes), size = 0.5, color="black", linetype="solid")
-g <- g + geom_line(aes(x=seq(1,n_train), y=df_fit$conf.fit[c(seq(1,n_train))]), size = 0.5, color="blue", alpha=.8, linetype="solid")
+g <- g + geom_line(aes(x=1:NROW(df), y=df$log_gdes), size = 0.5, color="black", linetype="solid")
+g <- g + geom_line(aes(x=1:n_train, y=df_fit$conf.fit[c(1:n_train)]), size = 0.5, color="blue", alpha=.8, linetype="solid")
 g <- g + geom_line(aes(x=terms_predict, y=df_fit$conf.fit[c(terms_predict)]), size = 0.5, color="blue", alpha=.8, linetype="dashed")
-g <- g + geom_ribbon(aes(x=seq(1:nrow(df_fit)), ymin=df_fit$conf.lwr, ymax=df_fit$conf.upr), fill="blue", alpha=.3)
+g <- g + geom_ribbon(aes(x=1:NROW(df_fit), ymin=df_fit$conf.lwr, ymax=df_fit$conf.upr), fill="blue", alpha=.3)
 g <- g + ggtitle('GDE and prediction')
 g <- g + theme(plot.title = element_text(hjust = 0.5))
 g <- g + labs(x='quarter year', y='log(GDE)')

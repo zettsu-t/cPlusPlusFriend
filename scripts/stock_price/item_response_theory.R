@@ -4,6 +4,7 @@
 ## http://www.ieice-hbkb.org/files/S3/S3gun_11hen_03.pdf
 
 library(bayesplot)
+library(plyr)
 library(dplyr)
 library(ggmcmc)
 library(ggplot2)
@@ -41,23 +42,19 @@ discriminations <- clamp(rnorm(k, mu_discrimination, sigma_discrimination), 0.00
 
 ## Draws a chart of difficulties of questions
 data <- matrix(0, n, k)
-data.df <- NULL
 xs <- seq(0.0, 1.0, 0.01)
-for (i in 1:k) {
+
+data.df <- do.call("cbind", lapply(1:k, function(i) {
     prob <- function(x) {
         p_base <- inv.logit(discriminations[i] * (x - difficulties[i]))
         return (chance + (1 - chance) * p_base)
     }
-    data[,i] <- sapply(prob(theta), function(x) { rbern(1, x) })
+    data[,i] <<- sapply(prob(theta), function(x) { rbern(1, x) })
 
     subdf <- data.frame(sapply(xs, function(x) { prob(x) }))
     names(subdf) <- paste(sprintf('%.5f', difficulties[i]), sep='')
-    if (i == 1) {
-        data.df <- subdf
-    } else {
-        data.df <- cbind(data.df, subdf)
-    }
-}
+    subdf
+}))
 
 data.df$x <- xs
 data.df <- melt(data.df, id.vars='x', variable.name='difficulty')
@@ -116,7 +113,7 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
     estimated <- df_fit[grepl(param_name_regex, rownames(df_fit)),]
     names(estimated) <- 'estimated'
     df_chart <- data.frame(estimated=estimated, actual=actual)
-    df_chart$index <- 1:nrow(df_chart)
+    df_chart$index <- 1:NROW(df_chart)
     df_chart$diff <- df_chart$estimated - df_chart$actual
 
     filename <- paste('itr_', display_name, '_hist.png', sep='')

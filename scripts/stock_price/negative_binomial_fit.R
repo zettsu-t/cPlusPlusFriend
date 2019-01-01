@@ -1,6 +1,8 @@
 library(ggplot2)
 library(reshape2)
 library(rstan)
+library(plyr)
+library(dplyr)
 
 actual_mu_base <- 10
 actual_mu_trend <- 6.0
@@ -52,53 +54,43 @@ ab_set <- data.frame(t(sapply(1:n_steps, function(scale) {
 ab_set$alpha <- as.numeric(ab_set$alpha)
 ab_set$beta <- as.numeric(ab_set$beta)
 
+png(filename='negative_binomial_alpha_beta.png', width=800, height=600)
 g <- ggplot(data=ab_set)
 g <- g + geom_line(aes(x=alpha, y=beta))
 plot(g)
+dev.off()
 
 ## Makes observations as random numbers
 observed <- NULL
 param_set_all <- NULL
-for(scale in 1:n_steps) {
+
+param_set_list <- sapply(1:n_steps, function(scale) {
     param_set <- calculate_size_mu(actual_mu_base, actual_mu_trend,
                                    actual_variance_base, actual_variance_trend, scale)
     ys <- data.frame(add_noise_to_count(rnbinom(n=n_samples, size=param_set$size, mu=param_set$mu)))
     param_set_df <- data.frame(size=param_set$size, mu=param_set$mu)
-    if (is.null(observed)) {
-        observed <- ys
-        param_set_all <- param_set_df
-    } else {
-        observed <- cbind(observed, ys)
-        param_set_all <- rbind(param_set_all, param_set_df)
-    }
-}
+    list(ys=ys, param_set_df=param_set_df)
+})
+
+observed <- do.call("cbind", param_set_list['ys',])
+param_set_all <- param_set_list['param_set_df',] %>% ldply(data.frame)
 names(observed) <- 1:n_steps
 max_x <- max(observed)
 
 ## Converts the observations to density histograms
-frequencies <- NULL
-for(scale in 1:n_steps) {
+frequencies <- do.call("cbind", lapply(1:n_steps, function(scale) {
     ## 0-based
     frequency <- data.frame(tabulate(1 + observed[,scale], max_x + 1)) / n_samples
     names(frequency) <- sprintf("%2df", scale)
-    if (is.null(frequencies)) {
-        frequencies <- frequency
-    } else {
-        frequencies <- cbind(frequencies, frequency)
-    }
-}
+    frequency
+}))
 frequencies$x <- 0:max_x
 
-densities <- NULL
-for(scale in 1:n_steps) {
+densities <- do.call("cbind", lapply(1:n_steps, function(scale) {
     density <- data.frame(dnbinom(0:max_x, size=param_set_all$size[scale], mu=param_set_all$mu[scale]))
     names(density) <- sprintf("%2dd", scale)
-    if (is.null(densities)) {
-        densities <- density
-    } else {
-        densities <- cbind(densities, density)
-    }
-}
+    density
+}))
 densities$x <- 0:max_x
 
 ## Fits on Stan and gets mean estimations of the model 1 (alpha-beta
@@ -113,16 +105,11 @@ if (use_model1) {
     mean_beta_trend <- fit1.df['beta_trend','mean.all.chains']
 
     ## Makes predictions under the model
-    for(scale in 1:n_steps) {
+    predicted1 <- do.call("cbind", lapply(1:n_steps, function(scale) {
         param_set <- calculate_size_prob(mean_alpha_base, mean_alpha_trend,
                                          mean_beta_base, mean_beta_trend, scale)
-        ys <- data.frame(dnbinom(0:max_x, size=param_set$size, prob=param_set$prob))
-        if (is.null(predicted1)) {
-            predicted1 <- ys
-        } else {
-            predicted1<- cbind(predicted1, ys)
-        }
-    }
+        data.frame(dnbinom(0:max_x, size=param_set$size, prob=param_set$prob))
+    }))
     names(predicted1) <- unlist(sapply(1:n_steps, function(i) { sprintf("%2dp1", i) }))
     predicted1$x <- 0:max_x
 }
@@ -139,16 +126,11 @@ if (use_model2) {
     mean_variance_trend <- fit2.df['variance_trend','mean.all.chains']
 
     ## Makes predictions under the model
-    for(scale in 1:n_steps) {
+    predicted2 <- do.call("cbind", lapply(1:n_steps, function(scale) {
         param_set <- calculate_size_mu(mean_mu_base, mean_mu_trend,
                                        mean_variance_base, mean_variance_trend, scale)
-        ys <- data.frame(dnbinom(0:max_x, size=param_set$size, mu=param_set$mu))
-        if (is.null(predicted2)) {
-            predicted2 <- ys
-        } else {
-            predicted2 <- cbind(predicted2, ys)
-        }
-    }
+        data.frame(dnbinom(0:max_x, size=param_set$size, mu=param_set$mu))
+    }))
     names(predicted2) <- unlist(sapply(1:n_steps, function(i) { sprintf("%2dp2", i) }))
     predicted2$x <- 0:max_x
 }
@@ -165,6 +147,7 @@ if (!is.null(predicted2)) {
     predicted2.melt <- melt(predicted2, id.vars='x')
 }
 
+png(filename='negative_binomial_fit1.png', width=800, height=600)
 g <- ggplot()
 g <- g + geom_line(data=densities.melt, aes(x=x, y=value, colour=variable), linetype='solid', size=1.5)
 g <- g + geom_line(data=frequencies.melt, aes(x=x, y=value, colour=variable), linetype='solid')
@@ -176,7 +159,9 @@ if (!is.null(predicted2.melt)) {
 }
 g <- g + theme(legend.position='none')
 plot(g)
+dev.off()
 
+png(filename='negative_binomial_fit2.png', width=800, height=600)
 g <- ggplot()
 g <- g + geom_line(data=densities.melt, aes(x=x, y=value, colour=variable), linetype='solid', size=1.5)
 g <- g + geom_line(data=frequencies.melt, aes(x=x, y=value, colour=variable), linetype='solid')
@@ -185,3 +170,4 @@ if (!is.null(predicted2.melt)) {
 }
 g <- g + theme(legend.position='none')
 plot(g)
+dev.off()
