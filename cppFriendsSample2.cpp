@@ -533,11 +533,23 @@ TEST_F(TestPrimalityTesting, YearAny) {
 
 TEST_F(TestPrimalityTesting, Year2019) {
     using namespace boost::multiprecision;
-    auto v=boost::math::constants::e<number<cpp_dec_float<13000>>>();
-    for(int i=0;i<6266;++i)v*=10;
-    cpp_int y=cpp_int(trunc(v))%10000;
-    std::cout<<y.str();
+    auto v = boost::math::constants::e<number<cpp_dec_float<13000>>>();
+    for(int i = 0; i < 6266; ++i) {
+        v *= 10;
+    }
+    cpp_int y = cpp_int(trunc(v)) % 10000;
+//  cpp_int y=trunc(v) % 10000;
+    std::cout << y.str();
     EXPECT_EQ("2019", y.str());
+}
+
+TEST_F(TestPrimalityTesting, CompilationError) {
+    using namespace boost::multiprecision;
+    using LongFloat = cpp_dec_float_50;
+    LongFloat v = 2.75;
+//  auto y = trunc(v);
+    LongFloat y = trunc(v);
+    EXPECT_EQ("2", y.str());
 }
 
 TEST_F(TestPrimalityTesting, NegativeZero) {
