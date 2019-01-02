@@ -538,18 +538,25 @@ TEST_F(TestPrimalityTesting, Year2019) {
         v *= 10;
     }
     cpp_int y = cpp_int(trunc(v)) % 10000;
-//  cpp_int y=trunc(v) % 10000;
+    // とっても長いコンパイルエラーのメッセージ
+    // cpp_int y=trunc(v) % 10000;
     std::cout << y.str();
     EXPECT_EQ("2019", y.str());
+
+//  もっと短いコンパイルエラーのメッセージ
+//  double v2 = 2.718;
+//  auto y2 = std::trunc(v2) % 10000;
 }
 
 TEST_F(TestPrimalityTesting, CompilationError) {
     using namespace boost::multiprecision;
-    using LongFloat = cpp_dec_float_50;
-    LongFloat v = 2.75;
-//  auto y = trunc(v);
-    LongFloat y = trunc(v);
+    using T=cpp_dec_float_50;
+    T v=2.75;
+    // boost::multiprecision::truncの返り値はunmentionable-expression-template-typeであって、Tではない
+    // auto y = trunc(v);
+    T y=trunc(v); // これは可能
     EXPECT_EQ("2", y.str());
+    static_assert(!std::is_same<decltype(v), decltype(trunc(v))>::value, "Different Types");
 }
 
 TEST_F(TestPrimalityTesting, NegativeZero) {
