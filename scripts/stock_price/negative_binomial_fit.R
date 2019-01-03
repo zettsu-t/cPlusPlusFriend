@@ -72,25 +72,26 @@ param_set_list <- sapply(1:n_steps, function(scale) {
     list(ys=ys, param_set_df=param_set_df)
 })
 
-observed <- do.call("cbind", param_set_list['ys',])
+observed <- param_set_list['ys',] %>% bind_cols()
+
 param_set_all <- param_set_list['param_set_df',] %>% ldply(data.frame)
 names(observed) <- 1:n_steps
 max_x <- max(observed)
 
 ## Converts the observations to density histograms
-frequencies <- do.call("cbind", lapply(1:n_steps, function(scale) {
+frequencies <- lapply(1:n_steps, function(scale) {
     ## 0-based
     frequency <- data.frame(tabulate(1 + observed[,scale], max_x + 1)) / n_samples
     names(frequency) <- sprintf("%2df", scale)
     frequency
-}))
+}) %>% bind_cols()
 frequencies$x <- 0:max_x
 
-densities <- do.call("cbind", lapply(1:n_steps, function(scale) {
+densities <- lapply(1:n_steps, function(scale) {
     density <- data.frame(dnbinom(0:max_x, size=param_set_all$size[scale], mu=param_set_all$mu[scale]))
     names(density) <- sprintf("%2dd", scale)
     density
-}))
+}) %>% bind_cols()
 densities$x <- 0:max_x
 
 ## Fits on Stan and gets mean estimations of the model 1 (alpha-beta
@@ -105,11 +106,11 @@ if (use_model1) {
     mean_beta_trend <- fit1.df['beta_trend','mean.all.chains']
 
     ## Makes predictions under the model
-    predicted1 <- do.call("cbind", lapply(1:n_steps, function(scale) {
+    predicted1 <- lapply(1:n_steps, function(scale) {
         param_set <- calculate_size_prob(mean_alpha_base, mean_alpha_trend,
                                          mean_beta_base, mean_beta_trend, scale)
         data.frame(dnbinom(0:max_x, size=param_set$size, prob=param_set$prob))
-    }))
+    }) %>% bind_cols()
     names(predicted1) <- unlist(sapply(1:n_steps, function(i) { sprintf("%2dp1", i) }))
     predicted1$x <- 0:max_x
 }
@@ -126,11 +127,11 @@ if (use_model2) {
     mean_variance_trend <- fit2.df['variance_trend','mean.all.chains']
 
     ## Makes predictions under the model
-    predicted2 <- do.call("cbind", lapply(1:n_steps, function(scale) {
+    predicted2 <- lapply(1:n_steps, function(scale) {
         param_set <- calculate_size_mu(mean_mu_base, mean_mu_trend,
                                        mean_variance_base, mean_variance_trend, scale)
         data.frame(dnbinom(0:max_x, size=param_set$size, mu=param_set$mu))
-    }))
+    }) %>% bind_cols()
     names(predicted2) <- unlist(sapply(1:n_steps, function(i) { sprintf("%2dp2", i) }))
     predicted2$x <- 0:max_x
 }

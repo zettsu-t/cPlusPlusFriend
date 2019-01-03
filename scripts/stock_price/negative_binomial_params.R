@@ -1,8 +1,11 @@
 library(ggplot2)
 library(reshape2)
 library(rstan)
+library(plyr)
+library(dplyr)
+library(purrr)
 
-xs <- 0:10000
+xs <- 0:100
 use_stan <- FALSE
 
 ## https://stackoverflow.com/questions/10397574/efficiently-compute-mean-and-standard-deviation-from-a-frequency-table
@@ -19,7 +22,7 @@ near_zero <- function(x) {
 
 sapply(c(0.25, 0.4, 0.5, 0.6, 0.75), function(actual_prob) {
     size_set <- c(1, 2, 3, 4, 5, 8, 10, 12, 15)
-    df <- do.call("cbind", lapply(size_set, function(actual_size) {
+    df <- lapply(size_set, function(actual_size) {
         df <- data.frame(x=xs)
         ys <- dnbinom(xs, size=actual_size, prob=actual_prob)
         col <- paste(sprintf('size=%.3f', actual_size), sprintf('prob=%.3f', actual_prob), sep=' ')
@@ -46,7 +49,7 @@ sapply(c(0.25, 0.4, 0.5, 0.6, 0.75), function(actual_prob) {
             df[[col]] <- dnbinom(xs, size=actual_size, prob=actual_prob) * 0.99
         }
         df
-    }))
+    }) %>% reduce(left_join, by='x')
     df.melt <- melt(df, id.vars='x')
 
     filename <- paste(gsub('0\\.', '', sprintf('prob_%.3f', actual_prob)), '.png', sep='')

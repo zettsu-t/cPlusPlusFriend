@@ -507,8 +507,10 @@ TEST_F(TestPrimalityTesting, QuizBoard) {
     EXPECT_EQ(expected, solution);
 }
 
+class TestFindYearInNapierConstant : public ::testing::Test{};
+
 // 指定された数がeに出てくる
-TEST_F(TestPrimalityTesting, YearAny) {
+TEST_F(TestFindYearInNapierConstant, YearAny) {
     using namespace boost::multiprecision;
     using LongFloat = number<cpp_dec_float<13000>>;
     using LongInt = cpp_int;
@@ -524,28 +526,28 @@ TEST_F(TestPrimalityTesting, YearAny) {
 
     auto value = boost::math::constants::e<LongFloat>();
     auto len = pos + target.size() - 2;
-    for(auto i=static_cast<decltype(pos)>(0); i < len; ++i) {
-        value *= 10;
-    }
+
+    LongFloat shiftDigits = 10;
+    value *= pow(shiftDigits, len);
     LongInt y = LongInt(trunc(value)) % 10000;
     EXPECT_EQ("2019", y.str());
 }
 
-TEST_F(TestPrimalityTesting, Year2019) {
+TEST_F(TestFindYearInNapierConstant, Year2019) {
     using namespace boost::multiprecision;
-    auto v = boost::math::constants::e<number<cpp_dec_float<13000>>>();
-    for(int i = 0; i < 6266; ++i) {
-        v *= 10;
-    }
-    cpp_int y = cpp_int(trunc(v)) % 10000;
-    // とっても長いコンパイルエラーのメッセージ
-    // cpp_int y=trunc(v) % 10000;
-    std::cout << y.str();
-    EXPECT_EQ("2019", y.str());
+    auto value = boost::math::constants::e<number<cpp_dec_float<13000>>>();
+    decltype(value) shiftDigits = 10;
+    value *= pow(shiftDigits, 6266);
 
-//  もっと短いコンパイルエラーのメッセージ
-//  double v2 = 2.718;
-//  auto y2 = std::trunc(v2) % 10000;
+    cpp_int year = cpp_int(trunc(value)) % 10000;
+    // とっても長いコンパイルエラーのメッセージ
+    // cpp_int year = trunc(value) % 10000;
+    std::cout << year.str();
+    EXPECT_EQ("2019", year.str());
+
+    // もっと短いコンパイルエラーのメッセージ
+    // double v = 2.718;
+    // auto y = std::trunc(v) % 10000;
 }
 
 TEST_F(TestPrimalityTesting, CompilationError) {

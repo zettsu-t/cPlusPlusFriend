@@ -44,7 +44,7 @@ discriminations <- clamp(rnorm(k, mu_discrimination, sigma_discrimination), 0.00
 data <- matrix(0, n, k)
 xs <- seq(0.0, 1.0, 0.01)
 
-data.df <- do.call("cbind", lapply(1:k, function(i) {
+data.df <- lapply(1:k, function(i) {
     prob <- function(x) {
         p_base <- inv.logit(discriminations[i] * (x - difficulties[i]))
         return (chance + (1 - chance) * p_base)
@@ -54,7 +54,7 @@ data.df <- do.call("cbind", lapply(1:k, function(i) {
     subdf <- data.frame(sapply(xs, function(x) { prob(x) }))
     names(subdf) <- paste(sprintf('%.5f', difficulties[i]), sep='')
     subdf
-}))
+}) %>% bind_cols()
 
 data.df$x <- xs
 data.df <- melt(data.df, id.vars='x', variable.name='difficulty')
