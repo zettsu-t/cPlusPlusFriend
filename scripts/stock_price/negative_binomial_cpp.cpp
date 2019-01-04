@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -8,6 +9,7 @@
 namespace {
     using ParamType = double;
     using ResultType = int;
+    using DensityType = double;
     using RandEngine = std::mt19937;
     using SizeType = size_t;
     using SeedType = std::mt19937::result_type;
@@ -15,53 +17,76 @@ namespace {
     struct ParamSet {
         ParamType size;
         ParamType prob;
+    };
+
+    struct FileSet {
+        SizeType n;
         std::string filename;
     };
 
-    const std::vector<ParamSet> AllParamSet {
-        {1.0,  0.25, "nbinom_1.csv"},
-        {1.0,  0.50, "nbinom_2.csv"},
-        {1.0,  0.75, "nbinom_3.csv"},
-        {2.0,  0.25, "nbinom_4.csv"},
-        {3.0,  0.40, "nbinom_5.csv"},
-        {5.0,  0.50, "nbinom_6.csv"},
-        {10.0, 0.50, "nbinom_7.csv"},
-        {15.0, 0.25, "nbinom_8.csv"},
-        {15.0, 0.75, "nbinom_9.csv"},
+    const std::vector<ParamType> SizeSet {2, 4, 6, 8};
+    const std::vector<ParamType> ProbSet {0.1, 0.15, 0.25, 0.5};
+    const std::vector<FileSet> AllFileSet {
+        {100, "nbinom100.csv"},
+        {1000, "nbinom1k.csv"},
+        {10000, "nbinom10k.csv"},
+        {100000, "nbinom100k.csv"},
     };
 }
 
-void rnbinomCpp(const auto& paramSet, SizeType n, SeedType seed) {
+void rnbinomCpp(const auto& paramSet, SizeType n, SeedType seed, std::ofstream& ofs) {
     const ParamType alpha = paramSet.size;
     // Notice that prob for R means 1 - prob in C++
-    const ParamType beta = (1 - paramSet.prob) / paramSet.prob;
+    const ParamType prob = paramSet.prob;
+    const ParamType beta = (1 - prob) / prob;
     std::mt19937 gen(seed);
     std::gamma_distribution<double> distGamma(alpha, beta);
     std::unordered_map<ResultType, SizeType> count;
 
-    std::ofstream ofs(paramSet.filename);
-    ofs << alpha << "\n" << beta << "\n";
-
+    // Makes random values
     ResultType maxValue = 0;
     for (decltype(n) i=0; i<n; ++i) {
         std::poisson_distribution<ResultType> dist(distGamma(gen));
-        auto value = dist(gen);
+        const auto value = dist(gen);
         count[value] += 1;
         maxValue = std::max(maxValue, value);
     }
 
+    // Can eliminate outliers
+    const SizeType sizeLimit = n - n / 100;
+    SizeType totalCount = 0;
     for (ResultType value=0; value<=maxValue; ++value) {
-        ofs << count[value] << "\n";
+        // Writes densities in a long format
+        const auto binCount = count[value];
+        totalCount += binCount;
+        const DensityType density = static_cast<DensityType>(binCount) / static_cast<DensityType>(n);
+        ofs << alpha << "," << beta << "," << prob << "," << value << "," << density << "\n";
+        if (totalCount >= sizeLimit) {
+            break;
+        }
     }
     return;
 }
 
-int main(int argc, char* argv[]) {
-    constexpr size_t n = 1000000;
+void rnbinomCppAll(void) {
     constexpr SeedType seed = 123;
-    for(const auto& paramSet : AllParamSet) {
-        rnbinomCpp(paramSet, n, seed);
+
+    for(const auto& fileSet :AllFileSet) {
+        // Writes titles
+        std::ofstream ofs(fileSet.filename);
+        ofs << "alpha,beta,prob,x,density" << std::endl;
+
+        for(const auto& size : SizeSet) {
+            for(const auto& prob : ProbSet) {
+                const ParamSet paramSet {size, prob};
+                rnbinomCpp(paramSet, fileSet.n, seed, ofs);
+            }
+        }
     }
+}
+
+int main(int argc, char* argv[]) {
+    rnbinomCppAll();
     return 0;
 }
 
