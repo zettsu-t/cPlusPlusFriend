@@ -58,7 +58,7 @@ draw_all <- function(dataset) {
     g3 <- g3 + geom_line(aes(x=dataset$xs, y=dataset$cumulative_densities), linetype='solid', color='darkorange', size=1.5)
     g3 <- g3 + ggtitle('Cumulative probability densities : MCMC samples (# of failures > 0 in 80 pieces)')
     g3 <- g3 + xlab('Failure rate per piece [%]')
-    g3 <- g3 + ylab('Density')
+    g3 <- g3 + ylab('Probability')
 
     g4 <- ggplot()
     g4 <- g4 + geom_line(aes(x=dataset$xs, y=dataset$calculated_probabilities), linetype='solid', color='darkorange', size=1.5)
@@ -79,7 +79,7 @@ draw_probabilities <- function(dataset) {
                                          'Differences of calculated probabilities'),
                                 values=c('navy', 'darkorange'))
     g <- g + xlab('Failure rate per piece [%]')
-    g <- g + ylab('Probability')
+    g <- g + ylab('Density')
     g <- g + theme(legend.position=c(0.6, 0.85), legend.title=element_blank())
     g <- g + guides(col = guide_legend(ncol=1))
     plot(g)
@@ -95,7 +95,7 @@ draw_cumulative_probabilities <- function(dataset) {
                                          'Calculated probabilities'),
                                 values=c('navy', 'darkorange'))
     g <- g + xlab('Failure rate per piece [%]')
-    g <- g + ylab('Density')
+    g <- g + ylab('Probability')
     g <- g + theme(legend.position=c(0.8, 0.25), legend.title=element_blank())
     g <- g + guides(col = guide_legend(ncol=1))
     plot(g)
