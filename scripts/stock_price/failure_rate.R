@@ -4,9 +4,9 @@ library(reshape2)
 library(rstan)
 library(matrixStats)
 
-common_seed <- 456
-stan_warmup <- 100000
-stan_iter <- 100000
+common_seed <- 123456
+stan_warmup <- 1000000
+stan_iter <- 1000000
 n_stan_chains <- 1
 n <- 80
 input_data <- list(N=n)
@@ -18,8 +18,15 @@ fit_extracted <- extract(fit.stan)
 samples <- fit_extracted$p
 
 make_dataset <- function(x_max) {
-    x_step <- 0.0001
-    xs <- seq(0.0000, x_max - x_step, x_step)
+    x_minor_step <- 0.000001
+    x_major_step <- 0.0001
+    x_thredhold <- 0.002
+    if (x_max > x_thredhold + x_major_step) {
+        xs <- seq(0.0, x_max - x_major_step, x_major_step)
+    } else {
+        xs <- seq(0.0, x_max - x_minor_step, x_minor_step)
+    }
+
     densities <- binCounts(samples, bx=c(xs, x_max))
     densities <- densities / NROW(samples)
     cumulative_densities <- cumsum(densities)
