@@ -88,6 +88,11 @@ public:
     std::list<std::string> dataSet_;
 };
 
+// 本当にconstデータなら書き換えられない
+constexpr size_t ConstantArraySampleSize = 0x10000;
+extern const uint8_t ConstantArraySample[ConstantArraySampleSize];
+extern const int& ConstantIntRefSample;
+
 #endif // CPPFRIENDS_CPPFRIENDS_HPP
 
 /*

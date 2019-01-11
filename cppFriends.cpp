@@ -553,6 +553,23 @@ TEST_F(TestRandomNumber, List) {
     CountRandomNumber(hr, std::cout);
 }
 
+class TestConstCast : public ::testing::Test{};
+
+TEST_F(TestConstCast, Ptr) {
+    auto ptr = ConstantArraySample;
+    EXPECT_FALSE(*ptr);
+    // これはできない
+    // auto q = const_cast<uint8_t*>(ptr);
+    // *q = 1;
+}
+
+TEST_F(TestConstCast, Ref) {
+    EXPECT_EQ(12, ConstantIntRefSample);
+    // これもできない
+    // auto& r = const_cast<int&>(ConstantIntRefSample);
+    // r = 1;
+}
+
 /*
 Local Variables:
 mode: c++

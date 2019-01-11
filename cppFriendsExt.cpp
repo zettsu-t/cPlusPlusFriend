@@ -76,6 +76,13 @@ void MyStringList::Clear(void) {
     dataSet_.clear();
 }
 
+namespace {
+    const int ConstantIntSample = 12;
+}
+
+const uint8_t ConstantArraySample[ConstantArraySampleSize] {0};
+const int& ConstantIntRefSample = ConstantIntSample;
+
 /*
 Local Variables:
 mode: c++
