@@ -553,21 +553,59 @@ TEST_F(TestRandomNumber, List) {
     CountRandomNumber(hr, std::cout);
 }
 
-class TestConstCast : public ::testing::Test{};
+class TestBadCast : public ::testing::Test{};
 
-TEST_F(TestConstCast, Ptr) {
+TEST_F(TestBadCast, Ptr) {
     auto ptr = ConstantArraySample;
     EXPECT_FALSE(*ptr);
     // これはできない
-    // auto q = const_cast<uint8_t*>(ptr);
-    // *q = 1;
+#if 0
+    auto q = const_cast<uint8_t*>(ptr);
+    *q = 1;
+#endif
 }
 
-TEST_F(TestConstCast, Ref) {
+TEST_F(TestBadCast, Ref) {
     EXPECT_EQ(12, ConstantIntRefSample);
     // これもできない
-    // auto& r = const_cast<int&>(ConstantIntRefSample);
-    // r = 1;
+#if 0
+    auto& r = const_cast<int&>(ConstantIntRefSample);
+    r = 1;
+#endif
+}
+
+TEST_F(TestBadCast, Alignment) {
+    using Register64 = uint64_t;
+    constexpr size_t XmmRegisterSize = 16;
+    constexpr Register64 expected = 0xff000000000000feull;
+
+    // ::typeが必要!
+    std::aligned_storage<XmmRegisterSize, XmmRegisterSize>::type xmmReg;
+    const Register64 generalRegs[] {1, expected};
+    static_assert(sizeof(xmmReg) >= XmmRegisterSize, "Must have the same size");
+    static_assert(sizeof(generalRegs) == XmmRegisterSize, "Must have the same size");
+    static_assert(sizeof(xmmReg) >= sizeof(generalRegs), "Must have the same size");
+    ::memmove(&xmmReg, generalRegs, XmmRegisterSize);
+
+    uint64_t actual = 0;
+    // Windows/Linuxの両方で使えるscratch registers
+    asm volatile (
+        "mov     %1, %%rdx       \n\t"
+        "movaps  (%%rdx), %%xmm4 \n\t"
+        "pextrq  $1, %%xmm4, %0  \n\t"
+        :"=a"(actual):"r"(&xmmReg):"rdx", "memory");
+    EXPECT_EQ(expected, actual);
+
+#if 0
+    // アラインメント違反
+    asm volatile (
+        "mov     %1, %%rdx       \n\t"
+        "add     $1, %%rdx       \n\t"
+        "movaps  (%%rdx), %%xmm4 \n\t"
+        "pextrq  $1, %%xmm4, %0  \n\t"
+        :"=a"(actual):"r"(&xmmReg):"rdx", "memory");
+    EXPECT_EQ(expected, actual);
+#endif
 }
 
 /*
