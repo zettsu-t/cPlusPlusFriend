@@ -1,10 +1,10 @@
 ## Find a nearest value in a vector
+library(Rcpp)
+library(BH)
 library(data.table)
 library(DescTools)
 library(ggplot2)
 library(microbenchmark)
-library(Rcpp)
-library(BH)
 library(plyr)
 library(dplyr)
 
@@ -30,11 +30,35 @@ quick_check <- function() {
         stop('actual != expected')
     }
 
-    actual <- lower_bound_number(ordered_xs, target_ys)
+    actual <- find_ceil_number(ordered_xs, target_ys)
     expected <- c(1, 2, 3, 4, 0)
     if (!all(actual == expected)) {
         stop('actual != expected')
     }
+
+    actual <- find_floor_number(ordered_xs, target_ys)
+    expected <- c(0, 1, 2, 3, 4)
+    if (!all(actual == expected)) {
+        stop('actual != expected')
+    }
+
+    ordered_str_xs <- sort(c('B', 'BC', 'D', 'DE'))
+    target_str_xs <- sort(c('A', 'B', 'BA', 'C', 'CD', 'D', 'E'))
+    actual <- find_ceil_string(ordered_str_xs, target_str_xs)
+    expected <- c(1, 1, 2, 3, 3, 3, 0)
+    if (!all(actual == expected)) {
+        stop('actual != expected')
+    }
+
+    ordered_str_xs <- rev(ordered_str_xs)
+    actual <- find_floor_reverse_string(ordered_str_xs, target_str_xs)
+    expected <- c(0, 1, 1, 2, 2, 3, 4)
+    expected <- sapply(expected, function(x) ifelse(x == 0, 0, length(ordered_str_xs) + 1 - x))
+    if (!all(actual == expected)) {
+        stop('actual != expected')
+    }
+
+    print('Quick check passed')
 }
 
 quick_check()
@@ -70,12 +94,12 @@ long_check <- function(n_sample, n_trial, ordered, use_r, no_cpp_serial, times) 
     cpp_serial <- NULL
     if (ordered) {
         cpp_vec <- microbenchmark(
-            lower_bound_number(xs, target_ys),
+            find_ceil_number(xs, target_ys),
             times=times)
 
         if (!no_cpp_serial) {
             cpp_serial <- microbenchmark(
-                sapply(target_ys, function(y) { lower_bound_number(xs, y) }),
+                sapply(target_ys, function(y) { find_ceil_number(xs, y) }),
                 times=times)
         }
     }
@@ -114,10 +138,10 @@ df_ordered <- lapply(c(10, 32, 100, 316, 1000, 3162, 10000), function(n_sample) 
 
     n_str <- as.character(n_sample)
     rbind(data.frame(n=rep(n_str, len_r_serial), method=rep('R DescTools::Closest', len_r_serial), time=result$r_serial$time),
-          data.frame(n=rep(n_str, len_cpp_serial), method=rep('C++ std::lower_bound', len_cpp_serial), time=result$cpp_serial$time))
+          data.frame(n=rep(n_str, len_cpp_serial), method=rep('C++ std::lower_bound (forward)', len_cpp_serial), time=result$cpp_serial$time))
 }) %>% ldply(data.table)
 
-draw_time(df_ordered, 'Time to find the nearest numbers (ordered)')
+draw_time(df_ordered, 'Time to find the nearest ceil numbers (ordered)')
 
 
 df_cpp_large <- lapply(1:7, function(i) {
@@ -126,10 +150,10 @@ df_cpp_large <- lapply(1:7, function(i) {
     len_cpp_vec <- length(result$cpp_vec$time)
     len_cpp_serial <- length(result$cpp_serial$time)
     n_str <- sprintf('%d', n_sample)
-    data.frame(n=rep(n_str, len_cpp_vec), method=rep('CPP std::lower_bound', len_cpp_vec), time=result$cpp_vec$time)
+    data.frame(n=rep(n_str, len_cpp_vec), method=rep('CPP std::lower_bound (forward)', len_cpp_vec), time=result$cpp_vec$time)
 }) %>% ldply(data.table)
 
-draw_time(df_cpp_large, 'Time to find the nearest numbers (std::lower_bound)')
+draw_time(df_cpp_large, 'Time to find the nearest ceil numbers (std::lower_bound)')
 
 
 df_r <- lapply(c(10, 32, 100, 316, 1000, 3162, 10000), function(n_sample) {
@@ -142,7 +166,7 @@ df_r <- lapply(c(10, 32, 100, 316, 1000, 3162, 10000), function(n_sample) {
           data.frame(n=rep(n_str, len_unordered), method=rep('R unordered', len_unordered), time=result_unordered$r_serial$time))
 }) %>% ldply(data.table)
 
-draw_time(df_r, 'Time to find the nearest numbers (unordered)')
+draw_time(df_r, 'Time to find the nearest ceil numbers (unordered)')
 
 
 df_cpp <- lapply(1:7, function(i) {
@@ -155,4 +179,4 @@ df_cpp <- lapply(1:7, function(i) {
           data.frame(n=rep(n_str, len_cpp_serial), method=rep('C++ calling serial', len_cpp_serial), time=result$cpp_serial$time))
 }) %>% ldply(data.table)
 
-draw_time(df_cpp, 'Time to find the nearest numbers (std::lower_bound)')
+draw_time(df_cpp, 'Time to find the nearest ceil numbers (std::lower_bound)')

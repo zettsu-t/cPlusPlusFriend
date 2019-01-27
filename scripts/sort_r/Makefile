@@ -29,7 +29,7 @@ all: $(TARGETS) run
 
 run: $(TARGET)
 	./$(TARGET)
-	$(RSCRIPT) $(RSOURCE)
+#	$(RSCRIPT) $(RSOURCE)
 
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
