@@ -31,7 +31,7 @@ using ContainerIndex = std::result_of_t<decltype(&Rcpp::NumericVector::size)(Rcp
 #endif
 
 template <template<class> class Compare, typename T, typename U>
-IndexVectorInner find_lower_bound(const T& vec, const T& keys, U& iBegin, U& iEnd) {
+IndexVectorInner find_lower_bound(const T& vec, const T& keys, U&& iBegin, U&& iEnd) {
     IndexVectorInner results;
     for(const auto& key : keys) {
         // Resolve types which proxies returns
