@@ -51,11 +51,8 @@ IndexVectorInner find_lower_bound(const T& vec, const T& keys, U&& iBegin, U&& i
 // The vec must be sorted in an ascending order
 template <typename T>
 IndexVector find_ceil(const T& vec, const T& keys) {
-    auto iBegin = vec.begin();
-    auto iEnd = vec.end();
-
     IndexVector results;
-    const auto rawResults = find_lower_bound<std::less>(vec, keys, iBegin, iEnd);
+    const auto rawResults = find_lower_bound<std::less>(vec, keys, vec.begin(), vec.end());
     for (const auto& result : rawResults) {
         results.push_back(static_cast<decltype(rawResults[0])>(result));
     }
@@ -66,16 +63,16 @@ IndexVector find_ceil(const T& vec, const T& keys) {
 // The vec must be sorted in an ascending order
 template <typename T>
 IndexVector find_floor(const T& vec, const T& keys) {
-#if __GNUC__ > 6
-    auto iBegin = vec.rbegin();
-    auto iEnd = vec.rend();
-#else
-    auto iBegin = boost::make_reverse_iterator(vec.end());
-    auto iEnd = boost::make_reverse_iterator(vec.begin());
-#endif
-
     const IndexVectorInner::size_type topIndex = vec.size() + 1;
-    const auto rawResults = find_lower_bound<std::greater>(vec, keys, iBegin, iEnd);
+#if __GNUC__ > 6
+    const auto rawResults = find_lower_bound<std::greater>(
+        vec, keys, vec.rbegin(), vec.rend());
+#else
+    const auto rawResults = find_lower_bound<std::greater>(
+        vec, keys,
+        boost::make_reverse_iterator(vec.end()),
+        boost::make_reverse_iterator(vec.begin()));
+#endif
     IndexVector results;
     for (const auto& result : rawResults) {
         results.push_back(static_cast<decltype(rawResults[0])>(result ? (topIndex - result) : result));
@@ -87,11 +84,8 @@ IndexVector find_floor(const T& vec, const T& keys) {
 // The vec must be sorted in a descending order
 template <typename T>
 IndexVector find_floor_reverse(const T& vec, const T& keys) {
-    auto iBegin = vec.begin();
-    auto iEnd = vec.end();
-
     IndexVector results;
-    const auto rawResults = find_lower_bound<std::greater>(vec, keys, iBegin, iEnd);
+    const auto rawResults = find_lower_bound<std::greater>(vec, keys, vec.begin(), vec.end());
     for (const auto& result : rawResults) {
         results.push_back(static_cast<decltype(rawResults[0])>(result));
     }
