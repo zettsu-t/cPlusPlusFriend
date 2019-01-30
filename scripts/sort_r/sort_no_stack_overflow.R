@@ -6,6 +6,16 @@ library(BH)
 Sys.setenv('PKG_CXXFLAGS'='-std=gnu++14')
 sourceCpp('sort_no_stack_overflow.cpp')
 
+clear_table(0)
+n <- 100
+nums <- sample(1:n, replace=FALSE)
+keys <- sprintf('%04d', nums)
+values <- sprintf('%05d', nums * 3)
+print(head(keys))
+add_table(keys, values)
+df <- convert_table_to_dataframe(0)
+print(head(df))
+
 n <- 10000000
 clear_table(0)
 keys <- as.character(c(1:n))

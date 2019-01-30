@@ -40,6 +40,31 @@ Rcpp::CharacterVector find_table(Rcpp::CharacterVector keys) {
     return results;
 }
 
+// [[Rcpp::export]]
+Rcpp::DataFrame convert_table_to_dataframe(Rcpp::NumericVector dummy) {
+    const auto rowSize = g_table.size();
+    Rcpp::CharacterVector keys(rowSize);
+    Rcpp::CharacterVector values(rowSize);
+
+    size_t i = 0;
+    for (const auto& keyValue : g_table) {
+        const auto key = keyValue.first;
+        keys[i] = key;
+        ++i;
+    }
+
+    keys.sort();
+    i = 0;
+    for (const auto& key : keys) {
+        values[i] = g_table[Rcpp::as<decltype(g_table)::key_type>(key)];
+        ++i;
+    }
+
+    Rcpp::DataFrame df = Rcpp::DataFrame::create(
+        Rcpp::Named("key")=keys, Rcpp::Named("value")=values);
+    return df;
+}
+
 /*
 Local Variables:
 mode: c++
