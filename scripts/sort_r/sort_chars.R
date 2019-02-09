@@ -1,4 +1,11 @@
+library(Rcpp)
+library(BH)
 library(stringr)
+
+## Build C++ code
+Sys.setenv('PKG_CXXFLAGS'='-std=gnu++14')
+sourceCpp('sort_fast.cpp')
+
 v<-c(
 ' ','!','"','#','$','%','&',"'",'(',')','*','+',',','-','.','/',
 '0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?',
@@ -9,3 +16,4 @@ v<-c(
 v
 sort(v)
 stringr::str_sort(v)
+sort_string_set(v)

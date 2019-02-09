@@ -118,6 +118,22 @@ IndexVector find_floor_reverse_string(Rcpp::CharacterVector vec, Rcpp::Character
     return find_floor_reverse(vec, value);
 }
 
+// [[Rcpp::export]]
+Rcpp::CharacterVector sort_string_set(Rcpp::CharacterVector vec) {
+    std::vector<std::string> string_set;
+    for(const auto& v : vec) {
+        auto s = Rcpp::as<std::string>(v);
+        string_set.push_back(s);
+    }
+    std::sort(string_set.begin(), string_set.end());
+
+    Rcpp::CharacterVector result;
+    for(const auto& v : string_set) {
+        result.push_back(v);
+    }
+    return result;
+}
+
 #else
 IndexVector find_ceil_number(const Rcpp::NumericVector& vec, const Rcpp::NumericVector& value) {
     return find_ceil(vec, value);
@@ -205,6 +221,17 @@ int test_floor_alt(void) {
 }
 
 int main(int argc, char* argv[]) {
+    std::vector<char> charSet;
+    signed char c = 0x7f;
+    do {
+        charSet.push_back(c);
+    } while(--c >= 0x20);
+
+    std::sort(charSet.begin(), charSet.end());
+    for(const auto c : charSet) {
+        std::cout << c;
+    }
+
     auto result = test_one_element_between_fences();
     result |= test_two_elements_between_fences();
     result |= test_exact_elements();
