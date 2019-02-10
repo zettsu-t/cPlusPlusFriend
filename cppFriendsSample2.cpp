@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <map>
 #include <random>
 #include <regex>
 #include <sstream>
@@ -1572,6 +1573,37 @@ TEST_F(TestMultiArray, Iteration) {
         EXPECT_EQ(index * size * size + 2, *i);
         ++index;
     }
+}
+
+namespace {
+    template<class T> struct RemoveKeyConst {
+        using value_type = std::pair<
+            typename std::remove_const_t<typename T::key_type>,
+            typename T::mapped_type>;
+    };
+};
+
+class TestRemoveConstFromKey : public ::testing::Test {};
+
+TEST_F(TestRemoveConstFromKey, Iteration) {
+    std::map<int, std::string> keyMap;
+    const std::string expected1("one");
+    const std::string expected2("two");
+    keyMap[1] = expected1;
+    keyMap[2] = expected2;
+    EXPECT_EQ(expected1, keyMap[1]);
+
+    decltype(keyMap)::value_type constKeyValue(2, expected2);
+    // firstがconstなのでこれはできない
+    // constKeyValue.first = 3;
+    EXPECT_EQ(2, constKeyValue.first);
+    EXPECT_EQ(expected2, constKeyValue.second);
+    EXPECT_EQ(expected2, keyMap[2]);
+
+    RemoveKeyConst<decltype(keyMap)>::value_type keyValue(3, expected2);
+    keyValue.first = 2;
+    EXPECT_EQ(2, keyValue.first);
+    EXPECT_EQ(expected2, keyValue.second);
 }
 
 /*
