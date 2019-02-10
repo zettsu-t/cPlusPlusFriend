@@ -14,6 +14,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
 #include <vector>
@@ -1408,6 +1409,61 @@ TEST_F(TestOneEqualsTwo, StringPtr) {
 //      std::cout << "YES";
     }
     EXPECT_TRUE(eq);
+}
+
+namespace {
+    using Inner = std::string;
+    struct Outer {
+        using Inner = int;
+        Outer(Inner arg) { inner_ = arg; }
+        Inner Foo(const Inner& other);
+        std::string Bar(const Inner& other);
+        Inner inner_ {0};
+    };
+
+    Outer::Inner Outer::Foo(const Inner& other) {
+        return inner_;
+    }
+
+    Inner Outer::Bar(const Inner& other) {
+        std::string s("bar");
+        return s;
+    }
+}
+
+class TestInnerClass : public ::testing::Test {};
+
+TEST_F(TestInnerClass, All) {
+    Outer a(1);
+    Outer b(2);
+    EXPECT_EQ(1, a.Foo(b.inner_));
+    const std::string expected = "bar";
+    EXPECT_EQ(expected, a.Bar(b.inner_));
+}
+
+namespace {
+    int InitializeInterator(const std::vector<int>& vec) {
+        const auto vecSize = vec.size();
+        static_assert(std::is_const<decltype(vecSize)>::value, "Must be const");
+        int value = 0;
+
+        // こう書けば、sizeのconstを外せる
+        for(auto i = decltype(vecSize){0}; i < vecSize; ++i) {
+            const auto& v = vec.at(i);
+            if (v < 0) {
+                value = v;
+            }
+        }
+
+        return value;
+    }
+}
+
+class TestInitializeInterator : public ::testing::Test {};
+
+TEST_F(TestInitializeInterator, All) {
+    const std::vector<int> vec {0, 2, -2, 3, -1, 4};
+    EXPECT_EQ(-1, InitializeInterator(vec));
 }
 
 /*

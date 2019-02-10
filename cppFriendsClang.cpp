@@ -182,6 +182,25 @@ namespace ProcessorException {
     }
 }
 
+namespace CheckWarning {
+    int WrongInterator(const std::vector<int>& vec) {
+        const auto size = vec.size();
+        int value = 0;
+
+        for(auto i = decltype(size){0}; i < size; ++i) {
+            // これはコンパイラに警告して欲しい
+            for(i = 0; i < size; ++i) {
+                const auto& v = vec.at(i);
+                if (v < 0) {
+                    value = v;
+                }
+            }
+        }
+
+        return value;
+    }
+}
+
 /*
 Local Variables:
 mode: c++
