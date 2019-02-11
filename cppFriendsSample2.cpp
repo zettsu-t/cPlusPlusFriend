@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <codecvt>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -1604,6 +1605,73 @@ TEST_F(TestRemoveConstFromKey, Iteration) {
     keyValue.first = 2;
     EXPECT_EQ(2, keyValue.first);
     EXPECT_EQ(expected2, keyValue.second);
+}
+
+namespace {
+    class MyParser {
+    public:
+        enum class Mode {
+            PARSE_INT,
+            OTHERS
+        };
+
+        MyParser(Mode mode) :
+            setter_(std::bind(&MyParser::setDefault, this, std::placeholders::_1)) {
+            switch(mode) {
+            case Mode::PARSE_INT:
+                setter_ = std::bind(&MyParser::setInt, this, std::placeholders::_1);
+                break;
+            default:
+                break;
+            }
+        }
+
+        virtual ~MyParser(void) = default;
+
+        void Set(const std::string& s) {
+            setter_(s);
+            return;
+        }
+
+        int GetInt(void) const {
+            return i_;
+        }
+
+        const std::string& GetString(void) const {
+            return s_;
+        }
+
+    private:
+        void setInt(const std::string& s) {
+            i_ = boost::lexical_cast<decltype(i_)>(s);
+            setDefault(s);
+            return;
+        }
+
+        void setDefault(const std::string& s) {
+            s_ = s;
+            return;
+        }
+
+        std::function<void(const std::string& s)> setter_;
+        int i_ {0};
+        std::string s_;
+    };
+};
+
+class TestBindMemberFunction : public ::testing::Test {};
+
+TEST_F(TestBindMemberFunction, All) {
+    MyParser parserInt(MyParser::Mode::PARSE_INT);
+    parserInt.Set("123");
+    EXPECT_EQ(123, parserInt.GetInt());
+    EXPECT_EQ("123", parserInt.GetString());
+    ASSERT_ANY_THROW(parserInt.Set("ABC"));
+
+    MyParser parserDefault(MyParser::Mode::OTHERS);
+    parserDefault.Set("abc");
+    EXPECT_EQ(0, parserDefault.GetInt());
+    EXPECT_EQ("abc", parserDefault.GetString());
 }
 
 /*
