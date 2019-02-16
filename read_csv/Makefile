@@ -23,7 +23,7 @@ VPATH=$(dir $(GTEST_SOURCE) $(GMOCK_SOURCE))
 CPP=g++
 LD=g++
 
-CFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CFLAGS_WALL=-O0 -g -Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 CPPFLAGS=-std=gnu++14 $(CFLAGS_WALL) $(GTEST_GMOCK_INCLUDE)
 ifeq ($(BUILD_ON_MINGW),yes)
 CPPFLAGS+= -isystem C:\MINGW\include

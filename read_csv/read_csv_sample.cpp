@@ -1,7 +1,11 @@
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/optional.hpp>
 #include <boost/tokenizer.hpp>
 #include <gtest/gtest.h>
 
@@ -87,6 +91,102 @@ TEST_F(TestCsvFile, LF) {
     CsvFile csvfile("lf.csv");
     const auto& actual = csvfile.GetCells();
     Compare(expected, actual);
+}
+
+template <typename T>
+class CsvParser {
+public:
+    using Setter = void(T::*)(const std::string& value);
+    using ParamToSetter = std::unordered_map<std::string, Setter>;
+    CsvParser(std::istream& is, const ParamToSetter& paramToSetter) {
+        using namespace boost;
+        std::string line;
+        std::getline(is, line);
+
+        tokenizer<escaped_list_separator<char>> t(
+            line, escaped_list_separator<char>('\\', ',', '\"'));
+
+        ColumnNumber columnNumber = 0;
+        for (tokenizer<escaped_list_separator<char>>::iterator i(t.begin());
+             i != t.end(); ++i) {
+            auto columnName = *i;
+            auto it = paramToSetter.find(columnName);
+            if (it != paramToSetter.end()) {
+                columnSetter_[columnNumber] = it->second;
+            }
+            ++columnNumber;
+        }
+    }
+
+    virtual ~CsvParser(void) = default;
+
+    boost::optional<T> ParseRow(std::istream& is) {
+        using namespace boost;
+        std::string line;
+        std::getline(is, line);
+        boost::trim_copy(line);
+
+        if (line.empty()) {
+            boost::optional<T> emptyRow;
+            return emptyRow;
+        }
+
+        T row;
+        tokenizer<escaped_list_separator<char>> t(
+            line, escaped_list_separator<char>('\\', ',', '\"'));
+
+        ColumnNumber columnNumber = 0;
+        for (tokenizer<escaped_list_separator<char>>::iterator i(t.begin());
+             i != t.end(); ++i) {
+            auto it = columnSetter_.find(columnNumber);
+            if (it != columnSetter_.end()) {
+                (row.*(it->second))(*i);
+            }
+            ++columnNumber;
+        }
+
+        return row;
+    }
+private:
+    using ColumnNumber = typename ParamToSetter::size_type;
+    using ColumnSetter = std::unordered_map<ColumnNumber, Setter>;
+    ColumnSetter columnSetter_;
+};
+
+class TestCsvParser : public ::testing::Test{};
+
+TEST_F(TestCsvParser, All) {
+    struct Param {
+        std::string name;
+        int index {0};
+        void SetName(const std::string& value) {
+            name = value;
+        }
+        void SetIndex(const std::string& value) {
+            index = boost::lexical_cast<decltype(index)>(value);
+        }
+    };
+
+    using Parser = CsvParser<Param>;
+    Parser::ParamToSetter setter {
+        {"name", &Param::SetName},
+        {"index", &Param::SetIndex}
+    };
+
+    std::istringstream is("name,index\nfoo,1\n");
+    Parser parser(is, setter);
+
+    auto row = parser.ParseRow(is);
+    ASSERT_TRUE(row);
+    EXPECT_EQ("foo", row->name);
+    EXPECT_EQ(1, row->index);
+    ASSERT_FALSE(parser.ParseRow(is));
+
+    std::istringstream isNext("bar,22\n");
+    row = parser.ParseRow(isNext);
+    ASSERT_TRUE(row);
+    EXPECT_EQ("bar", row->name);
+    EXPECT_EQ(22, row->index);
 }
 
 int main(int argc, char* argv[]) {
