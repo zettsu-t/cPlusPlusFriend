@@ -2,6 +2,10 @@
 #include <iostream>
 #include <random>
 #include <vector>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics.hpp>
+#include <boost/accumulators/statistics/weighted_mean.hpp>
+#include <boost/accumulators/statistics/weighted_variance.hpp>
 #include <gtest/gtest.h>
 
 // Assumes discrete distributions
@@ -75,22 +79,77 @@ struct Moments {
 };
 
 Moments GetMeanVariance(const ProbabilityDensity& dist, Probability epsilon) {
-    Value value = 0;
-    Mean actualMean = 0.0;
+    using namespace boost::accumulators;
+    EXPECT_NEAR(1.0, std::accumulate(dist.begin(), dist.end(), 0.0), epsilon);
+
+    Mean value = 0;
+    Mean actualMeanBasic = 0.0;
     for (const auto& prob : dist) {
-        actualMean += value * prob;
-        ++value;
+        actualMeanBasic += value * prob;
+        value += 1.0;
     }
 
-    Mean actualVariance = 0.0;
+    value = 0;
+    Mean actualVarianceBasic = 0.0;
+    for (const auto& prob : dist) {
+        actualVarianceBasic += (value - actualMeanBasic) * (value - actualMeanBasic) * prob * 10000;
+        value += 1.0;
+    }
+    actualVarianceBasic /= 10000;
+
+    // Must set the third type and have weighted_variance take (lazy)
+    accumulator_set<Mean, stats<tag::weighted_mean, tag::weighted_variance(lazy)>, Mean> acc;
     value = 0;
     for (const auto& prob : dist) {
-        actualVariance += (value - actualMean) * (value - actualMean) * prob;
-        ++value;
+        // Do not omit the weight below
+        acc(value, weight = prob * 10000);
+        value += 1.0;
     }
+    const Mean actualMean = weighted_mean(acc);
+    const Mean actualVariance = weighted_variance(acc);
+    constexpr Mean EpsilonAcc = 1.0;
+    EXPECT_NEAR(actualMeanBasic, actualMean, EpsilonAcc);
+    EXPECT_NEAR(actualVarianceBasic, actualVariance, EpsilonAcc);
 
-    EXPECT_NEAR(1.0, std::accumulate(dist.begin(), dist.end(), 0.0), epsilon);
-    Moments result {actualMean, actualVariance};
+    // weighted_variance without lazy does not work
+    accumulator_set<Mean, stats<tag::weighted_mean, tag::weighted_variance>, Mean> accNonLazy;
+    value = 0;
+    for (const auto& prob : dist) {
+        accNonLazy(value, weight = prob);
+        value += 1.0;
+    }
+    EXPECT_NEAR(actualMeanBasic, weighted_mean(accNonLazy), EpsilonAcc);
+//  EXPECT_NEAR(actualVarianceBasic, weighted_variance(accNonLazy), EpsilonAcc);
+
+    // If we forget weight = ...
+    accumulator_set<Mean, stats<tag::mean>> accWrong;
+    value = 0;
+    for (const auto& prob : dist) {
+        // Do not omit the weight below
+        accWrong(value, prob);
+        value += 1.0;
+    }
+//  EXPECT_NEAR(actualMeanBasic, mean(accWrong), EpsilonAcc);
+
+    // Replacing tag::weighted_mean to tag::mean works
+    accumulator_set<Mean, stats<tag::mean>, Mean> accPlain;
+    value = 0;
+    for (const auto& prob : dist) {
+        accPlain(value, weight = prob);
+        value += 1.0;
+    }
+    EXPECT_NEAR(actualMeanBasic, mean(accPlain), EpsilonAcc);
+
+    // But if we omit the third type argument...
+    accumulator_set<Mean, stats<tag::mean>> accPlainWrong;
+    value = 0;
+    for (const auto& prob : dist) {
+        accPlainWrong(value, weight = prob);
+        value += 1.0;
+    }
+//  EXPECT_NEAR(actualMeanBasic, mean(accPlainWrong), EpsilonAcc);
+
+    Moments result {actualMeanBasic, actualVarianceBasic};
     return result;
 }
 
@@ -210,6 +269,29 @@ TEST_F(TestMergeProbabilityDensity, SumNegativeBinomial) {
         EXPECT_TRUE(((expectedMean - 1) < actual.mean) && (actual.mean < (expectedMean + 1)));
         EXPECT_TRUE(((expectedVariance - 1) < actual.variance) && (actual.variance < (expectedVariance + 1)));
     }
+}
+
+class TestBoostAccumulators : public ::testing::Test {};
+
+TEST_F(TestBoostAccumulators, Weighted) {
+    using namespace boost::accumulators;
+    constexpr Mean EpsilonAcc = 0.001;
+
+    accumulator_set<Mean, stats<tag::weighted_mean, tag::weighted_variance(lazy)>, Mean> accLazy;
+    accLazy(-3.0, weight = 1.0);
+    accLazy(-1.0, weight = 3.0);
+    accLazy(1.0, weight = 6.0);
+    accLazy(5.0, weight = 0.0);
+    EXPECT_NEAR(0.0, mean(accLazy), EpsilonAcc);
+    EXPECT_NEAR(1.8, variance(accLazy), EpsilonAcc);
+
+    accumulator_set<Mean, stats<tag::weighted_mean, tag::weighted_variance>, Mean> accNonLazy;
+    accNonLazy(4.0, weight = 0.1);
+    accNonLazy(6.0, weight = 0.3);
+    accNonLazy(8.0, weight = 0.6);
+    accNonLazy(12.0, weight = 0.0);
+    EXPECT_NEAR(7.0, mean(accNonLazy), EpsilonAcc);
+    EXPECT_NEAR(1.8, variance(accNonLazy), EpsilonAcc);
 }
 
 int main(int argc, char* argv[]) {
