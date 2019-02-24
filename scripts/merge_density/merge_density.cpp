@@ -92,22 +92,35 @@ Moments GetMeanVariance(const ProbabilityDensity& dist, Probability epsilon) {
     value = 0;
     Mean actualVarianceBasic = 0.0;
     for (const auto& prob : dist) {
-        actualVarianceBasic += (value - actualMeanBasic) * (value - actualMeanBasic) * prob * 10000;
+        actualVarianceBasic += (value - actualMeanBasic) * (value - actualMeanBasic) * prob;
         value += 1.0;
     }
-    actualVarianceBasic /= 10000;
+
+    // Not weighted
+    accumulator_set<Mean, stats<tag::mean, tag::variance>> accBase;
+    value = 0;
+    for (const auto& prob : dist) {
+        Value count = static_cast<decltype(count)>(prob * 10000000);
+        for(Value i=0; i<count; ++i) {
+            accBase(value);
+        }
+        value += 1.0;
+    }
+    constexpr Mean EpsilonAccBase = 0.01;
+    EXPECT_NEAR(actualMeanBasic, mean(accBase), EpsilonAccBase);
+    EXPECT_NEAR(actualVarianceBasic, variance(accBase), EpsilonAccBase);
 
     // Must set the third type and have weighted_variance take (lazy)
     accumulator_set<Mean, stats<tag::weighted_mean, tag::weighted_variance(lazy)>, Mean> acc;
     value = 0;
     for (const auto& prob : dist) {
         // Do not omit the weight below
-        acc(value, weight = prob * 10000);
+        acc(value, weight = prob);
         value += 1.0;
     }
     const Mean actualMean = weighted_mean(acc);
     const Mean actualVariance = weighted_variance(acc);
-    constexpr Mean EpsilonAcc = 1.0;
+    constexpr Mean EpsilonAcc = 0.000001;
     EXPECT_NEAR(actualMeanBasic, actualMean, EpsilonAcc);
     EXPECT_NEAR(actualVarianceBasic, actualVariance, EpsilonAcc);
 
@@ -125,7 +138,7 @@ Moments GetMeanVariance(const ProbabilityDensity& dist, Probability epsilon) {
     accumulator_set<Mean, stats<tag::mean>> accWrong;
     value = 0;
     for (const auto& prob : dist) {
-        // Do not omit the weight below
+        // Do not omit the weight below!
         accWrong(value, prob);
         value += 1.0;
     }
@@ -156,9 +169,9 @@ Moments GetMeanVariance(const ProbabilityDensity& dist, Probability epsilon) {
 class TestMergeProbabilityDensity : public ::testing::Test {};
 
 TEST_F(TestMergeProbabilityDensity, Normal) {
-    constexpr Mean expectedMean = 50;
+    constexpr Mean expectedMean = 100;
     constexpr Mean expectedVariance = 25;
-    constexpr Value maxNumber = 150;
+    constexpr Value maxNumber = 200;
     constexpr Value trialSize = 1000000;
 
     const auto dist = MakeNormalDistribution(expectedMean, expectedVariance, maxNumber, trialSize);
@@ -170,7 +183,7 @@ TEST_F(TestMergeProbabilityDensity, Normal) {
 TEST_F(TestMergeProbabilityDensity, Poisson) {
     constexpr Mean expectedMean = 10;
     constexpr Mean expectedVariance = expectedMean;
-    constexpr Value maxNumber = 100;
+    constexpr Value maxNumber = 200;
     constexpr Value trialSize = 1000000;
 
     const auto dist = MakePoissonDistribution(expectedMean, maxNumber, trialSize);
@@ -184,7 +197,7 @@ TEST_F(TestMergeProbabilityDensity, NegativeBinomial) {
     constexpr Mean probToSuccess = 0.4;
     constexpr Mean expectedMean = static_cast<Mean>(size) * (1.0 - probToSuccess) / probToSuccess;
     constexpr Mean expectedVariance = expectedMean / probToSuccess;
-    constexpr Value maxNumber = 100;
+    constexpr Value maxNumber = 200;
     constexpr Value trialSize = 1000000;
 
     const auto dist = MakeNegativeBinomialDistribution(size, probToSuccess, maxNumber, trialSize);
@@ -194,10 +207,10 @@ TEST_F(TestMergeProbabilityDensity, NegativeBinomial) {
 }
 
 TEST_F(TestMergeProbabilityDensity, SumNormals) {
-    const std::vector<Moments> testCases {{10, 16}, {50, 25}, {60, 36}, {70, 49}};
+    const std::vector<Moments> testCases {{410, 16}, {450, 25}, {460, 36}, {470, 49}};
     const std::vector<Moments>::size_type testCaseSize = testCases.size();
-    constexpr Value maxNumber = 150;
-    constexpr Value trialSize = 100000;
+    constexpr Value maxNumber = 900;
+    constexpr Value trialSize = 1000000;
 
     for(auto size = decltype(testCaseSize){1}; size <= testCaseSize; ++size) {
         ProbabilityDensity accumDist;
@@ -248,7 +261,7 @@ TEST_F(TestMergeProbabilityDensity, SumNegativeBinomial) {
 
     const std::vector<Params> testCases {{3, 0.8}, {8, 0.6}, {10, 0.45}, {20, 0.7}};
     const std::vector<Params>::size_type testCaseSize = testCases.size();
-    constexpr Value maxNumber = 150;
+    constexpr Value maxNumber = 200;
     constexpr Value trialSize = 100000;
 
     for(auto size = decltype(testCaseSize){1}; size <= testCaseSize; ++size) {
