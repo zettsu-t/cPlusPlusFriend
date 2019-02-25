@@ -116,6 +116,7 @@ Moments GetMeanVariance(const ProbabilityDensity& dist, Probability epsilon) {
     for (const auto& prob : dist) {
         // Do not omit the weight below
         acc(value, weight = prob);
+//      acc(value, prob);
         value += 1.0;
     }
     const Mean actualMean = weighted_mean(acc);

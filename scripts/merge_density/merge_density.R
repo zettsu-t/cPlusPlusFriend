@@ -62,8 +62,8 @@ plot_norm_density(vec, 100, 83)
 
 vec <- merge_density(dpois(0:30, 3), dpois(0:30, 4))
 plot_pois_density(vec, 7)
-vec <- merge_density(dpois(0:30, 3), dpois(0:30, 8))
-plot_pois_density(vec, 11)
+vec <- merge_density(vec, dpois(0:30, 8))
+plot_pois_density(vec, 15)
 
 vec <- merge_density(dnbinom(0:100, size=10, prob=0.3), dnbinom(0:100, size=15, prob=0.8))
 vec <- merge_density(vec, dnbinom(0:100, size=30, prob=0.6))
