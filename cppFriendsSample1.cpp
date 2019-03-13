@@ -2,6 +2,7 @@
 #define  __STDC_LIMIT_MACROS
 #include <cstdint>
 #include <climits>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -1464,6 +1465,71 @@ class TestInitializeInterator : public ::testing::Test {};
 TEST_F(TestInitializeInterator, All) {
     const std::vector<int> vec {0, 2, -2, 3, -1, 4};
     EXPECT_EQ(-1, InitializeInterator(vec));
+}
+
+namespace {
+    std::atomic<size_t> sharedCounter {0};
+    struct Counter {
+        Counter(void) { ++sharedCounter; }
+        ~Counter(void) { --sharedCounter; }
+    };
+}
+
+class TestSmartPtr : public ::testing::Test {
+protected:
+    virtual void SetUp() override {
+        sharedCounter = 0;
+    }
+
+    virtual void TearDown() override {
+        EXPECT_FALSE(sharedCounter);
+        sharedCounter = 0;
+    }
+};
+
+TEST_F(TestSmartPtr, UniqueOne) {
+    Counter counter;
+    EXPECT_EQ(1, sharedCounter);
+}
+
+TEST_F(TestSmartPtr, UniquePtr) {
+    {
+        auto pCounter = std::make_unique<Counter>();
+        EXPECT_EQ(1, sharedCounter);
+    }
+    EXPECT_EQ(0, sharedCounter);
+}
+
+TEST_F(TestSmartPtr, UniqueMulti) {
+    constexpr size_t size = 5;
+    {
+        auto pCounter = std::unique_ptr<Counter[]>(new Counter[size]);
+        EXPECT_EQ(size, sharedCounter);
+    }
+    EXPECT_EQ(0, sharedCounter);
+}
+
+TEST_F(TestSmartPtr, SharedPtr) {
+    std::shared_ptr<Counter> pAlias;
+    {
+        auto pCounter = std::make_shared<Counter>();
+        EXPECT_EQ(1, sharedCounter);
+        pAlias = pCounter;
+        EXPECT_EQ(1, sharedCounter);
+    }
+
+    EXPECT_EQ(1, sharedCounter);
+    pAlias.reset();
+    EXPECT_EQ(0, sharedCounter);
+}
+
+TEST_F(TestSmartPtr, SharedMulti) {
+    constexpr size_t size = 7;
+    {
+        auto pCounter = std::shared_ptr<Counter[]>(new Counter[size]);
+        EXPECT_EQ(size, sharedCounter);
+    }
+    EXPECT_EQ(0, sharedCounter);
 }
 
 /*

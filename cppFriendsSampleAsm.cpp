@@ -748,6 +748,104 @@ TEST_F(TestAsmInstructions, Div3_32bit) {
     } while(++arg);
 }
 
+namespace {
+    using FilledBitSet = uint32_t;
+
+    FilledBitSet SetSplitByMsb(FilledBitSet arg, FilledBitSet& count) {
+        uint32_t result = 0;
+        asm volatile (
+            "lzcnt %%eax, %%ecx \n\t"
+            "mov   $-1, %%ebx \n\t"
+            "shrx  %%ecx, %%ebx, %%edx \n\t"
+            "cmovb %%eax, %%edx \n\t"
+            :"=d"(result),"=c"(count):"a"(arg):"rbx");
+        return result;
+    }
+
+    FilledBitSet SetOnesForLeadingZeros(FilledBitSet arg, FilledBitSet& count) {
+        uint32_t result = 0;
+        asm volatile (
+            "lzcnt %%eax, %%ecx \n\t"
+            "shlx  %%ecx, %%eax, %%ebx \n\t"
+            "sarx  %%ecx, %%ebx, %%edx \n\t"
+            :"=d"(result),"=c"(count):"a"(arg):"rbx");
+        return result;
+    }
+}
+
+TEST_F(TestAsmInstructions, SetLowOnes) {
+    FilledBitSet count = 0;
+    constexpr FilledBitSet BitSetWidth = sizeof(FilledBitSet) * 8;
+    static_assert(BitSetWidth == 32, "Unexpected uint size");
+
+    for(FilledBitSet i=0; i < BitSetWidth; ++i) {
+        const FilledBitSet expectedCount = 31 - i;
+        FilledBitSet pattern = 1;
+        pattern <<= i;
+        const FilledBitSet mask = pattern - 1;
+        const FilledBitSet expected = pattern | mask;
+
+        EXPECT_EQ(expected, SetSplitByMsb(pattern, count));
+        EXPECT_EQ(expectedCount, count);
+
+        uint32_t lowBits = 0xaaaaaaaa & mask;
+        EXPECT_EQ(expected, SetSplitByMsb(pattern | lowBits, count));
+        EXPECT_EQ(expectedCount, count);
+
+        lowBits = 0x55555555 & mask;
+        EXPECT_EQ(expected, SetSplitByMsb(pattern | lowBits, count));
+        EXPECT_EQ(expectedCount, count);
+    }
+
+    EXPECT_FALSE(SetSplitByMsb(0, count));
+    EXPECT_EQ(BitSetWidth, count);
+
+    EXPECT_EQ(0xffffffffu, SetSplitByMsb(0x80000000u, count));
+    EXPECT_EQ(0, count);
+
+    EXPECT_EQ(0xffffffffu, SetSplitByMsb(0xc0000000u, count));
+    EXPECT_EQ(0, count);
+}
+
+TEST_F(TestAsmInstructions, SetHighOnes) {
+    FilledBitSet count = 0;
+    constexpr FilledBitSet BitSetWidth = sizeof(FilledBitSet) * 8;
+    static_assert(BitSetWidth == 32, "Unexpected uint size");
+
+    for(FilledBitSet i=0; i < BitSetWidth; ++i) {
+        const FilledBitSet expectedCount = 31 - i;
+        FilledBitSet diff = 1;
+        diff <<= i;
+        FilledBitSet mask = diff - 1;
+        FilledBitSet expected = 0;
+        expected -= diff;
+
+        uint32_t arg = diff;
+        EXPECT_EQ(expected, SetOnesForLeadingZeros(arg, count));
+        EXPECT_EQ(expectedCount, count);
+
+        uint32_t highBits = ~mask;
+        uint32_t lowBits = 0xaaaaaaaa & mask;
+        expected = highBits | lowBits;
+        EXPECT_EQ(expected, SetOnesForLeadingZeros(arg | lowBits, count));
+        EXPECT_EQ(expectedCount, count);
+
+        lowBits = 0x55555555 & mask;
+        expected = highBits | lowBits;
+        EXPECT_EQ(expected, SetOnesForLeadingZeros(arg | lowBits, count));
+        EXPECT_EQ(expectedCount, count);
+    }
+
+    EXPECT_FALSE(SetOnesForLeadingZeros(0, count));
+    EXPECT_EQ(BitSetWidth, count);
+
+    EXPECT_EQ(0x80000000u, SetOnesForLeadingZeros(0x80000000u, count));
+    EXPECT_EQ(0, count);
+
+    EXPECT_EQ(0xc0000000u, SetOnesForLeadingZeros(0xc0000000u, count));
+    EXPECT_EQ(0, count);
+}
+
 /*
   Local Variables:
   mode: c++
