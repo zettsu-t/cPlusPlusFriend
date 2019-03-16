@@ -751,7 +751,7 @@ TEST_F(TestAsmInstructions, Div3_32bit) {
 namespace {
     using FilledBitSet = uint32_t;
 
-    FilledBitSet SetSplitByMsb(FilledBitSet arg, FilledBitSet& count) {
+    FilledBitSet SplitByMsb(FilledBitSet arg, FilledBitSet& count) {
         uint32_t result = 0;
         asm volatile (
             "lzcnt %%eax, %%ecx \n\t"
@@ -785,25 +785,25 @@ TEST_F(TestAsmInstructions, SetLowOnes) {
         const FilledBitSet mask = pattern - 1;
         const FilledBitSet expected = pattern | mask;
 
-        EXPECT_EQ(expected, SetSplitByMsb(pattern, count));
+        EXPECT_EQ(expected, SplitByMsb(pattern, count));
         EXPECT_EQ(expectedCount, count);
 
         uint32_t lowBits = 0xaaaaaaaa & mask;
-        EXPECT_EQ(expected, SetSplitByMsb(pattern | lowBits, count));
+        EXPECT_EQ(expected, SplitByMsb(pattern | lowBits, count));
         EXPECT_EQ(expectedCount, count);
 
         lowBits = 0x55555555 & mask;
-        EXPECT_EQ(expected, SetSplitByMsb(pattern | lowBits, count));
+        EXPECT_EQ(expected, SplitByMsb(pattern | lowBits, count));
         EXPECT_EQ(expectedCount, count);
     }
 
-    EXPECT_FALSE(SetSplitByMsb(0, count));
+    EXPECT_FALSE(SplitByMsb(0, count));
     EXPECT_EQ(BitSetWidth, count);
 
-    EXPECT_EQ(0xffffffffu, SetSplitByMsb(0x80000000u, count));
+    EXPECT_EQ(0xffffffffu, SplitByMsb(0x80000000u, count));
     EXPECT_EQ(0, count);
 
-    EXPECT_EQ(0xffffffffu, SetSplitByMsb(0xc0000000u, count));
+    EXPECT_EQ(0xffffffffu, SplitByMsb(0xc0000000u, count));
     EXPECT_EQ(0, count);
 }
 
@@ -844,6 +844,56 @@ TEST_F(TestAsmInstructions, SetHighOnes) {
 
     EXPECT_EQ(0xc0000000u, SetOnesForLeadingZeros(0xc0000000u, count));
     EXPECT_EQ(0, count);
+}
+
+TEST_F(TestAsmInstructions, BitScanReverse) {
+    constexpr FilledBitSet BitSetWidth = sizeof(FilledBitSet) * 8;
+    static_assert(BitSetWidth == 32, "Unexpected uint size");
+
+    for(FilledBitSet i=0; i < BitSetWidth; ++i) {
+        const FilledBitSet expectedBsr = i;
+        FilledBitSet arg = 1;
+        arg <<= i;
+
+        FilledBitSet actual = 0;
+        asm volatile (
+            "bsr %%eax, %%edx \n\t"
+            :"=d"(actual):"a"(arg):);
+        EXPECT_EQ(expectedBsr, actual);
+
+        const FilledBitSet expectedLzcnt = BitSetWidth - 1 - i;
+        actual = 0;
+        asm volatile (
+            "lzcnt %%eax, %%edx \n\t"
+            :"=d"(actual):"a"(arg):);
+        EXPECT_EQ(expectedLzcnt, actual);
+    }
+
+    constexpr FilledBitSet argZero = 0;
+    FilledBitSet actual = 0;
+    asm volatile (
+        "tzcnt %%eax, %%edx \n\t"
+        :"=d"(actual):"a"(argZero):);
+    EXPECT_EQ(BitSetWidth, actual);
+
+    actual = 0;
+    asm volatile (
+        "lzcnt %%eax, %%edx \n\t"
+        :"=d"(actual):"a"(argZero):);
+    EXPECT_EQ(BitSetWidth, actual);
+
+    constexpr uint64_t argZero64 = 0;
+    uint64_t actual64 = 0;
+    asm volatile (
+        "tzcnt %%rax, %%rdx \n\t"
+        :"=d"(actual64):"a"(argZero64):);
+    EXPECT_EQ(64, actual64);
+
+    actual64 = 0;
+    asm volatile (
+        "lzcnt %%rax, %%rdx \n\t"
+        :"=d"(actual64):"a"(argZero64):);
+    EXPECT_EQ(64, actual64);
 }
 
 /*
