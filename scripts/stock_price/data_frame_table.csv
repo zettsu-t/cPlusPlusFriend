@@ -1,0 +1,4 @@
+int_value,float_value,str_value,na_value,bool_value
+1,5.1,"abc",,FALSE
+2,5.2,"bcd",,TRUE
+3,5.3,"def",,FALSE
