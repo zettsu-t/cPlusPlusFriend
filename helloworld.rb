@@ -3,7 +3,7 @@
 
 require 'test/unit'
 
-PATTERN = /\A((H)|(h))ello,? (?(2)[Ww]|[w])orld!?\z/
+PATTERN = /\A(?:(H)|(h))ello,? (?(1)[Ww]|[w])orld!?\z/
 
 class TestSeatMap < Test::Unit::TestCase
   def test_valid_strings
@@ -34,6 +34,7 @@ class TestSeatMap < Test::Unit::TestCase
      'Hello World!?',
      'Hello World!!',
      'Hello  World!',
+     'Hello 2World!',
      'Hello,World',
      'ello world',
      'Hello orld',
