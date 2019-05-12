@@ -1466,6 +1466,11 @@ TEST_F(TestLiteralSizeof, Double) {
     static_assert(sizeof(double) == sizeof(3.14), "");
 }
 
+TEST_F(TestLiteralSizeof, Zero) {
+    // It's safe
+    free(malloc(0));
+}
+
 class TestTypeDeduction : public ::testing::Test {};
 
 TEST_F(TestTypeDeduction, Constant) {
