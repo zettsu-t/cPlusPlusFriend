@@ -8,6 +8,8 @@ library(plyr)
 library(dplyr)
 library(ggmcmc)
 library(ggplot2)
+library(gridExtra)
+library(ggthemes)
 library(raster)
 library(rstan)
 library(boot)
@@ -18,13 +20,19 @@ library(stringr)
 common_seed <- 123
 
 ## Set numbers of iterations in testing
-n_stan_chains <- 2
-stan_warmup <- 250
-stan_iter <- 500
+n_stan_chains <- 4
 
 ## Number of respondents(n) and questions(k)
-n <- 1500
-k <- 24
+## stan_warmup <- 250
+## stan_iter <- 500
+## n <- 1500
+## k <- 24
+
+## ggs sample
+stan_warmup <- 500
+stan_iter <- 500
+n <- 4
+k <- 100
 
 ## Assuming four-choice questions
 chance <- 0.25
@@ -85,6 +93,9 @@ g <- set_font_size(g, 32)
 plot(g)
 dev.off()
 
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+Sys.setenv(LOCAL_CPPFLAGS = '-march=native')
 
 ## Estimates with Stan
 input_data <- list(N=n, K=k, Y=data, chance=chance)
@@ -102,11 +113,28 @@ if (n_stan_chains == 1) {
 }
 df_fit <- as.data.frame(fit.stan.means)
 
+font_size <- 12
+set_font <- function(g) {
+    g + theme(axis.text=element_text(family='sans', size=font_size),
+              axis.title=element_text(family='sans', size=font_size),
+              strip.text=element_text(family='sans', size=font_size),
+              plot.title=element_text(family='sans', size=font_size))
+}
+
+fit.ggs <- ggs(fit.stan)
+png(filename='irt_all_difficulty_ggs.png', width=800, height=480)
+g1 <- set_font(ggs_Rhat(fit.ggs, family="theta") + guides(color=guide_legend(override.aes = list(size=4))))
+g2 <- set_font(ggs_histogram(fit.ggs, family="theta"))
+g3 <- set_font(ggs_traceplot(fit.ggs, family="theta"))
+grid.arrange(g1, g2, g3, ncol=3, nrow=1)
+dev.off()
 
 ## Draws a chart of difficulties of questions
-png(filename='irt_all_difficulty_hist.png', width=1200, height=800)
-stan_hist(fit.stan, pars=c('difficulty'), nrow=4, ncol=6, fill='slateblue')
-dev.off()
+if (n > 6) {
+    png(filename='irt_all_difficulty_hist.png', width=1200, height=800)
+    stan_hist(fit.stan, pars=c('difficulty'), nrow=4, ncol=6, fill='slateblue')
+    dev.off()
+}
 
 draw_charts <- function(actual, param_name, display_name, ylab_text) {
     param_name_regex <- paste('^', param_name, sep='')
