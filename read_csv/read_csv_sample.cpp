@@ -93,6 +93,64 @@ TEST_F(TestCsvFile, LF) {
     Compare(expected, actual);
 }
 
+namespace {
+    int lineToInt(const std::string& line) {
+        return boost::lexical_cast<int>(line);
+    }
+}
+
+class TestTrailingLf : public ::testing::Test{};
+
+TEST_F(TestTrailingLf, ToInt) {
+    constexpr int expected = 123;
+    auto ifs = std::ifstream("crlfnums.csv");
+    std::string line;
+    std::getline(ifs, line);
+    ASSERT_FALSE(line.empty());
+
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    ASSERT_EQ(expected, lineToInt(line));
+#else
+    ASSERT_ANY_THROW(lineToInt(line));
+#endif
+
+    boost::trim(line);
+    ASSERT_FALSE(line.empty());
+    ASSERT_EQ(expected, lineToInt(line));
+}
+
+TEST_F(TestTrailingLf, CRLF) {
+    constexpr char expected = '3';
+    auto ifs = std::ifstream("crlf.csv");
+    std::string line;
+    std::getline(ifs, line);
+
+    ASSERT_FALSE(line.empty());
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    ASSERT_EQ(expected, *(line.rbegin()));
+#else
+    ASSERT_EQ('\r', *(line.rbegin()));
+#endif
+
+    boost::trim(line);
+    ASSERT_FALSE(line.empty());
+    ASSERT_EQ(expected, *(line.rbegin()));
+}
+
+TEST_F(TestTrailingLf, LF) {
+    auto ifs = std::ifstream("lf.csv");
+    std::string line;
+    std::getline(ifs, line);
+    std::getline(ifs, line);
+
+    ASSERT_FALSE(line.empty());
+    ASSERT_EQ('6', *line.rbegin());
+
+    boost::trim(line);
+    ASSERT_FALSE(line.empty());
+    ASSERT_EQ('6', *line.rbegin());
+}
+
 template <typename T>
 class CsvParser {
 public:
