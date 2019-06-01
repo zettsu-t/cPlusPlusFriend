@@ -1,0 +1,69 @@
+---
+title: "はじめてのR Markdown"
+author: "プログラマたんbot"
+date: "2019/6/1"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+geometry: no
+---
+
+## きっかけ
+
+Rスクリプトで作成したPNG画像を、一枚一枚文書に貼り込むのは辛いのです。プログラマの三大美徳(短気、怠惰、傲慢)があれば実行可能ファイルをmake一発できるなら、文書作成もなんとかならないでしょうか。
+
+"再現可能性のすゝめ (Wonderful R 3)" (高橋康介 著/石田基広 監修, 2018/5, 共立出版)を読んで、R Markdownを使えばレポートが作成できることが分かったので、試してみましょう。
+
+## 例題
+
+[学校保健統計調による17歳の身長](https://www.e-stat.go.jp/stat-search/files?page=1&layout=datalist&toukei=00400002&tstat=000001011648&cycle=0&tclass1=000001113655&tclass2=000001113656&second2=1) をプロットしてみます。
+
+```{r load, include=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(reshape2)
+df <- readr::read_csv('data/height.csv')
+```
+
+まず性別を区別せずに、身長の分布を描きます。なんだか山がはっきりしません。
+
+```{r height_all, fig.height=3, fig.width=5, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
+df_all <- df %>% dplyr::select('height', 'all')
+g <- ggplot(df_all, aes(x=height, y=all))
+g <- g + geom_bar(position='dodge', stat = 'identity', fill='gray50')
+g <- g + scale_fill_manual(values = c('cyan'))
+g <- g + xlab('Height [cm]')
+g <- g + ylab('Percentage')
+g <- g + labs(title='Heights of 17-year-old')
+plot(g)
+```
+
+次に性別を区別して、身長の分布を描きます。男女それぞれに、山が一つあります。どうやら先ほどの図は、二つの山を足した分布だったようです。
+
+```{r height_both, fig.height=3, fig.width=5, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
+df_both <- df %>% dplyr::select('height', 'male', 'female') %>% reshape2::melt(id.vars=c('height'), variable.name='sex')
+g <- ggplot(df_both, aes(x=height, y=value, fill=sex))
+g <- g + geom_bar(position='dodge', stat = 'identity')
+g <- g + scale_fill_manual(values = c('royalblue', 'orchid'))
+g <- g + xlab('Height [cm]')
+g <- g + ylab('Percentage')
+g <- g + labs(title='Heights of 17-year-old males and females')
+g <- g + theme(legend.position=c(0.9, 0.85), legend.title=element_blank(), legend.text=element_text(size=rel(1)))
+plot(g)
+```
+
+このように標本をカテゴリ=ここでは性別を区別すると、それぞれをよく知られた分布で表現できそうです。試しに、正規分布かどうかQQ normで描いてみましょう。
+
+```{r qqnorm_all, fig.height=5, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
+par(mfrow=c(1,3))
+qqnorm(reshape::untable(df[,'height'], df$all * 100)$height, main='all')
+qqnorm(reshape::untable(df[,'height'], df$male * 100)$height, main='male')
+qqnorm(reshape::untable(df[,'height'], df$female * 100)$height, main='female')
+```
