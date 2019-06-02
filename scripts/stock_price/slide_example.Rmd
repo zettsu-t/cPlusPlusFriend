@@ -1,0 +1,69 @@
+---
+title: "R Markdownによるスライド作成"
+author: "プログラマたんbot"
+date: "2019年6月2日"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      countIncrementalSlides: false
+---
+
+class: my-one-page-font1, middle, center
+
+<style type="text/css">
+.my-one-page-font1 {
+  font-size: 48px;
+}
+</style>
+
+5000兆円あれば世界の株を買えますか?
+
+```{r load, include=FALSE, warning=FALSE}
+## Data source
+## https://data.worldbank.org/indicator/cm.mkt.lcap.cd
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(reshape2)
+df <- readr::read_csv("data/market.csv")
+```
+
+---
+
+class: my-one-page-font2, middle, center
+
+<style type="text/css">
+.my-one-page-font2 {
+  font-size: 24px;
+}
+</style>
+
+答: 買えません。
+
+```{r height_all, fig.height=6, fig.width=10, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
+df_world <- df %>% dplyr::filter(`Country Name` == 'World') %>%
+    dplyr::select(starts_with("1"), starts_with("2")) %>%
+    dplyr::select_if(function(x) all(!is.na(x)))  %>%
+    reshape2::melt(variable.name='year', value.name='price') %>%
+    dplyr::mutate(year=strtoi(as.character(year)))
+
+jpy_usd <- 110
+
+g <- ggplot(data=df_world)
+g <- g + geom_line(aes(x=year, y=price), size=3)
+g <- g + labs(title='Market capitalization of the World (current US$)')
+g <- g + xlim(range(df_world$year))
+g <- g + xlab('Year')
+g <- g + annotate('text', x=1995, y=5500000000000000 / jpy_usd, label='5000兆円 (110 JPY/US$)', size=5)
+g <- g + geom_hline(yintercept = 5000000000000000 / jpy_usd, color='orchid', size=2)
+g <- g + theme(axis.text=element_text(family='sans', size=24),
+               axis.title=element_text(family='sans', size=24),
+               strip.text=element_text(family='sans', size=24),
+               plot.title=element_text(family='sans', size=20))
+g <- g + ylab('Price (US$)')
+plot(g)
+```
+
+[出典:世界銀行](https://data.worldbank.org/indicator/CM.MKT.LCAP.CD) CC-BY 4.0の下で使用、改変
