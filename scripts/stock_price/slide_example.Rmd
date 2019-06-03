@@ -1,24 +1,19 @@
 ---
 title: "R Markdownによるスライド作成"
 author: "プログラマたんbot"
-date: "2019年6月2日"
+date: "2019年6月3日"
 output:
   xaringan::moon_reader:
+    css: [default, metropolis]
     lib_dir: libs
     nature:
       highlightStyle: github
       countIncrementalSlides: false
 ---
 
-class: my-one-page-font1, middle, center
+## 5000兆円あれば世界の株を全部買えますか?
 
-<style type="text/css">
-.my-one-page-font1 {
-  font-size: 48px;
-}
-</style>
-
-5000兆円あれば世界の株を買えますか?
+買えるかな?
 
 ```{r load, include=FALSE, warning=FALSE}
 ## Data source
@@ -32,15 +27,7 @@ df <- readr::read_csv("data/market.csv")
 
 ---
 
-class: my-one-page-font2, middle, center
-
-<style type="text/css">
-.my-one-page-font2 {
-  font-size: 24px;
-}
-</style>
-
-答: 買えません。
+## 答: 買えません。
 
 ```{r height_all, fig.height=6, fig.width=10, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE}
 df_world <- df %>% dplyr::filter(`Country Name` == 'World') %>%
