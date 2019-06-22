@@ -57,22 +57,27 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     }
 
     df_base <- read_excel(in_filename, sheet='tweets')
+    data_ranged <- !is.na(first_date) && !is.na(last_date)
 
     ## Exclude replies
     df <- df_base %>%
-        plyr::rename(replace=c('Created At' = 'date_str')) %>%
         dplyr::filter(!grepl('^@.*', Text)) %>%
+        plyr::rename(replace=c('Created At' = 'date_str')) %>%
         dplyr::mutate(date=convert_date_string(date_str))
 
     df$date <- convert_date_tz_string(df$date_str)
     df$hour <- lubridate::hour(df$date) + lubridate::minute(df$date) / 60.0
     df$wday <- as.character(lubridate::wday(df$date))
 
-    df_sub <- df %>% filter(between(date,
-                                    convert_date_string(paste(first_date, '00:00:00')),
-                                    convert_date_string(paste(last_date, '23:59:59'))))
+    df_sub <- df
+    chart_title <- data_title
+    if (data_ranged) {
+        df_sub <- df %>% filter(between(date,
+                                        convert_date_string(paste(first_date, '00:00:00')),
+                                        convert_date_string(paste(last_date, '23:59:59'))))
+        chart_title <- paste0(data_title, ' ', first_date, '-', last_date)
+    }
     readr::write_csv(df_sub, paste0(out_basename, '_out.csv'))
-    chart_title <- paste0(data_title, ' ', first_date, '-', last_date)
 
     png(filename=paste0(out_basename, '_like.png'), width=800, height=400)
     par(family=font_name)
@@ -91,18 +96,19 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     g <- ggplot(df_sub, aes(x=hour, y=Retweets, shape=wday, color=wday))
     g <- g + geom_point(size=4, alpha=0.9)
     g <- g + scale_y_log10()
-    g <- g + ylab('リツーイト')
+    g <- g + ylab('リツイート')
     g <- set_colors(g)
     g <- set_hour_ticks(g)
     g <- set_legend(g, chart_title)
     plot(g)
     dev.off()
 
+    df_like_rt <- df %>% filter(Favorites > 0 & Retweets > 0)
     png(filename=paste0(out_basename, '_like_rt.png'), width=800, height=400)
     par(family=font_name)
-    g <- ggplot(df_sub, aes(x=Favorites, y=Retweets, shape=wday, color=wday))
+    g <- ggplot(df_like_rt, aes(x=Favorites, y=Retweets, shape=wday, color=wday))
     g <- g + xlab('いいね')
-    g <- g + ylab('リツーイト')
+    g <- g + ylab('リツイート')
     g <- g + geom_point(size=4, alpha=0.9)
     g <- g + scale_x_log10()
     g <- g + scale_y_log10()
@@ -112,4 +118,6 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     dev.off()
 }
 
-draw_all('in.xlsx', 'アカウント', '2019/06/14', '2019/06/20')
+## Download an xlsx file from Vicinitas to analyze
+## https://www.vicinitas.io/
+draw_all('in.xlsx', 'アカウント', '2019/06/07', '2019/06/20')
