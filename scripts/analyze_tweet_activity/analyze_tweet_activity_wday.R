@@ -3,10 +3,14 @@ library(plyr)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
+library(purrrlyr)
 library(readr)
 library(readxl)
 library(stringr)
+library(tibble)
 
+g_input_dir <- './data'
+g_output_dir <- './images'
 font_name <- 'Migu 1M'
 
 ## Do not change the system locale
@@ -49,14 +53,32 @@ set_legend <- function(g, chart_title) {
     g
 }
 
-draw_all <- function(in_filename, data_title, first_date, last_date) {
+make_output_filename <- function(out_basename, suffix, extension) {
+    file.path(g_output_dir, paste0(out_basename, '_', suffix, '.', extension))
+}
+
+make_png_filename <- function(out_basename, suffix) {
+    make_output_filename(out_basename, suffix, 'png')
+}
+
+make_csv_filename <- function(out_basename, suffix) {
+    make_output_filename(out_basename, suffix, 'csv')
+}
+
+draw_all <- function(account) {
+    in_filename <- account$in_filename
+    account_name <- account$account_name
+    first_date <- account$first_date
+    last_date <- account$last_date
+
+    dir.create(g_output_dir)
     out_basename <- in_filename
     matched <- stringr::str_match(in_filename, "(.*)\\.")
     if (!is.na(matched)) {
         out_basename <- matched[1,2]
     }
 
-    df_base <- read_excel(in_filename, sheet='tweets')
+    df_base <- read_excel(file.path(g_input_dir, in_filename), sheet='tweets')
     data_ranged <- !is.na(first_date) && !is.na(last_date)
 
     ## Exclude replies
@@ -70,17 +92,18 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     df$wday <- as.character(lubridate::wday(df$date))
 
     df_sub <- df
-    chart_title <- data_title
+    chart_title <- account_name
     if (data_ranged) {
         df_sub <- df %>% filter(between(date,
                                         convert_date_string(paste(first_date, '00:00:00')),
                                         convert_date_string(paste(last_date, '23:59:59'))))
-        chart_title <- paste0(data_title, ' ', first_date, '-', last_date)
+        chart_title <- paste0(account_name, ' ', first_date, '-', last_date)
     }
-    readr::write_csv(df_sub, paste0(out_basename, '_out.csv'))
+    readr::write_csv(df_sub, make_csv_filename(out_basename, 'out'))
 
-    png(filename=paste0(out_basename, '_like.png'), width=800, height=400)
-    par(family=font_name)
+    df_log_likes <- tibble(Favorites=df_sub$Favorites, account=account_name)
+
+    png(filename=make_png_filename(out_basename, 'like'), width=800, height=400)
     g <- ggplot(df_sub, aes(x=hour, y=Favorites, shape=wday, color=wday))
     g <- g + geom_point(size=4, alpha=0.9)
     g <- g + scale_y_log10()
@@ -91,8 +114,7 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     plot(g)
     dev.off()
 
-    png(filename=paste0(out_basename, '_rt.png'), width=800, height=400)
-    par(family=font_name)
+    png(filename=make_png_filename(out_basename, 'rt'), width=800, height=400)
     g <- ggplot(df_sub, aes(x=hour, y=Retweets, shape=wday, color=wday))
     g <- g + geom_point(size=4, alpha=0.9)
     g <- g + scale_y_log10()
@@ -104,8 +126,7 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     dev.off()
 
     df_like_rt <- df %>% filter(Favorites > 0 & Retweets > 0)
-    png(filename=paste0(out_basename, '_like_rt.png'), width=800, height=400)
-    par(family=font_name)
+    png(filename=make_png_filename(out_basename, 'like_rt'), width=800, height=400)
     g <- ggplot(df_like_rt, aes(x=Favorites, y=Retweets, shape=wday, color=wday))
     g <- g + xlab('いいね')
     g <- g + ylab('リツイート')
@@ -116,8 +137,38 @@ draw_all <- function(in_filename, data_title, first_date, last_date) {
     g <- set_legend(g, chart_title)
     plot(g)
     dev.off()
+
+    df_log_likes
+}
+
+## draw_all_files<- function(in_filename, account_name, first_date, last_date) {
+draw_all_acoounts <- function(account_set) {
+    df <- account_set %>%
+        purrrlyr::by_row(function(x) { draw_all(x) }, .collate = c("list"))
+    df <- df[['.out']] %>% plyr::ldply() %>% dplyr::bind_rows()
+
+    png_filename <- file.path(g_output_dir, 'dist_all.png')
+    png(filename=png_filename, width=800, height=400)
+    g <- ggplot(df, aes(x=Favorites, color=account))
+    g <- g + geom_line(stat='density', size=1.5)
+    g <- g + scale_x_log10()
+    g <- set_legend(g, 'いいねの分布')
+    g <- g + xlab('いいね')
+    plot(g)
+    dev.off()
 }
 
 ## Download an xlsx file from Vicinitas to analyze
 ## https://www.vicinitas.io/
-draw_all('in.xlsx', 'アカウント', '2019/06/07', '2019/06/20')
+
+## This script reads a CSV file which consists of
+## column names: in_filename, account_name, first_date, last_date
+## rows for each account: downloaded xlsx filename, label for charts, first date of tweets (or NA), last date of tweets (or NA)
+args <- commandArgs(trailingOnly=TRUE)
+list_filename <- if (length(args) >= 1) {
+    args[1]
+} else {
+    'files.csv'
+}
+account_set <- readr::read_csv(file.path(g_input_dir, list_filename), locale=readr::locale(encoding="UTF-8"))
+draw_all_acoounts(account_set)
