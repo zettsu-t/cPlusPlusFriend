@@ -1679,6 +1679,18 @@ TEST_F(TestBindMemberFunction, All) {
     EXPECT_EQ("abc", parserDefault.GetString());
 }
 
+class TestOddEven : public ::testing::Test {};
+
+TEST_F(TestOddEven, All) {
+    for(int i=0; i<100; ++i) {
+        const auto expected = (i % 2) == 0;
+        std::smatch match;
+        const auto s = boost::lexical_cast<std::string>(i);
+        bool actual = std::regex_match(s, match, std::regex("^.*(0|2|4|6|8)\\s*$"));
+        EXPECT_EQ(expected, actual);
+    }
+}
+
 /*
 Local Variables:
 mode: c++
