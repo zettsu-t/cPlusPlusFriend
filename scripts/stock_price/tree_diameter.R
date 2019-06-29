@@ -1,7 +1,10 @@
 library(dplyr)
+library(extrafont)
 library(ggplot2)
 library(grDevices)
 library(igraph)
+library(readr)
+library(purrrlyr)
 
 to_leaves <- function(x, max_weight) {
     weight=max(0, max_weight - log2(x)) + 1
@@ -39,3 +42,55 @@ make_tree <- function(n_level, max_weight) {
 n_level <- 5
 make_tree(n_level, 1)
 make_tree(n_level, n_level)
+
+
+df <- readr::read_csv('keikyu_line.csv', col_types='cii')
+stations <- df[!duplicated(df$from),]$station
+df <- df %>% select(c('from', 'to'))
+gr <- graph_from_data_frame(df, directed=FALSE, vertices=NULL)
+gr <- simplify(gr)
+V(gr)$name <- stations
+
+## Split the graph gr into vertices along chains and junctions
+section <- 1
+sections <- integer()
+vertices <- integer()
+previous_dist <- 0
+previous_junction <- FALSE
+
+junctions <- sapply(1:NROW(stations), function(x) {
+    (NROW(igraph::neighbors(gr, x)) > 2)
+})
+
+dfs_callback <- function(g, v, exta) {
+    vid <- as.integer(v[['vid']] + 1)
+    dist <- v[['dist']]
+    is_junction <- junctions[vid]
+
+    ## Visits or leaves a junction, starts a new backtracking
+    if ((is_junction == TRUE) || (previous_junction == TRUE) || (previous_dist > dist)) {
+        section <<- section + 1
+    }
+
+    sections <<- c(sections, section)
+    vertices <<- c(vertices, vid)
+    previous_dist <<- dist
+    previous_junction <<- is_junction
+    FALSE
+}
+
+igraph::dfs(gr, root=1, "all", in.callback=dfs_callback)
+sections <- (tibble(section=sections, vertex=vertices) %>% dplyr::arrange(vertices))$section
+gr_c <- simplify(igraph::contract(gr, sections))
+V(gr_c)$name <- sapply(V(gr_c)$name, function(x) { paste(x,sep=',',collapse=',') })
+
+png(filename='full.png', width=1024, height=512)
+par(mfrow=c(1,2), family='Migu 1M')
+plot(gr, layout=layout.fruchterman.reingold, main='', family='Migu 1M',
+     edge.width=2, edge.color='black',
+     vertex.size=1, vertex.label.cex=0.75, vertex.label.color='black')
+
+plot(gr_c, layout=layout.fruchterman.reingold, main='', family='Migu 1M',
+     edge.width=2, edge.color='black',
+     vertex.size=5, vertex.label.cex=1, vertex.label.color='black')
+dev.off()
