@@ -1,4 +1,5 @@
 library(extrafont)
+library(forcats)
 library(plyr)
 library(dplyr)
 library(ggplot2)
@@ -147,6 +148,7 @@ draw_all_acoounts <- function(account_set) {
         purrrlyr::by_row(function(x) { draw_all(x) }, .collate = c("list"))
     df <- df[['.out']] %>% plyr::ldply() %>% dplyr::bind_rows()
 
+    df$account <- forcats::fct_inorder(df$account)
     png_filename <- file.path(g_output_dir, 'dist_all.png')
     png(filename=png_filename, width=800, height=400)
     g <- ggplot(df, aes(x=Favorites, color=account))
