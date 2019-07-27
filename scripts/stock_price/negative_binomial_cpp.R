@@ -24,10 +24,11 @@ draw_chart <- function(filename) {
     g <- ggplot(dfs, aes(x=x, y=value, group=variable, color=variable))
     g <- g + geom_line()
     g <- g + scale_linetype_manual(values=c('solid', 'solid', 'dashed'))
-    g <- g + scale_color_manual(labels=c('Random C++', 'R dnbinom', 'Poisson'), values=c('navy', 'cornflowerblue', 'orchid'))
+    g <- g + scale_color_manual(labels=c('C++ Random', 'R dnbinom', 'Poisson'), values=c('navy', 'cornflowerblue', 'orchid'))
     g <- g + facet_grid(prob~size, scales='free', labeller=labeller(size=label_both, prob=label_both))
     g <- g + xlab('Count')
     g <- g + ylab('Density')
+    g <- g + theme(legend.title=element_blank())
     plot(g)
     dev.off()
 }
