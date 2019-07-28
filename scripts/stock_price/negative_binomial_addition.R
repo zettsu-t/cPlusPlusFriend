@@ -30,13 +30,27 @@ scale_negative_binomial <- function(n_sample, nb_size, nb_prob, divider, is_size
     }
 }
 
+scale_gamma <- function(n_sample, gamma_shape, gamma_scale, divider, is_size_divided) {
+    if (is_size_divided) {
+        rowSums(replicate(divider, rgamma(n_sample, shape=gamma_shape/divider, scale=gamma_scale)))
+    } else {
+        rowSums(replicate(divider, rgamma(n_sample, shape=gamma_shape, scale=gamma_scale/divider)))
+    }
+}
+
 make_mean_var_label <- function(name, mu, sigma2) {
     paste0(name, 'mean=', sprintf('%3.2f', mu),' var=', sprintf('%3.2f', sigma2))
 }
 
-analyze_distributions <- function(nb_size, nb_prob, y_one, y_combined) {
-    expected_mean <- nb_size * (1 - nb_prob) / nb_prob
-    expected_var <- expected_mean / nb_prob
+analyze_distributions <- function(nb_size, nb_prob, gamma_shape, gamma_scale, is_nb, y_one, y_combined) {
+    if (is_nb) {
+        expected_mean <- nb_size * (1 - nb_prob) / nb_prob
+        expected_var <- expected_mean / nb_prob
+    } else {
+        expected_mean <- gamma_shape * gamma_scale
+        expected_var <- gamma_shape * gamma_scale * gamma_scale
+    }
+
     actual_one_mean <- mean(y_one)
     actual_one_var <- var(y_one)
     actual_combined_mean <- mean(y_combined)
@@ -67,20 +81,29 @@ analyze_distributions <- function(nb_size, nb_prob, y_one, y_combined) {
          actual_combined_label=actual_combined_label)
 }
 
-draw_distributions <- function(nb_size, nb_prob, divider, is_size_divided) {
+draw_distributions <- function(n_sample, nb_size, nb_prob, divider, is_size_divided, is_nb) {
+    gamma_shape <- nb_size
+    gamma_scale <- 1.0 / (1.0 / nb_prob - 1.0)
+    base_color <- 'black'
+    chart_colors <- c('royalblue', 'orange')
+
     if (is_size_divided) {
         chart_suffix <- 'alpha divided'
-        chart_colors <- c('navy', 'deeppink')
     } else {
         chart_suffix <- 'theta divided'
-        chart_colors <- c('royalblue', 'orange')
     }
-    base_color <- 'black'
-    chart_title <- paste('size =', nb_size, 'prob =', nb_prob, 'divider =', divider, chart_suffix)
 
-    y_one <- rnbinom(n_sample, size=nb_size, prob=nb_prob)
-    y_combined <- scale_negative_binomial(n_sample, nb_size, nb_prob, divider, is_size_divided)
-    result <- analyze_distributions(nb_size, nb_prob, y_one, y_combined)
+    if (is_nb) {
+        y_one <- rnbinom(n_sample, size=nb_size, prob=nb_prob)
+        y_combined <- scale_negative_binomial(n_sample, nb_size, nb_prob, divider, is_size_divided)
+        chart_title <- paste('size =', nb_size, 'prob =', nb_prob, 'divider =', divider, chart_suffix)
+    } else {
+        y_one <- rgamma(n_sample, shape=gamma_shape, scale=gamma_scale)
+        y_combined <- scale_gamma(n_sample, gamma_shape, gamma_scale, divider, is_size_divided)
+        chart_title <- paste('shape =', gamma_shape, 'scale =', sprintf('%3.2f', gamma_scale), 'divider =', divider, chart_suffix)
+    }
+
+    result <- analyze_distributions(nb_size, nb_prob, gamma_shape, gamma_scale, is_nb, y_one, y_combined)
 
     df <- result$df
     range_x <- range(df$x)
@@ -103,7 +126,6 @@ draw_distributions <- function(nb_size, nb_prob, divider, is_size_divided) {
     g <- g + geom_vline(xintercept=result$expected_mean, color=base_color, linetype='dashed')
     g <- g + geom_vline(xintercept=result$actual_one_mean, color=chart_colors[1], linetype='dashed')
     g <- g + geom_vline(xintercept=result$actual_combined_mean, color=chart_colors[2], linetype='dashed')
-
     g <- add_label(g, 0.3, result$expected_label, base_color)
     g <- add_label(g, 0.4, result$actual_one_label, chart_colors[1])
     g <- add_label(g, 0.5, result$actual_combined_label, chart_colors[2])
@@ -112,11 +134,15 @@ draw_distributions <- function(nb_size, nb_prob, divider, is_size_divided) {
     plot(g)
 }
 
+for(is_size_divided in c(TRUE, FALSE)) {
+    draw_distributions(n_sample, nb_size=32.0, nb_prob=0.3, divider=8, is_size_divided, FALSE)
+}
+
 for (nb_size in nb_size_set) {
     for (nb_prob in nb_prob_set) {
         for (divider in divider_set) {
             for(is_size_divided in c(TRUE, FALSE)) {
-                draw_distributions(nb_size, nb_prob, divider, is_size_divided)
+                draw_distributions(n_sample, nb_size, nb_prob, divider, is_size_divided, TRUE)
             }
         }
     }

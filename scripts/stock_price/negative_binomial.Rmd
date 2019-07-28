@@ -9,23 +9,154 @@ output:
     pandoc_args:
     - --latex-engine
     - xelatex
+header-includes:
+  \usepackage{float}
 documentclass: bxjsarticle
 classoption: xelatex,ja=standard
 geometry: no
 urlcolor: blue
 ---
 
-```{r load, include=FALSE, warning=FALSE}
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H')
+```
+
+```{r enum_expressions, include=FALSE, warning=FALSE}
+library(ggplot2)
+library(tibble)
+library(data.table)
+library(reshape2)
+library(stringr)
+
 ## Cited from
 ## https://keachmurakami.github.io/2016/10/04/Eqnknitr.html
 EqnNum_count <- 0
 head <- "式"
 
-EqnNum <-
-  function(head){
+EqnNum <- function(head){
     EqnNum_count <<- EqnNum_count + 1
     return(paste0(head, EqnNum_count))
-  }
+}
+
+## https://stackoverflow.com/questions/38861041/knitr-rmarkdown-latex-how-to-cross-reference-figures-and-tables
+```
+
+```{r load, include=FALSE, warning=FALSE}
+scale_negative_binomial <- function(n_sample, nb_size, nb_prob, divider, is_size_divided) {
+    if (is_size_divided) {
+        rowSums(replicate(divider, rnbinom(n_sample, size=nb_size/divider, prob=nb_prob)))
+    } else {
+        ## Convert a prob of negative binomial distributions
+        ## to a theta of Gamma (of not NB) distributions
+        ## theta : scale parameter, beta : rate parameter of Gamma distributions
+        theta_gamma <- (1 - nb_prob) / nb_prob
+        scaled_prob <- 1 / (1 + theta_gamma / divider)
+        rowSums(replicate(divider, rnbinom(n_sample, size=nb_size, prob=scaled_prob)))
+    }
+}
+
+scale_gamma <- function(n_sample, gamma_shape, gamma_scale, divider, is_size_divided) {
+    if (is_size_divided) {
+        rowSums(replicate(divider, rgamma(n_sample, shape=gamma_shape/divider, scale=gamma_scale)))
+    } else {
+        rowSums(replicate(divider, rgamma(n_sample, shape=gamma_shape, scale=gamma_scale/divider)))
+    }
+}
+
+make_mean_var_label <- function(name, mu, sigma2) {
+    paste0(name, 'mean=', sprintf('%3.2f', mu),' var=', sprintf('%3.2f', sigma2))
+}
+
+analyze_distributions <- function(nb_size, nb_prob, gamma_shape, gamma_scale, is_nb, y_one, y_combined) {
+    if (is_nb) {
+        expected_mean <- nb_size * (1 - nb_prob) / nb_prob
+        expected_var <- expected_mean / nb_prob
+    } else {
+        expected_mean <- gamma_shape * gamma_scale
+        expected_var <- gamma_shape * gamma_scale * gamma_scale
+    }
+
+    actual_one_mean <- mean(y_one)
+    actual_one_var <- var(y_one)
+    actual_combined_mean <- mean(y_combined)
+    actual_combined_var <- var(y_combined)
+
+    expected_label <- make_mean_var_label('Expected: ', expected_mean, expected_var)
+    actual_one_label <- make_mean_var_label('One:', actual_one_mean, actual_one_var)
+    actual_combined_label <- make_mean_var_label('Combined: ', actual_combined_mean, actual_combined_var)
+
+    table_one <- tabulate(y_one)
+    table_combined <- tabulate(y_combined)
+    max_count <- max(length(table_one), length(table_combined))
+    table_one <- append(table_one, rep(0, max_count - length(table_one)))
+    table_combined <- append(table_combined, rep(0, max_count - length(table_combined)))
+
+    df <- tibble(one=table_one, combined=table_combined)
+    df$x <- 1:NROW(df)
+    df <- melt(df, c('x'))
+    list(df=df,
+         expected_mean=expected_mean,
+         expected_var=expected_var,
+         expected_label=expected_label,
+         actual_one_mean=actual_one_mean,
+         actual_one_var=actual_one_var,
+         actual_one_label=actual_one_label,
+         actual_combined_mean=actual_combined_mean,
+         actual_combined_var=actual_combined_var,
+         actual_combined_label=actual_combined_label)
+}
+
+draw_distributions <- function(n_sample, nb_size, nb_prob, divider, is_size_divided, is_nb) {
+    gamma_shape <- nb_size
+    gamma_scale <- 1.0 / (1.0 / nb_prob - 1.0)
+    base_color <- 'black'
+    chart_colors <- c('royalblue', 'orange')
+
+    if (is_size_divided) {
+        chart_suffix <- 'alpha divided'
+    } else {
+        chart_suffix <- 'theta divided'
+    }
+
+    if (is_nb) {
+        y_one <- rnbinom(n_sample, size=nb_size, prob=nb_prob)
+        y_combined <- scale_negative_binomial(n_sample, nb_size, nb_prob, divider, is_size_divided)
+        chart_title <- paste('size =', nb_size, 'prob =', nb_prob, 'divider =', divider, chart_suffix)
+    } else {
+        y_one <- rgamma(n_sample, shape=gamma_shape, scale=gamma_scale)
+        y_combined <- scale_gamma(n_sample, gamma_shape, gamma_scale, divider, is_size_divided)
+        chart_title <- paste('shape =', gamma_shape, 'scale =', sprintf('%3.2f', gamma_scale), 'divider =', divider, chart_suffix)
+    }
+
+    result <- analyze_distributions(nb_size, nb_prob, gamma_shape, gamma_scale, is_nb, y_one, y_combined)
+
+    df <- result$df
+    range_x <- range(df$x)
+    x_min <- range_x[1]
+    x_position <- (range_x[2] - x_min) * 0.25 + x_min
+    range_y <- range(df$value)
+    y_min <- range_y[1]
+    y_range <- range_y[2] - y_min
+
+    add_label <- function(g, y_relative_pos, label, color) {
+        g + annotate('text', x=x_position, y=y_min + y_range * y_relative_pos,
+                     label=label, color=color)
+    }
+
+    g <- ggplot(df, aes(x=x, y=value, color=variable))
+    g <- g + geom_line(position = 'identity', size=1.5, alpha=0.6)
+    g <- g + scale_color_manual(values=chart_colors)
+
+    g <- g + geom_vline(xintercept=result$expected_mean, color=base_color, linetype='dashed')
+    g <- g + geom_vline(xintercept=result$actual_one_mean, color=chart_colors[1], linetype='dashed')
+    g <- g + geom_vline(xintercept=result$actual_combined_mean, color=chart_colors[2], linetype='dashed')
+    g <- add_label(g, 0.3, result$expected_label, base_color)
+    g <- add_label(g, 0.4, result$actual_one_label, chart_colors[1])
+    g <- add_label(g, 0.5, result$actual_combined_label, chart_colors[2])
+    g <- g + theme(legend.position = c(1.0, 1.0), legend.justification = c(1.0, 1.0),
+                   legend.key.width=unit(4, "line"))
+    plot(g)
+}
 ```
 
 ## 負の二項分布
@@ -49,7 +180,7 @@ $$
 であることを用い、
 
 $$
-NegativeBinomial(z|r,p) = \binom {z-1}{r-1} (1-p)^r p^{z-r} \tag{`r EqnNum(head)`} \label{eq:nb_def_alt} \\
+NegativeBinomial(z|r,p) = \binom {z-1}{r-1} (1-p)^r p^{z-r} \tag{`r EqnNum(head)`} \label{eq:nb_def_alt}
 $$
 
 としたものである。
@@ -69,7 +200,7 @@ $$
 である。これは階乗をガンマ関数におきかえ、 \ref{eq:stan_nb} を以下のように置き換えることで得られる。
 
 $$
-\Gamma(k+1) = k!, size := \alpha, \beta := 1/p - 1
+\Gamma(k+1) = k!, size := \alpha, \beta := 1/p - 1 \tag{`r EqnNum(head)`} \label{eq:dnbinom_params}
 $$
 
 ## ガンマ分布
@@ -83,13 +214,13 @@ $$
 である。慣習的に、$\alpha:=shape$, $\beta:=rate$, $\theta:=scale=1/\beta$と表記する。平均$\mathbb{E}[x]$と分散$Var[x]$は、以下の通りである。
 
 $$
-\mathbb{E}[x] = \frac {\alpha}{\beta} = \alpha \theta, Var[x] = \frac {\alpha}{{\beta}^2} = \frac {\mathbb{E}[x]}{\beta} = \alpha {\theta}^2 = \mathbb{E}[x] \theta
+\mathbb{E}[x] = \frac {\alpha}{\beta} = \alpha \theta, Var[x] = \frac {\alpha}{{\beta}^2} = \frac {\mathbb{E}[x]}{\beta} = \alpha {\theta}^2 = \mathbb{E}[x] \theta \tag{`r EqnNum(head)`} \label{eq:gamma_mu_var}
 $$
 
 平均と分散が既知なら(観測値があれば)、負の二項分布のパラメータ$\alpha, \beta$を求めることができる。
 
 $$
-\beta = \frac {\mathbb{E}[x]}{Var[x]}, \alpha = \mathbb{E}[x] \beta = \frac {\mathbb{E}[x]}{\theta}
+\beta = \frac {\mathbb{E}[x]}{Var[x]}, \alpha = \mathbb{E}[x] \beta = \frac {\mathbb{E}[x]}{\theta} \tag{`r EqnNum(head)`} \label{eq:gamma_params}
 $$
 
 ## ガンマ-ポアソン分布
@@ -112,33 +243,33 @@ $$
 
 負の二項分布の定義 \ref{eq:stan_nb} において、平均$\mathbb{E}[y]$と分散$Var[y]$は、以下の通りである。
 $$
-\mathbb{E}[y] = \frac {\alpha}{\beta}, Var[y] = \frac {\alpha}{{\beta}^2}(\beta+1) = \mathbb{E}[y] (1+\frac {1}{\beta}) \tag{`r EqnNum(head)`} \label{eq:nb_ab_mu}
+\mathbb{E}[y] = \frac {\alpha}{\beta}, Var[y] = \frac {\alpha}{{\beta}^2}(\beta+1) = \mathbb{E}[y] (1+\frac {1}{\beta}) \tag{`r EqnNum(head)`} \label{eq:nb_mu_var}
 $$
 
 であり、平均と分散が既知なら(観測値があれば)、負の二項分布のパラメータ$\alpha, \beta$を求めることができる。
 
 $$
-\beta = \frac {\mathbb{E}[y]}{Var[y] - \mathbb{E}[y]}, \alpha = \mathbb{E}[y] * \beta
+\beta = \frac {\mathbb{E}[y]}{Var[y] - \mathbb{E}[y]}, \alpha = \mathbb{E}[y] * \beta \tag{`r EqnNum(head)`} \label{eq:nb_alpha_beta}
 $$
 
 負の二項分布の代わりに、ガンマ-ポアソン分布 \ref{eq:gamma_poisson} におけるガンマ分布 \ref{eq:gamma_rate} のパラメータで表現することを考える。ポアソン分布$y \sim poisson(\lambda)$の平均$\mathbb{E}[y]$と分散$Var[y]$は
 
 $$
-\mathbb{E}[y] = \lambda, Var[y] = \lambda
+\mathbb{E}[y] = \lambda, Var[y] = \lambda \tag{`r EqnNum(head)`} \label{eq:gamma_poisson_y1}
 $$
 
 であり、[StackExchange](https://math.stackexchange.com/questions/1780385/mean-and-variance-of-the-sum-of-cgf-gamma-and-poisson-distribution)によると、独立な期待値と分散の加法性(共分散が0)から、$x$がガンマ分布$Gamma(\alpha_{gamma}, \beta_{gamma})$に従うとき、
 
 $$
-\mathbb{E}[y] = \lambda= \mathbb{E}[x], Var[y] = Var[Gamma(\alpha_{gamma}, \beta_{gamma})] + \lambda
+\mathbb{E}[y] = \lambda= \mathbb{E}[x], Var[y] = Var[Gamma(\alpha_{gamma}, \beta_{gamma})] + \lambda \tag{`r EqnNum(head)`} \label{eq:gamma_poisson_y2}
 $$
 
 $$
-\mathbb{E}[x] = \mathbb{E}[Gamma(\alpha_{gamma}, \beta_{gamma})] = \frac {\alpha_{gamma}}{\beta_{gamma}}
+\mathbb{E}[x] = \mathbb{E}[Gamma(\alpha_{gamma}, \beta_{gamma})] = \frac {\alpha_{gamma}}{\beta_{gamma}} \tag{`r EqnNum(head)`} \label{eq:gamma_poisson_x1}
 $$
 
 $$
-Var[x] = \mathbb{E}[x] + Var[Gamma(\alpha_{gamma}, \beta_{gamma}] = \frac {\alpha_{gamma}}{\beta_{gamma}} (1 + \frac{1} {\beta_{gamma}}) = \mathbb{E}[x] (1 + \frac{1} {\beta_{gamma}})
+Var[x] = \mathbb{E}[x] + Var[Gamma(\alpha_{gamma}, \beta_{gamma}] = \frac {\alpha_{gamma}}{\beta_{gamma}} (1 + \frac{1} {\beta_{gamma}}) = \mathbb{E}[x] (1 + \frac{1} {\beta_{gamma}}) \tag{`r EqnNum(head)`} \label{eq:gamma_poisson_x2}
 $$
 
 である。つまり、$\alpha=\alpha_{gamma}, \beta=\beta_{gamma}$が成り立つ。
@@ -147,26 +278,26 @@ $$
 
 負の二項分布の定義 \ref{eq:dnbinom} において、平均$\mathbb{E}[y]$と分散$Var[y]$は、以下の通りである。
 $$
-\mathbb{E}[y] = size \frac {1-prob}{prob}, Var[y]= size \frac {1-prob}{{prob}^2} = \frac {\mathbb{E}[y]}{prob}
+\mathbb{E}[y] = size \frac {1-prob}{prob}, Var[y]= size \frac {1-prob}{{prob}^2} = \frac {\mathbb{E}[y]}{prob} \tag{`r EqnNum(head)`} \label{eq:nb_y_size_prob}
 $$
 
 であり、平均と分散が既知なら(観測値があれば)、負の二項分布のパラメータ$size, prob$を求めることができる。
 
 $$
-prob = \frac {\mathbb{E}[y]}{Var[y]}, size = Var[y] * \frac {{prob}^2}{1-prob} = \frac {{\mathbb{E}[y]}^2}{Var[y] - \mathbb{E}[y]}
+prob = \frac {\mathbb{E}[y]}{Var[y]}, size = Var[y] * \frac {{prob}^2}{1-prob} = \frac {{\mathbb{E}[y]}^2}{Var[y] - \mathbb{E}[y]} \tag{`r EqnNum(head)`} \label{eq:nb_size_prob}
 $$
 
 負の二項分布の代わりに、ガンマ-ポアソン分布 \ref{eq:gamma_poisson} におけるガンマ分布 \ref{eq:gamma_rate} のパラメータで表現することを考える。先ほどとは逆に、$x$がガンマ分布$Gamma(\alpha_{gamma}, \beta_{gamma})$に従うとしてボトムアップに考える。
 
 $$
-\beta = \frac {Var(x)}{\mathbb{E}(x)} = \frac {Var(y) - \mathbb{E}(x)}{\mathbb{E}(x)} = \frac {Var(y) - \mathbb{E}(y)}{\mathbb{E}(y)} = \frac {1}{p} - 1
+\beta_{gamma} = \frac {Var(x)}{\mathbb{E}(x)} = \frac {Var(y) - \mathbb{E}(x)}{\mathbb{E}(x)} = \frac {Var(y) - \mathbb{E}(y)}{\mathbb{E}(y)} = \frac {1}{p} - 1 \tag{`r EqnNum(head)`} \label{eq:nb_alpha_beta_xy1}
 $$
 
 $$
-\alpha = \frac {\mathbb{E}[x]}{\beta} = \frac {\mathbb{E}[y]}{\beta} = size
+\alpha_{gamma} = \frac {\mathbb{E}[x]}{\beta} = \frac {\mathbb{E}[y]}{\beta} = size \tag{`r EqnNum(head)`} \label{eq:nb_alpha_beta_xy2}
 $$
 
-つまり、$\alpha=size, \beta=1/p - 1$が成り立つ。これは\ref{eq:stan_nb}と\ref{eq:dnbinom}の関係であった。
+つまり、$\alpha_{gamma}=size, \beta_{gamma}=1/p - 1$が成り立つ。これは\ref{eq:stan_nb}と\ref{eq:dnbinom}の関係であった。
 
 ## 再生性
 
@@ -175,17 +306,17 @@ $$
 負の二項分布$NB(size, prob)$は$size$に対して再生性がある。つまり
 
 $$
-NB(size_A+size_B, prob) = NB(size_A, prob) + NB(size_B, prob)
+NB(size_A+size_B, prob) = NB(size_A, prob) + NB(size_B, prob) \tag{`r EqnNum(head)`} \label{eq:nb_sum1}
 $$
 
 $$
-NB(y|size_A+size_B, prob) = \sum_{i=0}^y {NB(i|size_A, prob) * NB(y-i|size_B, prob)}
+NB(y|size_A+size_B, prob) = \sum_{i=0}^y {NB(i|size_A, prob) * NB(y-i|size_B, prob)} \tag{`r EqnNum(head)`} \label{eq:nb_sum2}
 $$
 
 負の二項分布のモーメント母関数
 
 $$
-M_x(t) = (\frac {p}{1-(1-p)e^t})^r
+M_x(t) = (\frac {p}{1-(1-p)e^t})^r \tag{`r EqnNum(head)`} \label{eq:nb_moment}
 $$
 
 の定義から明らかと言えるが、ここではガンマ関数の引数が整数に限るつまり階乗に置き換えられるものとして、sum記号の中を幾何的に解く。
@@ -193,16 +324,16 @@ $$
 言葉で書くと、$r$回目に失敗するまでに、$y$回成功するのは、$i$回成功してから$y-i$成功することと同じ、という意味である。直感的な証明は以下の通りである。\ref{eq:dnbinom} より、
 
 $$
-NB(y|size_A+size_B, prob) = \sum_{i=0}^y {\frac {\Gamma(i+size_A)}{\Gamma(size_A) i!} p^{size_A} (1-p)^i \frac {\Gamma(y-i+size_B)}{\Gamma(size_B) (y-i)!} p^{size_B} (1-p)^{y-i} }
+NB(y|size_A+size_B, prob) = \sum_{i=0}^y {\frac {\Gamma(i+size_A)}{\Gamma(size_A) i!} p^{size_A} (1-p)^i \frac {\Gamma(y-i+size_B)}{\Gamma(size_B) (y-i)!} p^{size_B} (1-p)^{y-i} } \tag{`r EqnNum(head)`} \label{eq:nb_sum_proof1}
 $$
 
 $$
-= p^{size_A + size_B} (1-p)^y \sum_{i=0}^y { \frac {\Gamma(i+size_A)}{\Gamma(size_A) i!} \frac {\Gamma(y-i+size)}{\Gamma(size) (y-i)!} }
+= p^{size_A + size_B} (1-p)^y \sum_{i=0}^y { \frac {\Gamma(i+size_A)}{\Gamma(size_A) i!} \frac {\Gamma(y-i+size)}{\Gamma(size) (y-i)!} } \tag{`r EqnNum(head)`} \label{eq:nb_sum_proof2}
 $$
 
 碁盤目の状の街があり、縦$m$区間、横$n$区間あるとする。このとき待ちの左上の端から右下の端まで、右または下方向に移動することを考える。つまり縦、縦、横、縦、... と移動する。このとき左上の端から右下の端までの経路は、$(m+n)!/(m!n!)$通りある。
 
-なぜなら縦同士、横同士の移動を移動時の座標に基づいて、縦1、縦2、横1、縦3、と区別したときの経路数は$(m+n)!$であるが、実は縦同士、横同士の移動を区別しないので、$m!*n!$で割ると、上記の通りになるからである。これはm+n個からm個取り出す組み合わせの数である。
+なぜなら縦同士、横同士の移動を移動時の座標に基づいて、縦1、縦2、横1、縦3、と区別したときの経路数は$(m+n)!$であるが、実は縦同士、横同士の移動を区別しないので、$m!n!$で割ると、上記の通りになるからである。これはm+n個からm個取り出す組み合わせの数である。
 
 ここで縦$y$区間、横$size_A+size_B-1$区間ある街を考える。ここで、
 
@@ -213,7 +344,7 @@ $$
 経路の数を考え、取りうるすべての$i \in {0..y}$について足す。これは$i$回成功してから$y-i$成功する経路を漏れなく重複なく数えることと同じである。よって、
 
 $$
-\binom {y+size_A+size_B-1}{y} = \sum_{i=0}^y { \binom {y+size_A-1}{y} \binom {y+size_B-1}{y} }
+\binom {y+size_A+size_B-1}{y} = \sum_{i=0}^y { \binom {y+size_A-1}{y} \binom {y+size_B-1}{y} } \tag{`r EqnNum(head)`} \label{eq:nb_sum_proof3}
 $$
 
 である。
@@ -223,20 +354,56 @@ $$
 ガンマ分布$GammaDistribution(\alpha, \beta)$は$\alpha=shape$に対して再生性がある。つまり
 
 $$
-x_A \sim GammaDistribution(\alpha_A, \beta), x_B \sim GammaDistribution(\alpha_B, \beta)
+x_A \sim GammaDistribution(\alpha_A, \beta), x_B \sim GammaDistribution(\alpha_B, \beta) \tag{`r EqnNum(head)`} \label{eq:gamma_sum1}
 $$
 
 なら
 
 $$
-x_A + x_B \sim GammaDistribution(\alpha_A+\alpha_B, \beta)
+x_A + x_B \sim GammaDistribution(\alpha_A+\alpha_B, \beta) \tag{`r EqnNum(head)`} \label{eq:gamma_sum2}
 $$
 
 である。
 
 ガンマ分布のモーメント母関数
 $$
-M_x(t) = (1 + t/\beta)^{\alpha}
+M_x(t) = (1 + t/\beta)^{\alpha} \tag{`r EqnNum(head)`} \label{eq:gamma_moment}
 $$
 
 の定義から明らかと言えるが、証明は[こちら](https://k-san.link/gamma-reproductive/)。
+
+### NB(size, prob)の再生性を確認する
+
+再生性の定義より、
+
+$$
+\sum_{i=1}^n NB(size, prob) = NB(size * n, prob) or \sum_{i=1}^n NB(size/n, prob) = NB(size prob) \tag{`r EqnNum(head)`} \label{eq:gamma_sum_proof}
+$$
+
+である。これはn人がそれぞれsize回当たるまでくじを引く($NB(size, prob)$)ときの合計試行回数と、一人でsize*n回当たるまでくじを引く($NB(size*n, prob)$)ときの試行回数が、同じ分布に従うということである。n人が同一人物と考えれば、そうなるのが自然である。
+
+```{r nb_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:figure1}negative binomial(size=16.0, prob=0.4) alpha combined"}
+draw_distributions(n_sample=10000, nb_size=16.0, nb_prob=0.4, divider=16, is_size_divided=TRUE, is_nb=TRUE)
+```
+
+図\ref{fig:figure1}はsize=16, prob=0.4の負の二項分布に基づいて生成した乱数のヒストグラムである。横軸は$x$、縦軸は各$x$の出現回数である。Expectedは\ref{eq:nb_size_prob}による平均と分散、oneは単一の負の二項分布、combinedはsizeを16分割した複数の負の二項分布の和である。
+
+\ref{eq:gamma_mu_var}より、ガンマ分布の期待値は$\alpha:=shape$にも$\theta:=scale=1/\beta$にも比例するが、\ref{eq:nb_mu_var}よりガンマ-ポアソン分布の期待値と分散は$\alpha$に比例しても、分散は$\theta=1/\beta$に比例しない。なので、$\theta$をn分割した負の二項分布の和は、元の負の二項分布とは異なる(図\ref{fig:figure2})。
+
+```{r nb_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:figure2}negative binomial(size=16.0, prob=0.4) theta combined"}
+draw_distributions(n_sample=10000, nb_size=16.0, nb_prob=0.4, divider=16, is_size_divided=FALSE, is_nb=TRUE)
+```
+
+### Gamma($\alpha, \theta$)の再生性を確認する
+
+負の二項分布と同様、$\alpha=size$の分割は再生性がある。
+
+```{r gamma_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:figure1}Gamma distribution alpha combined"}
+draw_distributions(n_sample=10000, nb_size=16.0, nb_prob=0.4, divider=16, is_size_divided=TRUE, is_nb=FALSE)
+```
+
+やはり負の二項分布と同様、$\theta$の分割は再生性がない(期待値は同じだが分散は異なる)。
+
+```{r gamma_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:figure2}Gamma distribution theta combined"}
+draw_distributions(n_sample=10000, nb_size=16.0, nb_prob=0.4, divider=16, is_size_divided=FALSE, is_nb=FALSE)
+```
