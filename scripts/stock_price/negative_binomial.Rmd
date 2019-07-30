@@ -195,7 +195,7 @@ $$
 「[高校数学の美しい物語](https://mathtrain.jp/negativebinom)」の定義は、成功回数$y$を試行回数$z:=y+r$に置き換えて、
 
 $$
-\binom {y+r-1}{x} = \binom {y+r-1}{r-1}
+\binom {y+r-1}{x} = \binom {y+r-1}{r-1} \tag{`r EqnNum(head)`} \label{eq:swap_combination}
 $$
 
 であることを用い、
@@ -321,7 +321,7 @@ $$
 \beta_{gamma} = \frac {\mathbb{E}(x)}{Var(x)} = \frac {\mathbb{E}(x)}{Var(y) - \mathbb{E}(x)} = \frac {\mathbb{E}(y)}{Var(y) - \mathbb{E}(y)} = \frac {1}{prob} - 1 \tag{`r EqnNum(head)`} \label{eq:nb_alpha_beta_xy1}
 $$
 
-\ref{eq:gamma_params}と\ref{eq:nb_alpha_beta_xy1}を見比べると、
+\ref{eq:gamma_params}, \ref{eq:nb_size_prob}および\ref{eq:nb_alpha_beta_xy1}を見比べると、
 
 $$
 \alpha_{gamma} = \beta_{gamma}\mathbb{E}[x] = \beta_{gamma}\mathbb{E}[y] = size \tag{`r EqnNum(head)`} \label{eq:nb_alpha_beta_xy2}
@@ -343,13 +343,21 @@ $$
 NB(y|size_A+size_B, prob) = \sum_{i=0}^y {NB(i|size_A, prob) * NB(y-i|size_B, prob)} \tag{`r EqnNum(head)`} \label{eq:nb_sum2}
 $$
 
-が成り立つ。これは負の二項分布のモーメント母関数の定義
+が成り立つ。これは負の二項分布のモーメント母関数の定義([データ科学便覧](https://data-science.gr.jp/theory/tpd_negative_binomial_distribution.html))
 
 $$
-M_x(t) = (\frac {p}{1-(1-p)e^t})^r \tag{`r EqnNum(head)`} \label{eq:nb_moment}
+M_x(t) = (\frac {p}{1-(1-p)*exp(t)})^r \tag{`r EqnNum(head)`} \label{eq:nb_moment_alt}
 $$
 
-で$r=size, p=prob$と置くと明らかと言える。ここではガンマ関数の引数が整数に限るつまり階乗に置き換えられるものとして、sum記号の中を幾何的に解く。
+で$r=size, p=prob$と置くと明らかと言える。
+
+ただしこの定義の基になる負の二項分布の定義は、本文書で一貫して用いているものとは逆の「1回の試行に確率$p$で成功するとき、$r$回目の成功までの、失敗回数$y$の分布」であるため(Rのdnbinom関数と同じ)、本文書の定義に合わせると以下のようになる。
+
+$$
+M_x(t) = (\frac {1-prob}{1-prob*exp(t)})^{size} \tag{`r EqnNum(head)`} \label{eq:nb_moment}
+$$
+
+ここではガンマ関数の引数が整数に限るつまり階乗に置き換えられるものとして、sum記号の中を幾何的に解く。
 
 言葉で書くと、$r$回目に失敗するまでに、$y$回成功するのは、$i$回成功してから$y-i$成功することと同じ、という意味である。\ref{eq:dnbinom} を用いて以下のように展開できる。
 
@@ -433,17 +441,17 @@ get_divider <- function() {
 }
 
 get_nb_label <- function(label, suffix) {
-    paste0('\\label{fig:', label, '}negative binomial(size=', sprintf('%3.2f', get_nb_size()), ', prob=', sprintf('%3.2f', get_nb_prob_alt()), ') ', suffix)
+    paste0('\\label{fig:nb_', label, '}negative binomial(size=', sprintf('%3.2f', get_nb_size()), ', prob=', sprintf('%3.2f', get_nb_prob_alt()), ') ', suffix)
 }
 
 get_gp_label <- function(label, suffix) {
     shape <- get_nb_size()
     rate <- 1 / get_nb_prob_alt() - 1
-    paste0('\\label{fig:', label, '}Gamma poisson(shape=', sprintf('%3.2f', shape), ', rate=', sprintf('%3.2f', rate), ') ', suffix)
+    paste0('\\label{fig:gp_', label, '}Gamma poisson(shape=', sprintf('%3.2f', shape), ', rate=', sprintf('%3.2f', rate), ') ', suffix)
 }
 ```
 
-```{r nb_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_nb_label('nb_alpha', 'alpha combined')}
+```{r nb_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_nb_label('alpha', 'alpha combined')}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=TRUE, dist_name='nb')
 ```
 
@@ -451,31 +459,31 @@ draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_n
 
 \ref{eq:gamma_mu_var}より、ガンマ分布の期待値は$\alpha:=shape$にも$\theta:=scale=1/\beta$にも比例するが、\ref{eq:nb_mu_var}よりガンマ-ポアソン分布の期待値と分散は$\alpha$に比例しても、分散は$\theta=1/\beta$に比例しない。なので、$\theta$をn分割した負の二項分布の和は、元の負の二項分布とは異なる(図\ref{fig:nb_theta})。
 
-```{r nb_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_nb_label('nb_theta', 'theta combined')}
+```{r nb_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_nb_label('theta', 'theta combined')}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=FALSE, dist_name='nb')
 ```
 
 ### ガンマ-ポアソン分布($\alpha, \theta$)の再生性を確認する
 
-図\ref{fig:nb_alpha}と同じ分布になるようにガンマ-ポアソン分布を作る。図\ref{fig:gp_scale_alpha}が示すように$shape$には再生性があり、図\ref{fig:gp_scale_theta}が示すように$shape$には再生性がない。
+図\ref{fig:nb_alpha}と同じ分布になるようにガンマ-ポアソン分布を作る。図\ref{fig:gp_alpha}が示すように$shape$には再生性があり、図\ref{fig:gp_theta}が示すように$shape$には再生性がない。
 
-```{r gp_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_gp_label('nb_alpha', 'alpha combined')}
+```{r gp_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_gp_label('alpha', 'alpha combined')}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=TRUE, dist_name='gp')
 ```
 
-```{r gp_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_gp_label('nb_theta', 'theta combined')}
+```{r gp_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap=get_gp_label('theta', 'theta combined')}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=FALSE, dist_name='gp')
 ```
 
 ### Gamma($\alpha, \theta$)の再生性を確認する
 
-負の二項分布と同様、$\alpha=size$の分割は再生性がある。
+負の二項分布と同様、$\alpha=size$の分割は再生性がある(図\ref{fig:gamma_alpha})。
 
 ```{r gamma_scale_alpha, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:gamma_alpha}Gamma distribution alpha combined"}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=TRUE, dist_name='gamma')
 ```
 
-やはり負の二項分布と同様、$\theta$の分割は再生性がない(期待値は同じだが分散は異なる)。
+やはり負の二項分布と同様、$\theta$の分割は再生性がない(期待値は同じだが分散は異なる : 図\ref{fig:gamma_theta})。
 
 ```{r gamma_scale_theta, fig.height=4, fig.width=8, fig.align='center', echo=FALSE, message=FALSE, warning=FALSE, fig.cap="\\label{fig:gamma_theta}Gamma distribution theta combined"}
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=FALSE, dist_name='gamma')
