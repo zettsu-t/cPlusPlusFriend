@@ -475,6 +475,13 @@ TEST_F(TestPrimalityTesting, MersenneNumber) {
 // Googleの看板"{first 10-digit prime found in consecutive digits of e}.com"を解く
 TEST_F(TestPrimalityTesting, QuizBoard) {
     using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<200>>;
+    static_assert(!std::is_floating_point<LongFloat>::value);
+    static_assert(std::is_floating_point<double>::value);
+    static_assert(boost::multiprecision::number_category<LongFloat>::value ==
+                  boost::multiprecision::number_kind_floating_point);
+    static_assert(boost::multiprecision::number_category<double>::value ==
+                  boost::multiprecision::number_kind_floating_point);
+
     // const std::string にすると、770行のエラーメッセージが出る
     // decltype(str) = const std::string なので変換できない
     // std::string str = boost::math::constants::e<LongFloat>().convert_to<decltype(str)>();
