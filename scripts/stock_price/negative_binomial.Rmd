@@ -1,7 +1,7 @@
 ---
 title: "負の二項分布とガンマ分布の関係"
 author: "プログラマたんbot"
-date: "2019/7/29"
+date: "2019/8/3"
 output:
   pdf_document:
     latex_engine: xelatex
@@ -33,6 +33,7 @@ library(stringr)
 ## https://keachmurakami.github.io/2016/10/04/Eqnknitr.html
 EqnNum_count <- 0
 head <- "式"
+set.seed(1)
 
 EqnNum <- function(head){
     EqnNum_count <<- EqnNum_count + 1
@@ -218,7 +219,9 @@ $$
 NegativeBinomial(y|size,prob) = \frac {\Gamma(y+size)}{\Gamma(size) y!} p^{size} (1-p)^y \tag{`r EqnNum(head)`} \label{eq:dnbinom_original}
 $$
 
-である。ただしこの定義は、これまで挙げた負の二項分布の定義とは逆で、「1回の試行に確率$p$で成功するとき、$r$回目の成功までの、失敗回数$y$の分布」である。そのため本文書では成功と失敗を逆に読み、$p$を$1-p$に置き換え、以下の式に読み替える。
+である。ただしこの定義は、これまで挙げた負の二項分布の定義とは逆で、「1回の試行に確率$p$で成功するとき、$r$回目の成功までの、失敗回数$y$の分布」である。
+
+そのため本文書では成功と失敗を逆に読み、$p$を$1-p$に置き換え、以下の式に読み替える。
 
 $$
 NegativeBinomial(y|size,prob) = \frac {\Gamma(y+size)}{\Gamma(size) y!} (1-p)^{size} p^y \tag{`r EqnNum(head)`} \label{eq:dnbinom}
@@ -238,7 +241,7 @@ $$
 GammaDistribution(x|shape,rate) = \frac {{rate}^{shape}}{\Gamma(shape)} x^{shape-1} e^{-rate*x} \tag{`r EqnNum(head)`} \label{eq:gamma_rate}
 $$
 
-である。慣習的に、$\alpha:=shape$, $\beta:=rate$, $\theta:=scale=1/\beta$と表記する。平均$\mathbb{E}[x]$と分散$Var[x]$は、以下の通りである。
+である。慣習的に、$\alpha:=shape$, $\beta:=rate$, $\theta:=scale=1/\beta$と表記する。文献によっては$\beta:=scale$としているものがあり、注意が必要である(例えば[C++のstd::gamma_distribution](http://www.cplusplus.com/reference/random/gamma_distribution/))。平均$\mathbb{E}[x]$と分散$Var[x]$は、以下の通りである。
 
 $$
 \mathbb{E}[x] = \frac {\alpha}{\beta} = \alpha \theta, Var[x] = \frac {\alpha}{{\beta}^2} = \frac {\mathbb{E}[x]}{\beta} = \alpha {\theta}^2 = \mathbb{E}[x] \theta \tag{`r EqnNum(head)`} \label{eq:gamma_mu_var}
@@ -249,6 +252,33 @@ $$
 $$
 \beta = \frac {\mathbb{E}[x]}{Var[x]}, \alpha = \mathbb{E}[x] \beta = \frac {\mathbb{E}[x]}{\theta} \tag{`r EqnNum(head)`} \label{eq:gamma_params}
 $$
+
+## 改めて表記上の注意
+
+これまで見たように、負の二項分布とガンマ分布のパラメータ表記には、複数の方法がある。本文書では、以下のように定義する。
+
+- 負の二項分布 :  1回の試行に確率$prob$で成功するとき、$r$回目の失敗までの、成功回数$y$の分布
+- ガンマ分布のパラメータ : $\alpha:=shape$, $\beta:=rate$, $\theta:=scale=1/\beta$
+
+これ以外にも以下の定義があるため、既存のソフトウェアを使う場合は注意が必要である。
+
+- $prob$の意味が逆($prob:=1-prob$)で、「1回の試行に確率$p$で成功するとき、$r$回目の成功までの、失敗回数$y$の分布」に基づく
+- $rate=\beta$ではなく$scale=\theta$を与える。もしくは、$\beta$の意味が逆数($\beta=scale$)になっている。
+
+|$y$の定義|ソフトウェア|
+|:-----------|:------------|
+|成功回数の分布|[Stan](https://mc-stan.org/docs/2_19/functions-reference-2_19.pdf)|
+|失敗回数の分布|[R dnbinom](https://stat.ethz.ch/R-manual/R-patched/library/stats/html/NegBinomial.html), [C++](http://www.cplusplus.com/reference/random/negative_binomial_distribution/), [Boost C++ Libraries](https://www.boost.org/doc/libs/1_70_0/libs/math/doc/html/math_toolkit/stat_tut/weg/neg_binom_eg/negative_binomial_example1.html)|
+
+:負の二項分布の$y$の定義と$prob$の与え方
+
+|beta,thetaの与え方|ソフトウェア|
+|:-----------|:------------|
+|rate|[Stan](https://mc-stan.org/docs/2_19/functions-reference-2_19.pdf)|
+|scale|[C++](http://www.cplusplus.com/reference/random/gamma_distribution/), Boost C++ Libraries|
+|rateまたはscale|[R dgamma](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/GammaDist.html)|
+
+:ガンマ分布への$beta$の与え方
 
 ## ガンマ-ポアソン分布
 
@@ -369,14 +399,14 @@ $$
 = {(1-prob)}^{size_A + size_B} {prob}^y \sum_{i=0}^y { \frac {\Gamma(i+size_A)}{\Gamma(size_A) i!} \frac {\Gamma(y-i+size)}{\Gamma(size) (y-i)!} } \tag{`r EqnNum(head)`} \label{eq:nb_sum_proof2}
 $$
 
-碁盤の目状の街があり、縦$m$区間、横$n$区間あるとする。このとき街の左上の端から右下の端まで、右または下方向に移動することを考える。つまり縦、縦、横、縦、... と移動する。このとき左上の端から右下の端までの経路は、$(m+n)!/(m!n!)$通りある。
+碁盤の目状の街があり、縦$m$区間、横$n$区間あるとする。このとき街の左上の端から右下の端まで、右または下方向に移動することを考える。つまり下、下、右、下、... と移動する。このとき左上の端から右下の端までの経路は、$(m+n)!/(m!n!)$通りある。
 
-なぜなら縦同士、横同士の移動を移動時の座標に基づいて、縦1、縦2、横1、縦3、と区別したときの経路数は$(m+n)!$であるが、実は縦同士、横同士の移動を区別しないので、$m!n!$で割ると、上記の通りになるからである。これはm+n個からm個取り出す組み合わせの数である。
+なぜなら下同士、右同士の移動を移動時の座標に基づいて、下1、下2、右1、下3、と区別したときの経路数は$(m+n)!$であるが、実は下同士、右同士の移動を区別しないので、$m!n!$で割ると、上記の通りになるからである。これはm+n個からm個取り出す組み合わせの数である。
 
 ここで縦$y$区間、横$size_A+size_B-1$区間ある街を考える。ここで、
 
 1. 縦$i$区間、横$size_A-1$区間移動して
-1. 横に1区間移動して
+1. 右に1区間移動して
 1. 縦$y-i$区間、横$size_B-1$区間移動する
 
 経路の数を考え、取りうるすべての$i \in {0..y}$について足す。これは$i$回成功してから$y-i$成功する経路を漏れなく重複なく数えることと同じである。よって、
@@ -404,7 +434,7 @@ $$
 である。これはガンマ分布のモーメント母関数の定義
 
 $$
-M_x(t) = (1 + t/\beta)^{\alpha} \tag{`r EqnNum(head)`} \label{eq:gamma_moment}
+M_x(t) = (1 - t/\beta)^{\alpha} \tag{`r EqnNum(head)`} \label{eq:gamma_moment}
 $$
 
 から明らかと言えるが、証明は[こちら](https://k-san.link/gamma-reproductive/)。
@@ -455,7 +485,7 @@ get_gp_label <- function(label, suffix) {
 draw_distributions(n_sample=get_n_sample(), nb_size=get_nb_size(), nb_prob=get_nb_prob_rnbinom(), divider=get_divider(), is_size_divided=TRUE, dist_name='nb')
 ```
 
-図\ref{fig:nb_alpha}は$size=`r get_nb_size()`, prob=`r get_nb_prob_alt()`$の負の二項分布に基づいて生成した乱数のヒストグラムである。Rのnbinomは本文書の$prob$を$1.0-prob$としているので、nbinomの引数は`r get_nb_prob_rnbinom()`であることに注意。横軸は$x$、縦軸は各$x$の出現回数である。Expectedは\ref{eq:nb_size_prob}による平均と分散、oneは単一の負の二項分布、combinedは$size$を`r get_divider()`分割した複数の負の二項分布の和である。
+図\ref{fig:nb_alpha}は$size=`r get_nb_size()`, prob=`r get_nb_prob_alt()`$の負の二項分布に基づいて生成した乱数のヒストグラムである。Rのrnbinomは本文書の$prob$を$1.0-prob$としているので、rnbinomの引数は`r get_nb_prob_rnbinom()`であることに注意。横軸は$x$、縦軸は各$x$の出現回数である。Expectedは\ref{eq:nb_size_prob}による平均と分散、oneは単一の負の二項分布、combinedは$size$を`r get_divider()`分割した複数の負の二項分布の和である。
 
 \ref{eq:gamma_mu_var}より、ガンマ分布の期待値は$\alpha:=shape$にも$\theta:=scale=1/\beta$にも比例するが、\ref{eq:nb_mu_var}よりガンマ-ポアソン分布の期待値と分散は$\alpha$に比例しても、分散は$\theta=1/\beta$に比例しない。なので、$\theta$をn分割した負の二項分布の和は、元の負の二項分布とは異なる(図\ref{fig:nb_theta})。
 
