@@ -629,6 +629,98 @@ TEST_F(TestPrimalityTesting, ToBigNumber) {
 }
 #endif
 
+// Based on
+// https://stackoverflow.com/questions/45943750/calculating-log-sum-exp-function-in-c
+namespace {
+    template <typename T, bool FilterInf = true,
+              std::enable_if_t<boost::multiprecision::number_category<typename T::value_type>::value, std::nullptr_t> = nullptr>
+    typename T::value_type logSumExp(const T& logProbabilityVec) {
+        using ValueType = typename T::value_type;
+        if (logProbabilityVec.empty()) {
+            return -std::numeric_limits<ValueType>::infinity();
+        }
+
+        const auto maxElement = *std::max_element(
+            logProbabilityVec.begin(), logProbabilityVec.end());
+
+        // これがないと Inf - Inf = NaNになってしまう
+        if (FilterInf && std::isinf(maxElement)) {
+            return maxElement;
+        }
+
+        typename T::value_type sum = std::accumulate(
+            logProbabilityVec.begin(), logProbabilityVec.end(), ValueType{0.0},
+            [&maxElement](const auto& acc, const auto& element) {
+                return acc + std::exp(element - maxElement); });
+
+        return maxElement + std::log(sum);
+    }
+}
+
+TEST_F(TestPrimalityTesting, LogSumExpDouble) {
+    using ValueType = double;
+    const std::vector<ValueType> logProbabilityVec {std::log(1.0/2.0), std::log(1.0/8.0), std::log(1.0/32.0)};
+    const auto actual = logSumExp(logProbabilityVec);
+    const auto expected = std::log(1.0/2.0 + 1.0/8.0 + 1.0/32.0);
+    EXPECT_DOUBLE_EQ(expected, actual);
+}
+
+TEST_F(TestPrimalityTesting, LogSumExpFloat) {
+    using ValueType = float;
+    const std::vector<ValueType> logProbabilityVec {std::log(1.0/4.0), std::log(1.0/16.0), std::log(1.0/64.0)};
+    const auto actual = logSumExp(logProbabilityVec);
+    const auto expected = std::log(1.0/4.0 + 1.0/16.0 + 1.0/64.0);
+    // floatをdoubleだと思って比較すると誤差が出る
+    EXPECT_NEAR(expected, actual, 1e-5);
+}
+
+TEST_F(TestPrimalityTesting, LogSumExpEmpty) {
+    const auto actual = logSumExp(std::vector<double>());
+    EXPECT_TRUE(std::isinf(actual));
+    EXPECT_GT(0.0, actual);
+}
+
+TEST_F(TestPrimalityTesting, LogSumExpInf) {
+    using ValueType = double;
+    const auto InfNum = std::numeric_limits<ValueType>::infinity();
+
+    const std::vector<ValueType> positiveInfVec {InfNum, 2.0, -1.0};
+    const auto actualPpositive = logSumExp(positiveInfVec);
+    EXPECT_TRUE(std::isinf(actualPpositive));
+    EXPECT_LT(0.0, actualPpositive);
+    EXPECT_TRUE(std::isnan(logSumExp<decltype(positiveInfVec), false>(positiveInfVec)));
+
+    const std::vector<ValueType> negativeInfVec {-InfNum, -InfNum, -InfNum};
+    const auto actualNegative = logSumExp(negativeInfVec);
+    EXPECT_TRUE(std::isinf(actualNegative));
+    EXPECT_GT(0.0, actualNegative);
+    EXPECT_TRUE(std::isnan(logSumExp<decltype(negativeInfVec), false>(negativeInfVec)));
+}
+
+// これがコンパイルできるのは困る
+#if 0
+TEST_F(TestPrimalityTesting, Int) {
+    const std::vector<int> logProbabilityVec {1, 2, 4};
+    logSumExp(logProbabilityVec);
+}
+#endif
+
+TEST_F(TestPrimalityTesting, Divide) {
+    const double actual = std::log(1/2);
+    EXPECT_TRUE(std::isinf(actual));
+    EXPECT_GT(0.0, actual);
+}
+
+#if 0
+// You will find very long error messages when you run code below.
+class TestLargeErrorMessage : public ::testing::Test {};
+
+TEST_F(TestLargeErrorMessage, StdCout) {
+    constexpr int n = 0;
+    std::cout << n < "\n";
+}
+#endif
+
 // 時刻と時差を扱う
 namespace {
     bool g_faultInStream = false;
