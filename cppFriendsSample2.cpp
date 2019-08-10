@@ -685,9 +685,9 @@ TEST_F(TestPrimalityTesting, LogSumExpInf) {
     const auto InfNum = std::numeric_limits<ValueType>::infinity();
 
     const std::vector<ValueType> positiveInfVec {InfNum, 2.0, -1.0};
-    const auto actualPpositive = logSumExp(positiveInfVec);
-    EXPECT_TRUE(std::isinf(actualPpositive));
-    EXPECT_LT(0.0, actualPpositive);
+    const auto actualPositive = logSumExp(positiveInfVec);
+    EXPECT_TRUE(std::isinf(actualPositive));
+    EXPECT_LT(0.0, actualPositive);
     EXPECT_TRUE(std::isnan(logSumExp<decltype(positiveInfVec), false>(positiveInfVec)));
 
     const std::vector<ValueType> negativeInfVec {-InfNum, -InfNum, -InfNum};
@@ -709,6 +709,20 @@ TEST_F(TestPrimalityTesting, Divide) {
     const double actual = std::log(1/2);
     EXPECT_TRUE(std::isinf(actual));
     EXPECT_GT(0.0, actual);
+}
+
+TEST_F(TestPrimalityTesting, BadAccumulation) {
+    const std::vector<double> v {0.125, 0.25};
+    const auto sumInt = std::accumulate(v.begin(), v.end(), 0,
+                                        [](const auto& acc, const auto& element){
+                                            return acc + element; });
+    EXPECT_EQ(0, sumInt);
+
+    const auto sumDouble = std::accumulate(v.begin(), v.end(),
+                                           decltype(v)::value_type{0},
+                                           [](const auto& acc, const auto& element){
+                                               return acc+ element; });
+    EXPECT_EQ(0.375, sumDouble);
 }
 
 #if 0

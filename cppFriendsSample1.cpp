@@ -14,6 +14,7 @@
 #include <memory>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -1530,6 +1531,64 @@ TEST_F(TestSmartPtr, SharedMulti) {
         EXPECT_EQ(size, sharedCounter);
     }
     EXPECT_EQ(0, sharedCounter);
+}
+
+namespace {
+    class MyException : public std::runtime_error {
+    public:
+        explicit MyException(const std::string& what_arg) : std::runtime_error(what_arg) {}
+        explicit MyException(const char* what_arg) : std::runtime_error(what_arg) {}
+        virtual ~MyException(void) = default;
+    };
+}
+
+class TestExceptionWhat : public ::testing::Test {};
+
+TEST_F(TestExceptionWhat, StrMessage) {
+    const std::string expected("Message");
+    bool thrown = false;
+
+    try {
+        throw MyException(expected);
+    } catch (MyException& e) {
+        thrown = true;
+        EXPECT_EQ(expected, e.what());
+        EXPECT_NE("Message", e.what());
+        static_assert(std::is_same<const char*, decltype(e.what())>::value);
+        static_assert(!std::is_same<const std::string, decltype(e.what())>::value);
+    }
+    EXPECT_TRUE(thrown);
+}
+
+TEST_F(TestExceptionWhat, CharMessage) {
+    bool thrown = false;
+    const char* pMessage = "Message";
+
+    try {
+        throw MyException(pMessage);
+    } catch (MyException& e) {
+        thrown = true;
+        const std::string expected(pMessage);
+        EXPECT_EQ(expected, e.what());
+        EXPECT_NE(pMessage, e.what());
+        static_assert(std::is_same<const char*, decltype(e.what())>::value);
+        static_assert(!std::is_same<const std::string, decltype(e.what())>::value);
+    }
+    EXPECT_TRUE(thrown);
+}
+
+class TestUnreadableConstant : public ::testing::Test {};
+
+TEST_F(TestUnreadableConstant, True) {
+    constexpr auto mytrue =
+    !!!!!  !!!!!   !    !  !!!!!
+      !    !    !  !    !  !
+      !    !!!!!   !    !  !!!!!
+      !    !    !  !    !  !
+      !    !    !   !!!!   !!!!!
+    "";
+    static_assert(std::is_same<const bool, decltype(mytrue)>::value, "");
+    EXPECT_TRUE(mytrue);
 }
 
 /*
