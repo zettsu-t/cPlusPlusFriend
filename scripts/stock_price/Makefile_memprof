@@ -1,0 +1,35 @@
+GTEST_GMOCK_TOP_DIR=$(HOME)/googletest
+GTEST_TOP_DIR=$(GTEST_GMOCK_TOP_DIR)/googletest
+GTEST_GMOCK_INCLUDE=$(addprefix -isystem, $(GTEST_TOP_DIR)/include $(GTEST_TOP_DIR) $(GMOCK_TOP_DIR)/include $(GMOCK_TOP_DIR))
+GTEST_SOURCE=$(GTEST_TOP_DIR)/src/gtest-all.cc
+GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
+
+SOURCE=memory_profile_list.cpp
+OBJ=memory_profile_list.o
+TARGET=memory_profile_list
+
+OBJS=$(OBJ) $(GTEST_OBJ)
+
+CXX=g++
+LD=g++
+CPPFLAGS=-std=gnu++17 -O2 -Wall $(GTEST_GMOCK_INCLUDE)
+LIBPATH=
+LDFLAGS=
+LIBS=
+
+.PHONY: all run clean
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	./$(TARGET)
+
+$(OBJ): $(SOURCE)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+$(GTEST_OBJ): $(GTEST_SOURCE)
+	$(CXX) $(CPPFLAGS) -o $@ -c $<
+
+clean:
+	rm -f $(TARGET) $(OBJS)
