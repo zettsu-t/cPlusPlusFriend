@@ -145,17 +145,18 @@ void exec_snprintf_twice(void) {
 void exec_io_with_definition(void) {
     static volatile int memoryMappedClock;
     static int nonVolatileClock;
-    char buf[64];
+    const size_t bufSize = 65;
+    char buf[bufSize + 1];
 
     for(int i = 0; i < 3; ++i) {
         // これはvolatileなので、毎回メモリから値を読みに行く
-        snprintf(buf, sizeof(buf), "%64d", g_memoryMappedClock);
+        snprintf(buf, bufSize, "%64d", g_memoryMappedClock);
         // これはvolatileではないが、snprintfが書き換えたかもしれないので毎回メモリから値を読みに行く
-        snprintf(buf, sizeof(buf), "%64d", g_nonVolatileClock);
+        snprintf(buf, bufSize, "%64d", g_nonVolatileClock);
         // これはvolatileなので、毎回メモリから値を読みに行く
-        snprintf(buf, sizeof(buf), "%64d", memoryMappedClock);
+        snprintf(buf, bufSize, "%64d", memoryMappedClock);
         // これはvolatileではないので、メモリは読まず、"xor r9d, r9d"で定数0が入る!
-        snprintf(buf, sizeof(buf), "%64d", nonVolatileClock);
+        snprintf(buf, bufSize, "%64d", nonVolatileClock);
     }
     return;
 }
@@ -163,6 +164,11 @@ void exec_io_with_definition(void) {
 // 負の数に対する除算に対して、コンパイラがどんなコードを出力するか確認する
 int divide_by_2(int src) {
     return src / 2;
+}
+
+// 定数ではない整数対する除算に対して、コンパイラがどんなコードを出力するか確認する
+int divide_integers(int op1, int op2) {
+    return op1 / op2;
 }
 
 int main(int argc, char* argv[]) {
