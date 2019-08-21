@@ -19,6 +19,7 @@ static_assert(std::is_integral_v<"
 def compile(n)
   puts "n=#{n}"
   exefile = "out"
+  exefileFull = exefile + ".exe"
   cppfile = "out.cpp"
   File.open(cppfile, "w") { |ofs|
     [HEADER, "type_identity_t<" * n, "int", ">" * n, ">);\n"].each do |line|
@@ -30,7 +31,13 @@ def compile(n)
   if File.exists?(exefile)
     abort("Cannot delete #{exefile}")
   end
-  os, er, status = Open3.capture3("g++ -std=c++17 -o #{exefile} #{cppfile}")
+  system("g++ -std=c++17 -o #{exefile} #{cppfile}")
+
+  if File.exists?(exefile) || File.exists?(exefileFull)
+    puts "#{exefile} exists."
+  else
+    puts "#{exefile} does not exist."
+  end
   system("#{exefile}") == true ? true : false
 end
 

@@ -18,6 +18,11 @@
 #include <vector>
 #include <boost/any.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 #include <boost/icl/interval_set.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
@@ -1802,6 +1807,23 @@ TEST_F(TestOddEven, All) {
         bool actual = std::regex_match(s, match, std::regex("^.*(0|2|4|6|8)\\s*$"));
         EXPECT_EQ(expected, actual);
     }
+}
+
+class TestBoostStat: public ::testing::Test {};
+
+TEST_F(TestBoostStat, MeanVar) {
+    using namespace boost::accumulators;
+    using T = double;
+    accumulator_set<T, stats<tag::mean, tag::variance>> acc;
+//  accumulator_set<T, stats<tag::mean>, stats<tag::variance>> accMeanVar;
+
+    acc(1);
+    acc(2);
+    acc(3);
+    const T expectedMean = 2.0;
+    const T expectedVar = 2.0 / 3.0;
+    EXPECT_DOUBLE_EQ(expectedMean, mean(acc));
+    EXPECT_DOUBLE_EQ(expectedVar, variance(acc));
 }
 
 /*
