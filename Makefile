@@ -243,7 +243,7 @@ INCLUDES_CLANGXX=$(addprefix -isystem ,$(ISYSTEM_MINGW_CLANG_INCLUDE_DIRS))
 endif
 
 # http://d.hatena.ne.jp/higepon/20080430/1209525546
-CFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CFLAGS_WALL=-Wall -W -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 CFLAGS_COMMON=-std=gnu11 -O2 $(CFLAGS_WALL)
 GXX_CFLAGS=$(INCLUDES_GXX) $(CFLAGS_COMMON)
 CLANGXX_CFLAGS=$(CLANG_TARGET) $(INCLUDES_CLANGXX) $(CFLAGS_COMMON)

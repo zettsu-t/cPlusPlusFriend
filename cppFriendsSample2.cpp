@@ -1809,12 +1809,13 @@ TEST_F(TestOddEven, All) {
     }
 }
 
-class TestBoostStat: public ::testing::Test {};
+class TestBoostStat : public ::testing::Test {};
 
 TEST_F(TestBoostStat, MeanVar) {
     using namespace boost::accumulators;
     using T = double;
     accumulator_set<T, stats<tag::mean, tag::variance>> acc;
+//  こう書くと、大量のエラーが出る
 //  accumulator_set<T, stats<tag::mean>, stats<tag::variance>> accMeanVar;
 
     acc(1);
@@ -1824,6 +1825,35 @@ TEST_F(TestBoostStat, MeanVar) {
     const T expectedVar = 2.0 / 3.0;
     EXPECT_DOUBLE_EQ(expectedMean, mean(acc));
     EXPECT_DOUBLE_EQ(expectedVar, variance(acc));
+}
+
+class TestCheckRandomSeed : public ::testing::Test {};
+
+TEST_F(TestCheckRandomSeed, Reproduce) {
+    std::random_device randDev;
+    std::vector<std::random_device::result_type> seedSet;
+    const auto seedSize = decltype(seedSet)::value_type{100};
+
+    for(auto i=decltype(seedSize){0}; i<seedSize; ++i) {
+        seedSet.push_back(randDev());
+    }
+
+    using RandEngine = std::mt19937;
+    std::vector<RandEngine::result_type> randNumbers;
+
+    // First
+    for(const auto& seed : seedSet) {
+        RandEngine gen(seed);
+        randNumbers.push_back(gen());
+    }
+    ASSERT_FALSE(randNumbers.empty());
+
+    // Second
+    const auto numSize = randNumbers.size();
+    for(auto i=decltype(numSize){0}; i<numSize; ++i) {
+        RandEngine gen(seedSet.at(i));
+        EXPECT_EQ(randNumbers.at(i), gen());
+    }
 }
 
 /*

@@ -1591,6 +1591,59 @@ TEST_F(TestUnreadableConstant, True) {
     EXPECT_TRUE(mytrue);
 }
 
+class TestAtomicOps : public ::testing::Test {};
+
+TEST_F(TestAtomicOps, Or) {
+    std::atomic<int32_t> base {0};
+    base |= 1;
+    EXPECT_EQ(1, base.load());
+    EXPECT_EQ(1, base.fetch_or(2));
+    EXPECT_EQ(3, base.fetch_or(4));
+}
+
+namespace {
+    void takeStrStream(std::istream& is) {
+        std::string line;
+        std::getline(is, line);
+        EXPECT_EQ("test", line);
+    }
+}
+
+class TestCastStream : public ::testing::Test {};
+
+TEST_F(TestCastStream, Or) {
+    std::stringstream is("test\n");
+    takeStrStream(is);
+//  takeStrStream("test\n");
+}
+
+namespace {
+    struct ParamPair {
+        int a;
+        double b;
+    };
+
+    struct ParamTaker {
+        explicit ParamTaker(const ParamPair& params) : a_(params.a), b_(params.b) {}
+        int a_;
+        double b_;
+    };
+}
+
+class TestSetPair : public ::testing::Test {};
+
+TEST_F(TestSetPair, Explicit) {
+    int a = 2;
+    double b = 3.0;
+    ParamPair params {a, b};
+    ParamTaker obj(params);
+    EXPECT_EQ(a, obj.a_);
+    EXPECT_EQ(b, obj.b_);
+
+//  こう書いても自動的にParamPairにはならない
+//  ParamTaker alt(a, b);
+}
+
 /*
 Local Variables:
 mode: c++

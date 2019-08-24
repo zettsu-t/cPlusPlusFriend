@@ -31,13 +31,15 @@ def compile(n)
   if File.exists?(exefile)
     abort("Cannot delete #{exefile}")
   end
-  system("g++ -std=c++17 -o #{exefile} #{cppfile}")
 
-  if File.exists?(exefile) || File.exists?(exefileFull)
+  os, er, status = Open3.capture3("g++ -std=c++17 -o #{exefile} #{cppfile}")
+
+  if status.success? && (File.exists?(exefile) || File.exists?(exefileFull))
     puts "#{exefile} exists."
   else
     puts "#{exefile} does not exist."
   end
+
   system("#{exefile}") == true ? true : false
 end
 

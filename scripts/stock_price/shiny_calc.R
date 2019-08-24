@@ -251,7 +251,7 @@ server <- function(input, output) {
 
     observeEvent(input$sqrt, { add_unary_operator('sqrt', sqrt) })
     observeEvent(input$inv, { add_unary_operator('inv', function(x) 1/x) })
-    observeEvent(input$sign, { add_unary_operator('sign', function(x) 1/x) })
+    observeEvent(input$sign, { add_unary_operator('sign', function(x) -x) })
 
     output$digits <- renderText(digits())
     output$expr <- renderText(paste(expr()))
