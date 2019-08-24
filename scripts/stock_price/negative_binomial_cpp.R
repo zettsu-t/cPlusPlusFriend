@@ -33,5 +33,19 @@ draw_chart <- function(filename) {
     dev.off()
 }
 
+draw_random_nb <- function() {
+    png(filename='negative_binomial_cpp_random.png', width=800, height=480)
+    n <- 10000
+    size <- 0.40
+    prob <- 0.30
+    df <- data.frame(value=rnbinom(n=n, size=size, prob=prob))
+    g <- ggplot(df, aes(x=value))
+    g <- g + geom_histogram(bins=max(df$value+1), color='black', fill='royalblue')
+    g <- g + ggtitle(sprintf("Negative binomial distribution (n=%d, size=%.2f, prob=%.2f): random numbers", n, size, prob))
+    plot(g)
+    dev.off()
+}
+
+draw_random_nb()
 files <- c('nbinom100.csv', 'nbinom1k.csv', 'nbinom10k.csv', 'nbinom100k.csv')
 sapply(files, draw_chart)

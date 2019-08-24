@@ -8,9 +8,12 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #include <boost/math/distributions/gamma.hpp>
 #include <boost/math/distributions/negative_binomial.hpp>
+#include <boost/cast.hpp>
+#include <boost/random/negative_binomial_distribution.hpp>
 
 namespace {
     using ParamType = double;
@@ -46,11 +49,14 @@ void rnbinomCpp(const auto& paramSet, SizeType n, SeedType seed, std::ofstream& 
     const ParamType prob = paramSet.prob;
     const ParamType beta = (1 - prob) / prob;
     std::mt19937 gen(seed);
+
     std::gamma_distribution<double> distGamma(alpha, beta);
     std::unordered_map<ResultType, SizeType> count;
 
     // Cannot use alpha as integers
-    std::negative_binomial_distribution<int> distNB(alpha, beta);
+    using StdAlpha = int;
+    const auto stdAlpha = boost::numeric_cast<StdAlpha>(alpha);
+    std::negative_binomial_distribution<StdAlpha> distNB(stdAlpha, beta);
 
     // Makes random values
     ResultType maxValue = 0;
@@ -155,9 +161,61 @@ void nbinomCppCdf(void) {
     std::cout << osGamma.str() << std::endl;
 }
 
+void cppRandombinom(void) {
+    constexpr int size = 2;
+    constexpr double prob = 0.5;
+    std::negative_binomial_distribution<int> dist(size, prob);
+//  std::negative_binomial_distribution<double> dist(size, prob);
+    std::mt19937 randGen;
+    for(int i=0; i<10000; ++i) {
+       std::cout << dist(randGen);
+    }
+}
+
+void boostMathCppNbinom(void) {
+    constexpr double size = 0.99;
+    constexpr double prob = 0.5;
+    boost::math::negative_binomial dist(size, prob);
+
+    for(double p=0.1; p<0.91; p += 0.1) {
+       std::cout << boost::math::cdf(dist, p);
+    };
+}
+
+void boostRandombinomLarge(void) {
+    constexpr int size = 2;
+    constexpr double prob = 0.5;
+    boost::random::negative_binomial_distribution<int, double> dist(size, prob);
+//  boost::random::negative_binomial_distribution<double, double> dist(size, prob);
+    std::mt19937 randGen;
+    for(int i=0; i<10000; ++i) {
+       std::cout << dist(randGen);
+    }
+}
+
+// This code occurs a runtime assertion failure
+void boostRandombinomSmall(void) {
+#if 0
+    constexpr int size = 0.4;
+    constexpr double prob = 0.3;
+    boost::random::negative_binomial_distribution<int, double> dist(size, prob);
+    std::mt19937 randGen;
+    for(int i=0; i<10000; ++i) {
+       std::cout << dist(randGen);
+    }
+#endif
+}
+
 int main(int argc, char* argv[]) {
+    std::cout << "BOOST_VERSION=" << BOOST_VERSION << "\n";
+    cppRandombinom();
+    boostMathCppNbinom();
+    boostRandombinomLarge();
+    boostRandombinomSmall();
+
     rnbinomCppAll();
     nbinomCppCdf();
+    std::cout << "Everything is OK\n";
     return 0;
 }
 

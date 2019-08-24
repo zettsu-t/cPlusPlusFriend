@@ -226,6 +226,10 @@ $ ruby convert_opcode.rb coffee
 c0,ff,ee  sar bh,0xee
 ```
 
+### C++で負の二項分布を作ると、sizeに整数しか指定できないことがある
+
+[こちら](scripts/stock_price/negative_binomial_cpp.md)に説明を置きました。
+
 ## C++の一般的な情報源
 
 これらに記載されていることをすべて本ページに書くわけにもいきませんので、自分でC++のコードを書いていて、特に気になることだけを随時上記にまとめています。

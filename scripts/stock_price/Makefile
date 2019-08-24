@@ -12,7 +12,7 @@ OBJS=$(OBJ)
 
 CPP=g++
 LD=g++
-CPPFLAGS=-std=gnu++14 -Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CPPFLAGS=-O0 -g -std=gnu++14 -Wall -W -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 ifeq ($(BUILD_ON_MINGW),yes)
 CPPFLAGS+= -isystem C:\MINGW\include
 endif
@@ -28,7 +28,7 @@ RSOURCE=negative_binomial_cpp.R
 all: $(TARGETS) run
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) | grep "Everything"
 	$(RSCRIPT) $(RSOURCE)
 
 $(TARGET): $(OBJS)
