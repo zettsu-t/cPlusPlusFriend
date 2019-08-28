@@ -28,10 +28,18 @@ TEST_F(TestNumericCast, ExplicitRef) {
     }
 }
 
-TEST_F(TestNumericCast, DeclType) {
+TEST_F(TestNumericCast, DeclTypeBoost) {
     std::vector<double> vs {4.0};
     for(const auto& v : vs) {
         auto a=boost::numeric_cast<decltype(v)>(2)/v;
+        EXPECT_DOUBLE_EQ(0.5,a);
+    }
+}
+
+TEST_F(TestNumericCast, DeclTypeStatic) {
+    std::vector<double> vs {4.0};
+    for(const auto& v : vs) {
+        auto a=static_cast<decltype(v)>(2)/v;
         EXPECT_DOUBLE_EQ(0.5,a);
     }
 }
