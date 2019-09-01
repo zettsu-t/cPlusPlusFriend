@@ -33,6 +33,7 @@
 #include <boost/locale.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/tools/minima.hpp>
 #include <boost/multi_array.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>
@@ -1854,6 +1855,21 @@ TEST_F(TestCheckRandomSeed, Reproduce) {
         RandEngine gen(seedSet.at(i));
         EXPECT_EQ(randNumbers.at(i), gen());
     }
+}
+
+class TestBrendFindMinima : public ::testing::Test {};
+
+TEST_F(TestBrendFindMinima, All) {
+    using ValueType = double;
+    auto r = boost::math::tools::brent_find_minima(
+        [](ValueType x) {return x * std::log(x);},
+        std::numeric_limits<ValueType>::min(),
+        std::numeric_limits<ValueType>::max(),
+        20);
+
+    const auto expected = std::exp(-1);
+    EXPECT_NEAR(expected, r.first, 1e-6);
+    EXPECT_NEAR(-expected, r.second, 1e-6);
 }
 
 /*

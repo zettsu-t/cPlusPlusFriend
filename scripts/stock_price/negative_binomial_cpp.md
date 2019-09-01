@@ -16,7 +16,7 @@ std::negative_binomial_distribution<double> dist(size, prob);
 
 probはdoubleだが、sizeは整数に限る。
 
-## Boost 標準C++ライブラリによる確率密度
+## Boost C++ライブラリによる確率密度
 
 負の二項分布に基づく確率密度を生成する。size, probとも浮動小数を指定できる(省略時はdouble)。
 
@@ -25,7 +25,7 @@ boost::math::negative_binomial dist(size, prob);
 boost::math::cdf(dist, p);
 ```
 
-## Boost 標準C++ライブラリによる乱数生成
+## Boost C++ライブラリによる乱数生成
 
 標準C++と同様である。
 

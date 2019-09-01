@@ -10,10 +10,10 @@ TARGET=decl_type
 
 OBJS=$(OBJ) $(GTEST_OBJ)
 
-##CXX=g++
-CXX=clang++
-##OPT=-O0 -g
-OPT=-O2
+CXX=g++
+##CXX=clang++
+OPT=-O0 -g
+##OPT=-O2
 
 LD=g++
 CPPFLAGS=-std=gnu++17 $(OPT) -Wall $(GTEST_GMOCK_INCLUDE)
@@ -34,7 +34,10 @@ all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
-	-./$(TARGET)
+	./$(TARGET)
+
+run : $(TARGET)
+	./$(TARGET)
 
 $(OBJ): $(SOURCE)
 	$(CXX) $(CLANG_TARGET) $(CPPFLAGS) -o $@ -c $<
