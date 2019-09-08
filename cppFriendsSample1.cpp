@@ -362,6 +362,18 @@ TEST_F(TestForEach, Array) {
 }
 
 TEST_F(TestForEach, EraseAfterRemove) {
+    std::vector<int> vec = {1,3,5};
+    // これはイディオム
+    vec.erase(std::remove(vec.begin(), vec.end(), 3));
+    EXPECT_EQ(2, vec.size());
+    int sum = 0;
+    for(auto e : vec) {
+        sum += e;
+    }
+    EXPECT_EQ(6, sum);
+}
+
+TEST_F(TestForEach, EraseAfterRemoveIf) {
     std::vector<int> vec = {1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39};
     // これはイディオム
     vec.erase(std::remove_if(vec.begin(), vec.end(), [](auto i) { return ((i % 10) != 5);}), vec.end());

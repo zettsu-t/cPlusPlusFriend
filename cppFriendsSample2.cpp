@@ -33,6 +33,7 @@
 #include <boost/locale.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/distributions/poisson.hpp>
 #include <boost/math/tools/minima.hpp>
 #include <boost/multi_array.hpp>
 #include <boost/multi_index_container.hpp>
@@ -729,6 +730,123 @@ TEST_F(TestPrimalityTesting, BadAccumulation) {
                                            [](const auto& acc, const auto& element){
                                                return acc+ element; });
     EXPECT_EQ(0.375, sumDouble);
+}
+
+// 浮動小数の誤差を適切に扱わないと何が起きるか
+// https://snowtree-injune.com/2019/07/07/arange-linspace/
+class TestIterateDouble : public ::testing::Test{};
+
+namespace {
+    struct IterateDoubleTestCase {
+        using Value = double;
+        Value stepValue;
+        Value upperBound;
+        int nSection = 10;
+        Value expectedLast;
+        std::string expectedArrange;
+        std::string expectedLinspace;
+    };
+
+    const std::vector<IterateDoubleTestCase> IterateDoubleTestCaseSet {
+        {0.1, 1.0, 10, 0.9, "^0.99999\\d+$", "^0.90000\\d+$"},
+        {0.3, 0.9, 3, 0.6, "^0.89999\\d+$", "^0.59999\\d+$"},
+    };
+}
+
+TEST_F(TestIterateDouble, PythonArangeLike) {
+    using Value = IterateDoubleTestCase::Value;
+    for (const auto& testCase : IterateDoubleTestCaseSet) {
+        auto count = decltype(testCase.nSection){0};
+        Value lastValue = 0;
+
+        for(auto x=testCase.stepValue; x<testCase.upperBound; x+=testCase.stepValue) {
+            lastValue = x;
+            ++count;
+        }
+
+        std::smatch match;
+        const auto s = boost::lexical_cast<std::string>(lastValue);
+        EXPECT_TRUE(std::regex_match(s, match, std::regex(testCase.expectedArrange)));
+        EXPECT_DOUBLE_EQ(testCase.upperBound, lastValue);
+        EXPECT_EQ(testCase.nSection, count);
+    }
+
+    return;
+}
+
+TEST_F(TestIterateDouble, PythonArangeLikeFixed) {
+    double lv = 0;
+    for(double x=0.1; x<1.0; x+=0.1) {
+        lv = x;
+    }
+    EXPECT_DOUBLE_EQ(1.0, lv);
+    return;
+}
+
+TEST_F(TestIterateDouble, PythonLinspaceLike) {
+    using Value = IterateDoubleTestCase::Value;
+    for (const auto& testCase : IterateDoubleTestCaseSet) {
+        auto count = decltype(testCase.nSection){0};
+        Value lastValue = 0;
+
+        for(auto i=decltype(count){1}; i<testCase.nSection; ++i) {
+            lastValue = static_cast<Value>(i);
+            lastValue *= testCase.upperBound;
+            lastValue /= static_cast<Value>(testCase.nSection);
+            ++count;
+        }
+
+        std::smatch match;
+        const auto s = boost::lexical_cast<std::string>(lastValue);
+        EXPECT_TRUE(std::regex_match(s, match, std::regex(testCase.expectedLinspace)));
+        EXPECT_DOUBLE_EQ(testCase.expectedLast, lastValue);
+        EXPECT_EQ(testCase.nSection - 1, count);
+    }
+
+    return;
+}
+
+namespace {
+    template <typename Dist>
+    std::string CppQpois(const std::string& title, Dist& dist) {
+        const std::vector<double> quantiles {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+        std::vector<std::string> results;
+
+        for (const auto& qValue : quantiles) {
+            results.push_back(boost::lexical_cast<std::string>(boost::math::quantile(dist, qValue)));
+        }
+
+        std::string line = title;
+        line += " : ";
+        line += boost::algorithm::join(results, ",");
+        return line;
+    }
+}
+
+class TestDiscreteQuantilePolicies : public ::testing::Test{};
+
+TEST_F(TestDiscreteQuantilePolicies, All) {
+    using namespace boost::math;
+    using namespace boost::math::policies;
+    using MeanType = double;
+    using PoisssonOutwards = poisson_distribution<MeanType, policy<discrete_quantile<integer_round_outwards>>>;
+    using PoisssonInwards = poisson_distribution<MeanType, policy<discrete_quantile<integer_round_inwards>>>;
+    using PoisssonDown = poisson_distribution<MeanType, policy<discrete_quantile<integer_round_down>>>;
+    using PoisssonUp = poisson_distribution<MeanType, policy<discrete_quantile<integer_round_up>>>; // R qpois
+    using PoisssonNearest = poisson_distribution<MeanType, policy<discrete_quantile<integer_round_nearest>>>;
+
+    constexpr MeanType mean = 7;
+    PoisssonOutwards distOutwards(mean);
+    PoisssonInwards distInwards(mean);
+    PoisssonDown distDown(mean);
+    PoisssonUp distUp(mean);
+    PoisssonNearest distNearest(mean);
+
+    EXPECT_EQ("Outwards : 3,4,4,5,7,8,8,9,10", CppQpois("Outwards", distOutwards));
+    EXPECT_EQ("Inwards  : 4,5,5,6,6,7,7,8,9", CppQpois("Inwards ", distInwards));
+    EXPECT_EQ("Down     : 3,4,4,5,6,7,7,8,9", CppQpois("Down    ", distDown));
+    EXPECT_EQ("Up       : 4,5,5,6,7,8,8,9,10", CppQpois("Up      ", distUp));
+    EXPECT_EQ("Nearest  : 3,4,5,6,6,7,8,9,10", CppQpois("Nearest ", distNearest));
 }
 
 #if 0
