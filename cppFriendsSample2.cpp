@@ -482,6 +482,7 @@ TEST_F(TestPrimalityTesting, MersenneNumber) {
 // Googleの看板"{first 10-digit prime found in consecutive digits of e}.com"を解く
 TEST_F(TestPrimalityTesting, QuizBoard) {
     using LongFloat = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<200>>;
+//  std::cout << "\n\n" << typeid(boost::multiprecision::cpp_dec_float_50::str).name() << "\n\n";
     static_assert(!std::is_floating_point<LongFloat>::value);
     static_assert(std::is_floating_point<double>::value);
     static_assert(boost::multiprecision::number_category<LongFloat>::value ==
@@ -1724,7 +1725,7 @@ TEST_F(TestTypeDeduction, Constant) {
         ++count;
     }
 #endif
-    for(auto i=static_cast<decltype(n)>(0); i<n; ++i) {
+    for(auto i=decltype(n){0}; i<n; ++i) {
         static_assert(std::is_same<size_t, decltype(i)>::value, "");
         static_assert(!std::is_const<decltype(i)>::value, "");
         static_assert(std::is_same<decltype(i), std::remove_const_t<decltype(n)>>::value, "");

@@ -1,4 +1,15 @@
+// Cygwin g++ 7.4.0 does not contain charconv
+// #define USE_STD_TO_CHARS
+#ifdef USE_STD_TO_CHARS
+#include <charconv>
+#endif
+
+#include <array>
+#include <iostream>
 #include <limits>
+#include <sstream>
+#include <string_view>
+#include <system_error>
 #include <tuple>
 #include <utility>
 #include <gtest/gtest.h>
@@ -141,6 +152,51 @@ TEST_F(TestStructuredBinding, Double) {
         EXPECT_DOUBLE_EQ(0.0, quotient);
     }
 }
+
+// CSV風に、書式を指定して数値を文字列にしたものをjoinする
+#ifdef USE_STD_TO_CHARS
+class TestJoinFloating : public ::testing::Test {};
+
+TEST_F(TestJoinFloating, Integer) {
+    std::ostringstream os;
+    std::array<char, 100> str = {0};
+
+    int value = 10;
+    constexpr int size = 4;
+    for (int i=decltype(size){0}; i<size; ++i) {
+        if (auto [p, ec] = std::to_chars(str.data(), str.data() + str.size(), value);
+            ec == std::errc()) {
+            os << std::string_view(str.data(), p - str.data());
+        }
+
+        if ((i + 1) < size) {
+            os << ",";
+        }
+        value /= 3;
+    }
+
+    const std::string expected = "10,3,1,0";
+    EXPECT_EQ(expected, os.str());
+}
+
+TEST_F(TestJoinFloating, ShortBuffer) {
+    std::ostringstream os;
+    std::array<char, 5> strShort = {0};
+
+    constexpr int value = 123456;
+    auto [p, ec] = std::to_chars(strShort.data(), strShort.data() + strShort.size(), value);
+    ASSERT_EQ(std::errc::value_too_large, ec);
+
+    std::array<char, 6> strExact = {0};
+    if (auto [p, ec] = std::to_chars(strExact.data(), strExact.data() + strExact.size(), value);
+        ec == std::errc()) {
+        os << std::string_view(strExact.data(), p - strExact.data());
+    }
+
+    const std::string expected = "123456";
+    EXPECT_EQ(expected, os.str());
+}
+#endif
 
 /*
 Local Variables:
