@@ -17,22 +17,28 @@ library(Rlab)
 library(reshape2)
 library(stringr)
 
-common_seed <- 123
+g_use_advi <- TRUE
+common_seed <- floor(runif(1, 1, 10000))
+print(paste0("seed=",common_seed))
 
 ## Set numbers of iterations in testing
-n_stan_chains <- 4
+if (g_use_advi) {
+    n_stan_chains <- 1
+} else {
+    n_stan_chains <- 2
+}
 
 ## Number of respondents(n) and questions(k)
-## stan_warmup <- 250
-## stan_iter <- 500
-## n <- 1500
-## k <- 24
-
-## ggs sample
 stan_warmup <- 500
 stan_iter <- 500
-n <- 4
-k <- 100
+n <- 1500
+k <- 24
+
+## ggs sample
+#stan_warmup <- 1000
+#stan_iter <- 1000
+#n <- 10
+#k <- 100
 
 ## Assuming four-choice questions
 chance <- 0.25
@@ -100,13 +106,30 @@ Sys.setenv(LOCAL_CPPFLAGS = '-march=native')
 ## Estimates with Stan
 input_data <- list(N=n, K=k, Y=data, chance=chance)
 start_time <- proc.time()
-fit.stan <- stan(file='item_response_theory.stan', data=input_data,
-                 iter=stan_iter+stan_warmup, warmup=stan_warmup, chains=n_stan_chains, seed=common_seed)
+
+if (g_use_advi) {
+    stan_model <- stan_model(file='item_response_theory.stan')
+    stan_thin <- 1
+    stan_output_samples <- as.integer(stan_iter / stan_thin * n_stan_chains)
+    print(head(stan_output_samples))
+    fit.stan <- vb(
+        stan_model,
+        data=input_data,
+        output_samples=stan_output_samples,
+        seed=common_seed,
+        algorithm="meanfield"
+    )
+} else {
+    fit.stan <- stan(file='item_response_theory.stan', data=input_data,
+                     iter=stan_iter+stan_warmup, warmup=stan_warmup, chains=n_stan_chains, seed=common_seed)
+}
+
 elapsed_time <- proc.time() - start_time
+print(elapsed_time)
 
 fit.stan.array <- as.array(fit.stan)
 fit.stan.names <- unlist(dimnames(fit.stan.array))
-if (n_stan_chains == 1) {
+if (g_use_advi || (n_stan_chains == 1)) {
     fit.stan.means <- get_posterior_mean(fit.stan)
 } else {
     fit.stan.means <- get_posterior_mean(fit.stan)[,n_stan_chains + 1]
@@ -121,16 +144,24 @@ set_font <- function(g) {
               plot.title=element_text(family='sans', size=font_size))
 }
 
-fit.ggs <- ggs(fit.stan)
-png(filename='irt_all_difficulty_ggs.png', width=800, height=480)
-g1 <- set_font(ggs_Rhat(fit.ggs, family="theta") + guides(color=guide_legend(override.aes = list(size=4))))
-g2 <- set_font(ggs_histogram(fit.ggs, family="theta"))
-g3 <- set_font(ggs_traceplot(fit.ggs, family="theta"))
-grid.arrange(g1, g2, g3, ncol=3, nrow=1)
-dev.off()
+if (n < 30) {
+    fit.ggs <- ggs(fit.stan)
+    png(filename='irt_all_difficulty_ggs.png', width=800, height=3200)
+    if (!g_use_advi) {
+        g1 <- set_font(ggs_Rhat(fit.ggs, family="theta") + guides(color=guide_legend(override.aes = list(size=4))))
+    }
+    g2 <- set_font(ggs_histogram(fit.ggs, family="theta"))
+    g3 <- set_font(ggs_traceplot(fit.ggs, family="theta"))
+    if (g_use_advi) {
+        grid.arrange(g2, g3, ncol=3, nrow=1)
+    } else {
+        grid.arrange(g1, g2, g3, ncol=3, nrow=1)
+    }
+    dev.off()
+}
 
 ## Draws a chart of difficulties of questions
-if (n > 6) {
+if (!g_use_advi && (n > 6)) {
     png(filename='irt_all_difficulty_hist.png', width=1200, height=800)
     stan_hist(fit.stan, pars=c('difficulty'), nrow=4, ncol=6, fill='slateblue')
     dev.off()
@@ -158,7 +189,7 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
 
     filename <- paste('itr_', display_name, '_plot.png', sep='')
     title <- paste('Estimated and actual', display_name, sep=' ')
-    png(filename=filename, width=1600, height=800)
+    png(filename=filename, width=3200, height=2000)
     g <- ggplot(df_chart)
     g <- g + geom_point(aes(x=index, y=estimated), color='orchid', size=7)
     g <- g + geom_line(aes(x=index, y=actual), color='black', size=2)
@@ -170,7 +201,7 @@ draw_charts <- function(actual, param_name, display_name, ylab_text) {
     dev.off()
 
     filename <- paste('itr_', display_name, '_interval.png', sep='')
-    png(filename=filename, width=1000, height=1000)
+    png(filename=filename, width=3200, height=2000)
     g <- mcmc_intervals(fit.stan.array, rev(fit.stan.names[grepl(param_name_regex, fit.stan.names)]))
     g <- g + coord_flip()
     g <- g + labs(title=ylab_text)
@@ -183,6 +214,6 @@ draw_charts(difficulties, 'difficulty', 'difficulty', 'Difficulty')
 draw_charts(theta, 'theta', 'ability', 'Ability')
 
 ## Print summary
-summary(fit.stan)
-print(fit.stan, pars=c('discrimination', 'difficulty'))
+# print(head(summary(fit.stan)))
+# print(fit.stan, pars=c('discrimination', 'difficulty'))
 print(elapsed_time)
