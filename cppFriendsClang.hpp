@@ -81,6 +81,20 @@ namespace ProcessorException {
     extern int abs_int(int src);
 }
 
+namespace InferVariadicTemplate {
+    template <typename F, typename... V>
+    auto MyApply(const F& f, V&&... v) {
+        return f(std::forward<V>(v)...);
+    };
+
+#if !defined(__clang__)
+    template <typename F>
+    auto MyApply2(const F& f, auto&&... v) {
+        return f(std::forward<decltype(v)>(v)...);
+    };
+#endif
+}
+
 // LTOの有無で動作が変わる
 extern uint32_t ShiftManyFor1(uint32_t src);
 

@@ -116,8 +116,8 @@ TEST_F(TestTypeCast, PopCount) {
     EXPECT_EQ(14, MySlowPopCount(0xf7304225u));
 }
 
-// typeidを比較する
 namespace {
+    // typeidを比較する
     class TypeIdAssigner {
     public:
         virtual ~TypeIdAssigner() = default;
@@ -164,6 +164,172 @@ TEST_F(TestTypeId, Compare) {
         foundDerived = true;
     }
     EXPECT_TRUE(foundDerived);
+}
+
+namespace {
+    class BaseDoubler {
+    public:
+        explicit BaseDoubler(const IntHolderImplicit& arg) : value_(arg * 2) {
+            implicit_ = true;
+        }
+        explicit BaseDoubler(const IntHolderExplicit& arg) : value_(arg.Get() * 2) {
+            explicit_ = true;
+        }
+        virtual ~BaseDoubler() = default;
+        int Get() const { return value_; }
+        bool TakenImplicit() const { return implicit_; }
+        bool TakenExplicit() const { return explicit_; }
+    private:
+        int value_ {0};
+        bool implicit_ {false};
+        bool explicit_ {false};
+    };
+
+    // 継承コンストラクタ
+    class DerivedDoubler : public BaseDoubler {
+    public:
+        using BaseDoubler::BaseDoubler;
+        virtual ~DerivedDoubler() = default;
+    };
+
+    // explicitではない
+    class ImplicitDoubler1 {
+    public:
+        constexpr ImplicitDoubler1(int arg) : value_(arg * 2) {}
+        virtual ~ImplicitDoubler1() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+
+    class ImplicitDoubler2 {
+    public:
+        ImplicitDoubler2(const IntHolderImplicit& arg) : value_(arg * 2) {}
+        virtual ~ImplicitDoubler2() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+
+    class ImplicitDoubler3 {
+    public:
+        // explicitではない
+        ImplicitDoubler3(const IntHolderExplicit& arg) : value_(arg.Get() * 2) {}
+        virtual ~ImplicitDoubler3() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+
+    class ExplicitDoubler1 {
+    public:
+        constexpr explicit ExplicitDoubler1(int arg) : value_(arg * 2) {}
+        virtual ~ExplicitDoubler1() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+
+    class ExplicitDoubler2 {
+    public:
+        explicit ExplicitDoubler2(const IntHolderImplicit& arg) : value_(arg * 2) {}
+        virtual ~ExplicitDoubler2() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+
+    class ExplicitDoubler3 {
+    public:
+        explicit ExplicitDoubler3(const IntHolderExplicit& arg) : value_(arg.Get() * 2) {}
+        virtual ~ExplicitDoubler3() = default;
+        int Get() const { return value_; }
+    private:
+        int value_ {0};
+    };
+}
+
+class TestInheritingConstructors : public ::testing::Test {};
+
+// #define BUILD_TEST_FULL_HOLDERS
+
+TEST_F(TestInheritingConstructors, Int) {
+    constexpr int arg = 5;
+    constexpr int expected = 10;
+
+    // 呼び出し先があいまいかというと、そうではない
+    BaseDoubler instBase(arg);
+    EXPECT_TRUE(instBase.TakenImplicit());
+    EXPECT_FALSE(instBase.TakenExplicit());
+
+    DerivedDoubler instDerived(arg);
+    EXPECT_TRUE(instDerived.TakenImplicit());
+    EXPECT_FALSE(instDerived.TakenExplicit());
+
+#ifdef BUILD_TEST_FULL_HOLDERS
+    // 引数無しのコンストラクタは削除されている
+    EXPECT_EQ(0, DerivedHolder());
+#endif
+
+    ImplicitDoubler1 id1 = 1;
+#ifdef BUILD_TEST_FULL_HOLDERS
+    ImplicitDoubler2 id2 = 1;
+    ImplicitDoubler3 id3 = 1;
+    ExplicitDoubler1 ed1 = 1;
+    ExplicitDoubler2 ed2 = 1;
+    ExplicitDoubler3 ed3 = 1;
+#endif
+
+    EXPECT_EQ(expected, ImplicitDoubler1(arg).Get());
+    EXPECT_EQ(expected, ExplicitDoubler1(arg).Get());
+    EXPECT_EQ(expected, ImplicitDoubler2(arg).Get());
+    EXPECT_EQ(expected, ExplicitDoubler2(arg).Get());
+#ifdef BUILD_TEST_FULL_HOLDERS
+    EXPECT_EQ(expected, ImplicitDoubler3(arg).Get());
+    EXPECT_EQ(expected, ExplicitDoubler3(arg).Get());
+#endif
+}
+
+TEST_F(TestInheritingConstructors, HolderImplicit) {
+    constexpr int arg = 5;
+    constexpr int expected = 10;
+    const IntHolderImplicit holder {arg};
+
+    BaseDoubler inst(holder);
+    EXPECT_TRUE(inst.TakenImplicit());
+    EXPECT_FALSE(inst.TakenExplicit());
+
+    EXPECT_EQ(expected, BaseDoubler(holder).Get());
+    EXPECT_EQ(expected, DerivedDoubler(holder).Get());
+    EXPECT_EQ(expected, ImplicitDoubler1(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler1(holder).Get());
+    EXPECT_EQ(expected, ImplicitDoubler2(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler2(holder).Get());
+#ifdef BUILD_TEST_FULL_HOLDERS
+    EXPECT_EQ(expected, ImplicitDoubler3(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler3(holder).Get());
+#endif
+}
+
+TEST_F(TestInheritingConstructors, HolderExplicit) {
+    constexpr int arg = 5;
+    constexpr int expected = 10;
+    const IntHolderExplicit holder {arg};
+
+    BaseDoubler inst(holder);
+    EXPECT_FALSE(inst.TakenImplicit());
+    EXPECT_TRUE(inst.TakenExplicit());
+
+    EXPECT_EQ(expected, BaseDoubler(holder).Get());
+    EXPECT_EQ(expected, DerivedDoubler(holder).Get());
+#ifdef BUILD_TEST_FULL_HOLDERS
+    EXPECT_EQ(expected, ImplicitDoubler1(holder).Get());
+    EXPECT_EQ(expected, ImplicitDoubler2(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler1(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler2(holder).Get());
+#endif
+    EXPECT_EQ(expected, ImplicitDoubler3(holder).Get());
+    EXPECT_EQ(expected, ExplicitDoubler3(holder).Get());
 }
 
 TEST_F(TestTypeId, SharedPtr) {
@@ -402,6 +568,29 @@ TEST_F(TestForEach, RawPointer) {
 //  EXPECT_NE(pData1, vec1.data());
     EXPECT_EQ("123456", os.str());
 }
+
+class TestLastElement : public ::testing::Test{};
+
+TEST_F(TestLastElement, NotEmpty) {
+    const std::vector<int> vec {2, 4, 8};
+    int count = 0;
+    for (auto i = decltype(vec.size()){0}; i < (vec.size() - 1); ++i) {
+        ++count;
+    }
+    EXPECT_EQ(2, count);
+}
+
+#if 0
+TEST_F(TestLastElement, Empty) {
+    std::vector<int> vec;
+    int c=0;
+    auto n=vec.size();
+    --n;
+    // vec.size() - 1 < 0 を符号無し整数で表現するので、未定義動作になるが...
+    for (auto i=decltype(n){0}; i<n; ++i) { ++c; }
+    EXPECT_EQ(-1, c);
+}
+#endif
 
 // Min-maxの使い方
 class TestMinMax : public ::testing::Test{};
@@ -1654,6 +1843,29 @@ TEST_F(TestSetPair, Explicit) {
 
 //  こう書いても自動的にParamPairにはならない
 //  ParamTaker alt(a, b);
+}
+
+class TestShortCircuit : public ::testing::Test {};
+
+TEST_F(TestShortCircuit, NullPointer) {
+    int* p = nullptr;
+    int actual = 0;
+    if (!p || (*p == 0)) {
+        actual += 1;
+    }
+
+    int value = 0;
+    p = &value;
+    if (!p || (*p == 0)) {
+        actual += 2;
+    }
+
+    ++value;
+    if (!p || (*p == 0)) {
+        actual += 4;
+    }
+
+    EXPECT_EQ(3, actual);
 }
 
 /*

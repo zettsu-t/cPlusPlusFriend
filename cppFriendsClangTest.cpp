@@ -263,6 +263,29 @@ TEST_F(TestConditionalMove, All) {
     EXPECT_EQ(1, cell.candidates_);
 }
 
+namespace InferVariadicTemplate {
+#if !defined(__clang__)
+    auto MyApply3(auto& f, auto&&... v) {
+        return f(std::forward<decltype(v)>(v)...);
+    };
+#endif
+}
+
+class TestInferVariadicTemplate : public ::testing::Test{};
+
+TEST_F(TestInferVariadicTemplate, All) {
+    auto sumTwo = [](const auto& lhs, const auto& rhs) {
+        return lhs + rhs;
+    };
+
+    EXPECT_EQ(5, InferVariadicTemplate::MyApply(sumTwo, 2, 3));
+
+#if !defined(__clang__)
+    EXPECT_EQ(7, InferVariadicTemplate::MyApply2(sumTwo, 3, 4));
+    EXPECT_EQ(9, InferVariadicTemplate::MyApply3(sumTwo, 4, 5));
+#endif
+}
+
 /*
 Local Variables:
 mode: c++

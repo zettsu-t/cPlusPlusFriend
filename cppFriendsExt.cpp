@@ -83,6 +83,26 @@ namespace {
 const uint8_t ConstantArraySample[ConstantArraySampleSize] {0};
 const int& ConstantIntRefSample = ConstantIntSample;
 
+IntHolderImplicit::IntHolderImplicit(int arg) : value_(arg) {
+    return;
+}
+
+IntHolderImplicit::operator int&() {
+    return value_;
+}
+
+IntHolderImplicit::operator int() const {
+    return value_;
+}
+
+IntHolderExplicit::IntHolderExplicit(int arg) : value_(arg) {
+    return;
+}
+
+int IntHolderExplicit::Get() const {
+    return value_;
+}
+
 /*
 Local Variables:
 mode: c++

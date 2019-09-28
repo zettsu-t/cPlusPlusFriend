@@ -17,6 +17,13 @@ TEST_SAMPLE_FILENAME = "shuffleLinesSample.txt"
 # 実行ファイル名
 TEST_COMMAND_NAME = "ruby -Ku shuffleLines.rb"
 
+# 無視したい警告メッセージ
+TEXT_REDUNDANT_PATTERN = "ruby: warning: shebang line ending with \\r may cause problems"
+
+def remove_shebang_message(message)
+  message.gsub(TEXT_REDUNDANT_PATTERN, '').lstrip
+end
+
 class MockInputStream
   def initialize(lines)
     @lines = lines.dup
@@ -647,7 +654,7 @@ class TestActualFile < Test::Unit::TestCase
     stdoutstr, stderrstr, status = Open3.capture3(command + outFilename)
 
     assert_equal("", stdoutstr.chomp)
-    assert_equal("", stderrstr.chomp)
+    assert_equal("", remove_shebang_message(stderrstr.chomp))
     assert_true(status.success?)
     assert_equal(@inputLines, readAndSort(outFilename))
   end
@@ -670,7 +677,7 @@ class TestActualFile < Test::Unit::TestCase
     stdoutstr, stderrstr, status = Open3.capture3(command)
 
     assert_equal("", stdoutstr.chomp)
-    assert_equal("", stderrstr.chomp)
+    assert_equal("", remove_shebang_message(stderrstr.chomp))
     assert_true(status.success?)
 
     lines = readAndSort(outFilename)
@@ -709,7 +716,7 @@ class TestActualFile < Test::Unit::TestCase
     assert_equal(success, status.success?)
 
     if success
-      assert_equal("", stderrstr.chomp)
+      assert_equal("", remove_shebang_message(stderrstr.chomp))
       assert_equal(@inputLines, readAndSort(outFilename))
     else
       assert_true(stderrstr.include?("Cannot find #{phrase} in the input."))
@@ -722,7 +729,7 @@ class TestActualFile < Test::Unit::TestCase
       command = "#{TEST_COMMAND_NAME} -i #{TEST_SAMPLE_FILENAME} -p 5"
       stdoutstr, stderrstr, status = Open3.capture3(command)
       assert_false(stdoutstr.empty?)
-      assert_equal("", stderrstr.chomp)
+      assert_equal("", remove_shebang_message(stderrstr.chomp))
       assert_true(status.success?)
 
       str = stdoutstr.tr("\r\n@#xy ", "")
@@ -744,6 +751,6 @@ class TestActualFile < Test::Unit::TestCase
     str += "Unknown tag(s) #x found\n"
     str += "Mention(s) found in c @y"
     expectedStr = expected ? str : ""
-    assert_equal(expectedStr, stderrstr.chomp)
+    assert_equal(expectedStr, remove_shebang_message(stderrstr.chomp))
   end
 end

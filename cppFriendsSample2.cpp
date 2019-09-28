@@ -1609,6 +1609,23 @@ TEST_F(TestOptional, Print) {
     EXPECT_EQ("--Str", osStrValue.str());
 }
 
+TEST_F(TestOptional, Arrow) {
+    struct MyPair {
+        struct Value {
+            int num;
+        };
+        int key {0};
+        boost::optional<Value> value;
+    };
+
+    MyPair kv;
+    kv.key = 1;
+    kv.value = MyPair::Value {2};
+    EXPECT_EQ(1, kv.key);
+    ASSERT_TRUE(kv.value);
+    ASSERT_EQ(2, kv.value->num);
+}
+
 namespace {
     struct Element {
         int id;

@@ -93,6 +93,20 @@ constexpr size_t ConstantArraySampleSize = 0x10000;
 extern const uint8_t ConstantArraySample[ConstantArraySampleSize];
 extern const int& ConstantIntRefSample;
 
+// 呼び出し側には定義を見せない
+struct IntHolderImplicit {
+    IntHolderImplicit(int arg);
+    operator int&();
+    operator int() const;
+    int value_ {0};
+};
+
+struct IntHolderExplicit {
+    explicit IntHolderExplicit(int arg);
+    int Get() const;
+    int value_ {0};
+};
+
 #endif // CPPFRIENDS_CPPFRIENDS_HPP
 
 /*
