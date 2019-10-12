@@ -24,6 +24,7 @@
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/icl/interval_set.hpp>
+#include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/date_time/time_facet.hpp>
@@ -1934,6 +1935,14 @@ TEST_F(TestBindMemberFunction, All) {
     EXPECT_EQ("abc", parserDefault.GetString());
 }
 
+#if 0
+TEST_F(TestBindMemberFunction, Error) {
+    // >が足りないが、template argument 2 is invalid としか言われない
+    using FuncMap = std::map<int, std::function<void(int)>;
+    FuncMap mp;
+}
+#endif
+
 class TestOddEven : public ::testing::Test {};
 
 TEST_F(TestOddEven, All) {
@@ -2006,6 +2015,29 @@ TEST_F(TestBrendFindMinima, All) {
     const auto expected = std::exp(-1);
     EXPECT_NEAR(expected, r.first, 1e-6);
     EXPECT_NEAR(-expected, r.second, 1e-6);
+}
+
+class TestDayOfYear : public ::testing::Test {};
+
+TEST_F(TestDayOfYear, All) {
+    using boost::gregorian::date;
+    EXPECT_LT(0, boost::gregorian::day_clock::local_day().day_of_year());
+    if (boost::gregorian::day_clock::local_day().day_of_year() == 256) {
+        // Prorammers' day
+        EXPECT_TRUE(true);
+    }
+
+    date theFirstDay = boost::gregorian::from_string("2020/01/01");
+    EXPECT_EQ(1, theFirstDay.day_of_year());
+
+    date silvester = boost::gregorian::from_string("2020/12/31");
+    EXPECT_EQ(366, silvester.day_of_year());
+
+    date theProgrammersDay2019 = boost::gregorian::from_string("2019/09/13");
+    EXPECT_EQ(256, theProgrammersDay2019.day_of_year());
+
+    date theProgrammersDay2020 = boost::gregorian::from_string("2020/09/12");
+    EXPECT_EQ(256, theProgrammersDay2020.day_of_year());
 }
 
 /*

@@ -72,8 +72,9 @@ OUTPUT_ASM_C_EXT2=cFriendsSideEffect.s
 OUTPUT_ASM_CPP_CLANG=cppFriendsClang_clang.s
 OUTPUT_ASM_CPP_GCC=cppFriendsClang_gcc.s
 OUTPUT_ASM_SINGLETON_11=cppFriendsSingleton.s
-OUTPUT_ASM_SINGLETON_DEFAULT=cppFriendsSingleton_thread_safe.s
-OUTPUT_ASM_SINGLETON_NO=cppFriendsSingleton_no_thread_safe.s
+# C++11 or newer is required for Google Test
+# OUTPUT_ASM_SINGLETON_DEFAULT=cppFriendsSingleton_thread_safe.s
+# OUTPUT_ASM_SINGLETON_NO=cppFriendsSingleton_no_thread_safe.s
 
 OUTPUT_ASMS=$(OUTPUT_ASM87_C) $(OUTPUT_ASM87_STORE_C) $(OUTPUT_ASM64_C) $(OUTPUT_ASM64_CLANG) $(OUTPUT_ASM_C_EXT1) $(OUTPUT_ASM_C_EXT2) $(OUTPUT_ASM_CPP_CLANG) $(OUTPUT_ASM_CPP_GCC) $(OUTPUT_ASM_SINGLETON_11) $(OUTPUT_ASM_SINGLETON_DEFAULT) $(OUTPUT_ASM_SINGLETON_NO)
 

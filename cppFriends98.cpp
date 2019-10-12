@@ -1,3 +1,5 @@
+// GoogleTest 1.10はC++11以上が必須
+#if 0
 #include <boost/fusion/container/vector.hpp>
 #include <gtest/gtest.h>
 
@@ -18,6 +20,7 @@ TEST_F(TestCpp98BoostFusionVector, Numbered) {
 #endif
     EXPECT_NE(typeid(boost::fusion::vector<int,int>), typeid(boost::fusion::vector2<int,int>));
 }
+#endif
 
 /*
 Local Variables:
