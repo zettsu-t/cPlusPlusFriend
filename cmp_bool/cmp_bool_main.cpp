@@ -15,6 +15,14 @@ int main(int argc, char* argv[]) {
     std::cout << "isNotTrue(trueValue) " << isNotTrue(trueValue) << "\n";
     std::cout << "isNotTrue(trueValue) " << isNotTrue(falseValue)<< "\n";
 
+    std::cout << "toBool(0) " << toBool(0) << "\n";
+    std::cout << "toBool(1) " << toBool(1) << "\n";
+    std::cout << "f(0) " << f(false) << "\n";
+    std::cout << "f(1) " << f(true) << "\n";
+    std::cout << "mySelect(false,1,-1) " << mySelect(false,1,-1) << "\n";
+    std::cout << "mySelect(true,1,-1) " << mySelect(true,1,-1) << "\n";
+
+    std::cout << "\n";
     return 0;
 }
 
