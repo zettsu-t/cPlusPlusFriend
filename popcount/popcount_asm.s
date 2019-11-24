@@ -1,5 +1,5 @@
 .intel_syntax noprefix
-.file "popcnt.s"
+.file "popcount_asm.s"
 
 .set  BytesInYmmReg, 32
 

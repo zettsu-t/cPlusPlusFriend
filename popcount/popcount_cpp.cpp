@@ -7,13 +7,13 @@
 #include <limits>
 #include <memory>
 #include <random>
+#include <utility>
 #include <time.h>
 #include <gtest/gtest.h>
 
 namespace {
     using Count = uint64_t;
-    using IntElement = uint32_t;
-    using TrialCount = uint32_t;
+    using TrialCount = uint64_t;
     constexpr size_t BytesInYmmRegister = 32;
 
     enum class MethodToFill {
@@ -23,20 +23,35 @@ namespace {
         RANDOM,
     };
 
+    template <typename T, typename std::enable_if_t<std::is_same_v<T, uint32_t>, std::nullptr_t> = nullptr>
+    auto BuitinPopcount(const T& num) {
+        return __builtin_popcount(num);
+    }
+
+    template <typename T, typename std::enable_if_t<std::is_same_v<T, uint64_t>, std::nullptr_t> = nullptr>
+    auto BuitinPopcount(const T& num) {
+        return __builtin_popcountll(num);
+    }
+
+    template<typename ElementType>
     struct AlignedBuffer final {
         AlignedBuffer(size_t nElments, MethodToFill method) {
             // Check the Ymm registers alignment
             constexpr size_t nYmmRegisters = 4;
             size_t unit = BytesInYmmRegister * nYmmRegisters;
             unit /= sizeof(nElments);
-            assert((nElments % unit) == 0);
+            assert((nElments > 0) && (nElments % unit) == 0);
 
             nElments_ = nElments;
-            sizeInByte_ = sizeof(IntElement) * nElments;
+            nElments32_ = nElments * sizeof(ElementType) / sizeof(uint32_t);
+            sizeInByte_ = sizeof(ElementType) * nElments;
             sizeOfYmmRegister_ = sizeInByte_ / BytesInYmmRegister;
-            auto pData = aligned_alloc(BytesInYmmRegister, sizeInByte_);
+            void* pData = aligned_alloc(BytesInYmmRegister, sizeInByte_);
             if (pData) {
-                pData_ = static_cast<IntElement*>(pData);
+                pData_ = static_cast<decltype(pData_)>(pData);
+                static_assert((alignof(std::remove_pointer_t<decltype(pData_)>) % alignof(std::remove_pointer_t<decltype(pData32_)>)) == 0);
+                // May not aligned
+                pData32_ = static_cast<decltype(pData32_)>(pData);
                 initialize(method);
             }
         }
@@ -74,9 +89,9 @@ namespace {
         }
 
         Count fillByOnes(void) {
-            std::fill(pData_, pData_ + nElments_, std::numeric_limits<IntElement>::max());
+            std::fill(pData_, pData_ + nElments_, std::numeric_limits<ElementType>::max());
             Count count = nElments_;
-            count *= sizeof(IntElement);
+            count *= sizeof(ElementType);
             count *= 8;  // bits per byte
             return count;
         }
@@ -84,9 +99,9 @@ namespace {
         Count fillSequential(void) {
             Count count = 0;
             for(size_t i=0; i<nElments_; ++i) {
-                IntElement num = static_cast<IntElement>(i & std::numeric_limits<IntElement>::max());
+                ElementType num = static_cast<ElementType>(i & std::numeric_limits<ElementType>::max());
                 pData_[i] = num;
-                count += static_cast<decltype(count)>(__builtin_popcount(num));
+                count += static_cast<decltype(count)>(BuitinPopcount(num));
             }
             return count;
         }
@@ -94,21 +109,23 @@ namespace {
         Count fillRandom(void) {
             std::random_device seedGen;
             std::default_random_engine engine(seedGen());
-            std::uniform_int_distribution<IntElement> dist;
+            std::uniform_int_distribution<ElementType> dist;
 
             Count count = 0;
             for(size_t i=0; i<nElments_; ++i) {
                 auto num = dist(engine);
                 pData_[i] = num;
-                count += static_cast<decltype(count)>(__builtin_popcount(num));
+                count += static_cast<decltype(count)>(BuitinPopcount(num));
             }
             return count;
         }
 
         size_t nElments_ {0};
+        size_t nElments32_ {0};
         size_t sizeInByte_ {0};
         size_t sizeOfYmmRegister_ {0};
-        IntElement* pData_ {nullptr};
+        ElementType* pData_ {nullptr};
+        uint32_t* pData32_ {nullptr};
         Count actualCount_ {0};
     };
 
@@ -134,7 +151,8 @@ namespace {
         return result;
     }
 
-    Count CountByAsm(const IntElement* pData, size_t sizeOfYmmRegister, TrialCount nTrial) {
+    template<typename ElementType>
+    Count CountByAsm(const ElementType* pData, size_t sizeOfYmmRegister, TrialCount nTrial) {
         Count total = 0;
         for(auto trial = decltype(nTrial){0}; trial<nTrial; ++trial) {
             auto ptr = pData;
@@ -149,11 +167,12 @@ namespace {
         return total;
     }
 
-    Count CountByIntrinsic(const IntElement* pData, size_t nElments, TrialCount nTrial) {
+    template<typename ElementType>
+    Count CountByIntrinsic(const ElementType* pData, size_t nElments, TrialCount nTrial) {
         Count total = 0;
         for(auto trial = decltype(nTrial){0}; trial<nTrial; ++trial) {
             for(size_t i=0; i<nElments; ++i) {
-                total += static_cast<decltype(total)>(__builtin_popcount(pData[i]));
+                total += static_cast<decltype(total)>(BuitinPopcount(pData[i]));
             }
         }
 
@@ -161,10 +180,23 @@ namespace {
     }
 }
 
+template <typename ElementType>
 class TestPopulationCount : public ::testing::Test {
 protected:
-    void fillAndCount(size_t nElements, size_t width, MethodToFill method) {
-        std::unique_ptr<AlignedBuffer> pBuf = std::make_unique<AlignedBuffer>(nElements, method);
+    size_t getSizeWidth(void) {
+        size_t width = 0;
+        size_t size = sizeof(ElementType);
+        while(size) {
+            ++width;
+            size >>= 1;
+        }
+        width += 2;
+        return width;
+    }
+
+    void fillAndCount(size_t nElements, MethodToFill method) {
+        using BufType = AlignedBuffer<ElementType>;
+        std::unique_ptr<BufType> pBuf = std::make_unique<BufType>(nElements, method);
         if (method == MethodToFill::ZEROS) {
             EXPECT_FALSE(pBuf->pData_[0]);
         } else if (method == MethodToFill::ONES) {
@@ -184,112 +216,131 @@ protected:
         size_t expected = nElements * width;
         expected >>= 1;
         constexpr MethodToFill method = MethodToFill::SEQUENTIAL;
-        std::unique_ptr<AlignedBuffer> pBuf = std::make_unique<AlignedBuffer>(nElements, method);
+        using BufType = AlignedBuffer<ElementType>;
+        std::unique_ptr<BufType> pBuf = std::make_unique<BufType>(nElements, method);
         EXPECT_EQ(expected, pBuf->actualCount_);
 
         constexpr TrialCount nTrial = 1;
-        auto funcAsm = std::bind(CountByAsm, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
+        auto funcAsm = std::bind(CountByAsm<ElementType>, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
         auto actual = MeasureTime(funcAsm);
         EXPECT_EQ(expected, actual.count);
 
-        auto funcIntrinsic = std::bind(CountByIntrinsic, pBuf->pData_, pBuf->nElments_, nTrial);
+        auto funcIntrinsic = std::bind(CountByIntrinsic<ElementType>, pBuf->pData_, pBuf->nElments_, nTrial);
         actual = MeasureTime(funcIntrinsic);
         EXPECT_EQ(expected, actual.count);
     }
 
-    void fillRandomAndCount(size_t nElements, size_t width) {
+    void fillRandomAndCount(size_t nElements) {
         constexpr MethodToFill method = MethodToFill::RANDOM;
-        std::unique_ptr<AlignedBuffer> pBuf = std::make_unique<AlignedBuffer>(nElements, method);
+        using BufType = AlignedBuffer<ElementType>;
+        std::unique_ptr<BufType> pBuf = std::make_unique<BufType>(nElements, method);
 
         constexpr TrialCount nTrial = 1;
-        auto funcAsm = std::bind(CountByAsm, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
+        auto funcAsm = std::bind(CountByAsm<ElementType>, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
         auto actual = MeasureTime(funcAsm);
-        auto funcIntrinsic = std::bind(CountByIntrinsic, pBuf->pData_, pBuf->nElments_, nTrial);
+        auto funcIntrinsic = std::bind(CountByIntrinsic<ElementType>, pBuf->pData_, pBuf->nElments_, nTrial);
         auto expected = MeasureTime(funcIntrinsic);
         EXPECT_EQ(pBuf->actualCount_, expected.count);
         EXPECT_EQ(expected.count, actual.count);
     }
+};
 
-    void measureTime(size_t width, TrialCount nTrial) {
+typedef ::testing::Types<uint32_t, uint64_t> ElementTypeSet;
+TYPED_TEST_SUITE(TestPopulationCount, ElementTypeSet);
+
+TYPED_TEST(TestPopulationCount, Zeros) {
+    for(size_t sizeBitWidth = 10; sizeBitWidth < 35; ++sizeBitWidth) {
         size_t nElements = 1;
-        nElements <<= width;
-        size_t nBytes = nElements * sizeof(IntElement);
-        nBytes *= nTrial;
+        nElements <<= (sizeBitWidth - this->getSizeWidth());
+        this->fillAndCount(nElements, MethodToFill::ZEROS);
+    }
+}
+
+TYPED_TEST(TestPopulationCount, Ones) {
+    for(size_t sizeBitWidth = 10; sizeBitWidth < 35; ++sizeBitWidth) {
+        size_t nElements = 1;
+        nElements <<= (sizeBitWidth - this->getSizeWidth());
+        this->fillAndCount(nElements, MethodToFill::ONES);
+    }
+}
+
+TYPED_TEST(TestPopulationCount, Sequential) {
+    for(size_t sizeBitWidth = 10; sizeBitWidth < 35; sizeBitWidth += 6) {
+        size_t nElements = 1;
+        auto elementSizeWidth = sizeBitWidth - this->getSizeWidth();
+        nElements <<= elementSizeWidth;
+        this->fillSequentialAndCount(nElements, elementSizeWidth);
+    }
+}
+
+TYPED_TEST(TestPopulationCount, Random) {
+    for(size_t sizeBitWidth = 10; sizeBitWidth < 35; sizeBitWidth += 4) {
+        size_t nElements = 1;
+        nElements <<= (sizeBitWidth - this->getSizeWidth());
+        this->fillRandomAndCount(nElements);
+    }
+}
+
+namespace {
+    void measureTime(size_t sizeBitWidth, TrialCount nTrial) {
+        using ElementType64 = uint64_t;
+        size_t nBytes = 1;
+        nBytes <<= sizeBitWidth;
         size_t nBits = nBytes;
         nBits *= 8;
+        size_t nElements = nBytes;
+        nElements /= sizeof(ElementType64);
 
         constexpr MethodToFill method = MethodToFill::RANDOM;
-        std::unique_ptr<AlignedBuffer> pBuf = std::make_unique<AlignedBuffer>(nElements, method);
+        using BufType = AlignedBuffer<ElementType64>;
+        std::unique_ptr<BufType> pBuf = std::make_unique<BufType>(nElements, method);
 
-        auto funcAsm = std::bind(CountByAsm, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
-        auto funcIntrinsic = std::bind(CountByIntrinsic, pBuf->pData_, pBuf->nElments_, nTrial);
+        using ElementType32 = uint32_t;
+        auto funcAsm = std::bind(CountByAsm<ElementType64>, pBuf->pData_, pBuf->sizeOfYmmRegister_, nTrial);
+        auto funcIntrinsic64 = std::bind(CountByIntrinsic<ElementType64>, pBuf->pData_, pBuf->nElments_, nTrial);
+        auto funcIntrinsic32 = std::bind(CountByIntrinsic<ElementType32>, pBuf->pData32_, pBuf->nElments32_, nTrial);
         TimeResult asmResult {0, 0};
-        TimeResult intrinsicResult {0, 0};
+        TimeResult intrinsicResult64 {0, 0};
+        TimeResult intrinsicResult32 {0, 0};
 
         // Throw away fitst execution due to the cold cache problem
         for(TrialCount loop = 0; loop < 2; ++loop) {
             asmResult = MeasureTime(funcAsm);
-            intrinsicResult = MeasureTime(funcIntrinsic);
+            intrinsicResult64 = MeasureTime(funcIntrinsic64);
+            intrinsicResult32 = MeasureTime(funcIntrinsic32);
         }
 
         std::cout << "Counting 1s in " << nBytes << " bytes, " << nBits << " bits\n";
-        std::cout << asmResult.timeInNsec << "[nsec], answer=" << asmResult.count << " : asm\n";
-        std::cout << intrinsicResult.timeInNsec << "[nsec], answer=" << intrinsicResult.count << " : popcount\n";
+        std::cout << intrinsicResult64.timeInNsec << "[nsec], answer=" << intrinsicResult64.count << " : popcnt64\n";
+        std::cout << asmResult.timeInNsec << "[nsec], answer=" << asmResult.count << " : SIMD asm\n";
+        std::cout << intrinsicResult32.timeInNsec << "[nsec], answer=" << intrinsicResult32.count << " : popcnt32\n";
+
         Count expected = pBuf->actualCount_;
         expected *= nTrial;
         EXPECT_EQ(expected, asmResult.count);
-        EXPECT_EQ(expected, intrinsicResult.count);
-    }
-};
-
-TEST_F(TestPopulationCount, Zeros) {
-    for(size_t width = 5; width < 30; ++width) {
-        size_t nElements = 1;
-        nElements <<= width;
-        fillAndCount(nElements, width, MethodToFill::ZEROS);
+        EXPECT_EQ(expected, intrinsicResult64.count);
+        EXPECT_EQ(expected, intrinsicResult32.count);
     }
 }
 
-TEST_F(TestPopulationCount, Ones) {
-    for(size_t width = 5; width < 30; ++width) {
-        size_t nElements = 1;
-        nElements <<= width;
-        fillAndCount(nElements, width, MethodToFill::ONES);
-    }
-}
+class TestTimeToCountPopulation : public ::testing::Test {};
 
-TEST_F(TestPopulationCount, Sequential) {
-    for(size_t width = 5; width < 30; width += 6) {
-        size_t nElements = 1;
-        nElements <<= width;
-        fillSequentialAndCount(nElements, width);
-    }
-}
-
-TEST_F(TestPopulationCount, Random) {
-    for(size_t width = 5; width < 30; width += 3) {
-        size_t nElements = 1;
-        nElements <<= width;
-        fillRandomAndCount(nElements, width);
-    }
-}
-
-TEST_F(TestPopulationCount, MeasureTime1) {
-    constexpr size_t width = 25;
+TEST_F(TestTimeToCountPopulation, MeasureTime1) {
+    constexpr size_t sizeBitWidth = 25;
     constexpr TrialCount nTrial = 2;
-    measureTime(width, nTrial);
+    measureTime(sizeBitWidth, nTrial);
 }
 
-TEST_F(TestPopulationCount, MeasureTime2) {
-    constexpr size_t width = 27;
+TEST_F(TestTimeToCountPopulation, MeasureTime2) {
+    constexpr size_t sizeBitWidth = 28;
     constexpr TrialCount nTrial = 2;
-    measureTime(width, nTrial);
+    measureTime(sizeBitWidth, nTrial);
 }
 
-TEST_F(TestPopulationCount, MeasureTime3) {
-    constexpr size_t width = 29;
+TEST_F(TestTimeToCountPopulation, MeasureTime3) {
+    constexpr size_t sizeBitWidth = 31;
     constexpr TrialCount nTrial = 2;
-    measureTime(width, nTrial);
+    measureTime(sizeBitWidth, nTrial);
 }
 
 int main(int argc, char* argv[]) {
