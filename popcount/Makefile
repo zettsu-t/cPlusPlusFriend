@@ -37,7 +37,7 @@ ifeq (clang++,$(CXX))
 endif
 endif
 
-.PHONY: all run clean
+.PHONY: all run time clean
 
 all: $(TARGETS)
 
@@ -50,6 +50,9 @@ $(TARGET_CLANG): $(OBJS_CLANG)
 run : $(TARGETS)
 	./$(TARGET_GCC)
 	./$(TARGET_CLANG)
+
+time : $(TARGETS)
+	./$(TARGET_CLANG) --gtest_filter="*Measure*"
 
 $(OBJ_CPP_GCC): $(SOURCE_CPP)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<

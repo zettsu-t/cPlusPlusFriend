@@ -213,6 +213,10 @@ protected:
     void measureTime(size_t width, TrialCount nTrial) {
         size_t nElements = 1;
         nElements <<= width;
+        size_t nBytes = nElements * sizeof(IntElement);
+        nBytes *= nTrial;
+        size_t nBits = nBytes;
+        nBits *= 8;
 
         constexpr MethodToFill method = MethodToFill::RANDOM;
         std::unique_ptr<AlignedBuffer> pBuf = std::make_unique<AlignedBuffer>(nElements, method);
@@ -228,6 +232,7 @@ protected:
             intrinsicResult = MeasureTime(funcIntrinsic);
         }
 
+        std::cout << "Counting 1s in " << nBytes << " bytes, " << nBits << " bits\n";
         std::cout << asmResult.timeInNsec << "[nsec], answer=" << asmResult.count << " : asm\n";
         std::cout << intrinsicResult.timeInNsec << "[nsec], answer=" << intrinsicResult.count << " : popcount\n";
         Count expected = pBuf->actualCount_;
