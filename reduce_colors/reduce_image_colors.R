@@ -15,8 +15,15 @@ library(purrrlyr)
 library(stringr)
 library(tibble)
 library(bit64)
+library(car)
+library(grDevices)
 library(imager)
 library(optparse)
+library(rgl)
+
+g_color_rgb <- 'rgb'
+g_color_hsv <- 'hsv'
+g_color_yuv <- 'yuv'
 
 get_position <- function(width_height, offst_pos) {
     if (offst_pos > 0) {
@@ -38,7 +45,7 @@ add_label_to_original_image <- function(img, width, height, labels) {
                           color=labels$color, opacity=labels$opacity, fsize=labels$fsize)
 }
 
-read_image <- function(in_png_filename, labels) {
+read_image <- function(in_png_filename, color_model, labels) {
     ## Remove alpha channels
     start_time <- proc.time()
     img <- imager::rm.alpha(imager::load.image(in_png_filename))
@@ -55,7 +62,16 @@ read_image <- function(in_png_filename, labels) {
 
     ## Counts RGB color values
     start_time <- proc.time()
-    df <- tibble::as_tibble(array(data=img, dim=c(width * height, dim_img[3] * dim_img[4]))) %>% dplyr::rename(c1=V1, c2=V2, c3=V3)
+    source_img <- if (color_model == g_color_rgb) {
+        img
+    } else if (color_model == g_color_hsv) {
+        imager::RGBtoHSV(img)
+    } else if (color_model == g_color_yuv) {
+        imager::RGBtoYUV(img)
+    }
+
+    img_array <- array(data=source_img, dim=c(width * height, dim_img[3] * dim_img[4]))
+    df <- tibble::as_tibble(img_array) %>% dplyr::rename(c1=V1, c2=V2, c3=V3)
     df$color <- as.integer64(df$c1 * n_value_level_3) + as.integer64(df$c2 * n_value_level_2) + as.integer64(df$c3 * n_value_level)
     n_colors <- NROW(unique(df$color))
     print(paste(n_colors, 'colors found'))
@@ -78,12 +94,11 @@ add_label_to_new_image <- function(img, width, height, labels, text) {
                       color=labels$color, opacity=labels$opacity, fsize=labels$fsize)
 }
 
-reduce_colors <- function(img_data, n_colors, labels, out_png_filenames) {
-    df <- img_data$df
+cluster_colors <- function(df, n_colors) {
+    start_time <- proc.time()
 
     ## Reduces colors by the k-means algorithm
     ## Try other clustering and dimension-reducing methods!
-    start_time <- proc.time()
     fit <- kmeans(x=df, centers=n_colors, iter.max=100000)
     print('k-means')
     print(proc.time() - start_time)
@@ -99,42 +114,93 @@ reduce_colors <- function(img_data, n_colors, labels, out_png_filenames) {
     print(paste0('Make a ', n_colors, '-colors map'))
     print(proc.time() - start_time)
 
-    ## Saves the new image
+    list(color_map=color_map, new_image_df=new_image_df)
+}
+
+reduce_colors <- function(img_data, labels, n_colors, color_model, show_images, out_png_filenames) {
+    img_reduced <- cluster_colors(df=img_data$df, n_colors=n_colors)
+
+    ## Saves the new RGB image
     start_time <- proc.time()
-    new_img <- imager::as.cimg(obj=c(new_image_df$c1, new_image_df$c2, new_image_df$c3),
+    new_img <- imager::as.cimg(obj=c(img_reduced$new_image_df$c1, img_reduced$new_image_df$c2, img_reduced$new_image_df$c3),
                                x=img_data$width, y=img_data$height, cc=3)
-    imager::save.image(im=new_img, file=out_png_filenames$post)
+    new_img <- if (color_model == g_color_rgb) {
+        new_img
+    } else if (color_model == g_color_hsv) {
+        imager::HSVtoRGB(new_img)
+    } else if (color_model == g_color_yuv) {
+        imager::YUVtoRGB(new_img)
+    }
+    plot(new_img)
+
+    out_filename <- out_png_filenames$post
+    imager::save.image(im=new_img, file=out_filename)
 
     ## Saves the new image with a label
-    text <- paste0(n_colors, 'colors')
+    text <- paste0(stringr::str_to_upper(color_model), ' ', n_colors, ' colors')
     new_img_label <- add_label_to_new_image(img=new_img, width=img_data$width, height=img_data$height, labels=labels, text=text)
-    imager::save.image(im=new_img_label, file=out_png_filenames$post_label)
+    out_filename <- out_png_filenames$post_label
+    imager::save.image(im=new_img_label, file=out_filename)
 
     ## Combines the original and new images and saves it
     joint_horizontal_img <- imager::imappend(imlist=list(img_data$img, new_img), axis='x')
-    imager::save.image(im=joint_horizontal_img, file=out_png_filenames$joint_horizontal)
+    out_filename <- out_png_filenames$joint_horizontal
+    imager::save.image(im=joint_horizontal_img, file=out_filename)
+
     joint_vertical_img <- imager::imappend(imlist=list(img_data$img, new_img), axis='y')
-    imager::save.image(im=joint_vertical_img, file=out_png_filenames$joint_vertical)
+    out_filename <- out_png_filenames$joint_vertical
+    imager::save.image(im=joint_vertical_img, file=out_filename)
 
     joint_horizontal_img_label <- imager::imappend(imlist=list(img_data$img_label, new_img_label), axis='x')
-    imager::save.image(im=joint_horizontal_img_label, file=out_png_filenames$joint_horizontal_label)
-    joint_vertical_img_label <- imager::imappend(imlist=list(img_data$img_label, new_img_label), axis='y')
-    imager::save.image(im=joint_vertical_img_label, file=out_png_filenames$joint_vertical_label)
+    out_filename <- out_png_filenames$joint_horizontal_label
+    imager::save.image(im=joint_horizontal_img_label, file=out_filename)
 
-    print('Joint images and save PNG file')
+    joint_vertical_img_label <- imager::imappend(imlist=list(img_data$img_label, new_img_label), axis='y')
+    out_filename <- out_png_filenames$joint_vertical_label
+    imager::save.image(im=joint_vertical_img_label, file=out_filename)
+
+    print(paste0('Joint images and save PNG file', color_model))
     print(proc.time() - start_time)
+
+    if (show_images == TRUE) {
+        plot(new_img_label)
+
+        surface_colors <- c()
+        labels_3d <- list(x='', y='', z='')
+        if (color_model == g_color_rgb) {
+            surface_colors <- grDevices::rgb(img_reduced$color_map$c1, img_reduced$color_map$c2, img_reduced$color_map$c3)
+            labels_3d <- list(x='Red', y='Green', z='Blue')
+        } else if (color_model == g_color_hsv) {
+            surface_colors <- grDevices::hsv(img_reduced$color_map$c1 / 360.0, img_reduced$color_map$c2, img_reduced$color_map$c3)
+            labels_3d <- list(x='Hue', y='Saturation', z='Value')
+        } else if (color_model == g_color_yuv) {
+            surface_colors <- grDevices::rgb(pmax(0.0, pmin(1.0, (img_reduced$color_map$c1 + 1.402 * img_reduced$color_map$c3))),
+                                             pmax(0.0, pmin(1.0, (img_reduced$color_map$c1 - 0.244 * img_reduced$color_map$c2 - 0.714 * img_reduced$color_map$c3))),
+                                             pmax(0.0, pmin(1.0, (img_reduced$color_map$c1 + 1.772 * img_reduced$color_map$c2))))
+            labels_3d <- list(x='Y', y='U', z='V')
+        }
+
+        rgl::par3d(c(10, 10, 240, 240))
+        car::scatter3d(x=img_reduced$color_map$c1, y=img_reduced$color_map$c2, z=img_reduced$color_map$c3,
+                       xlab=labels_3d$x, ylab=labels_3d$y, zlab=labels_3d$z,
+                       axis.col=rep('black', 3), surface.col=surface_colors,
+                       surface=FALSE, sphere.size=2, groups=factor(1:NROW(img_reduced$color_map)),
+                       ellipsoid.alpha=0.03)
+
+        invisible(readline(prompt='Press [enter] to continue'))
+    }
 
     list(new_img=new_img, new_img_label=new_img_label,
          joint_horizontal_img=joint_horizontal_img, joint_horizontal_img_label=joint_horizontal_img_label,
          joint_vertical_img=joint_vertical_img, joint_vertical_img_label=joint_vertical_img_label)
 }
 
-reduce_n_color_set <- function(original_filename, labels, n_color_set, out_dirname) {
-    img_data <- read_image(in_png_filename=original_filename, labels=labels)
+reduce_n_color_set <- function(original_filename, labels, n_color_set, color_model, show_images, out_dirname, no_reduced_images) {
+    img_data <- read_image(in_png_filename=original_filename, color_model=color_model, labels=labels)
 
     images <- lapply(n_color_set, function(n_colors) {
         file_basename <- paste0('color_', n_colors, '_', basename(original_filename)) %>%
-            stringr::str_replace_all('(.*?)\\.[^.]*$', '\\1')
+            stringr::str_replace_all('(.*?)\\.[^.]*$', paste0('\\1', '_', color_model))
 
         joint_horizontal_prefix <- 'joint_horizontal'
         joint_vertical_prefix <- 'joint_vertical'
@@ -147,28 +213,49 @@ reduce_n_color_set <- function(original_filename, labels, n_color_set, out_dirna
                                   joint_vertical=file.path(out_dirname, paste0(joint_vertical_prefix, file_basename, no_label_suffix)),
                                   joint_vertical_label=file.path(out_dirname, paste0(joint_vertical_prefix, file_basename, label_suffix)))
 
-        images <- reduce_colors(img_data=img_data, n_colors=n_colors, labels=labels, out_png_filenames=out_png_filenames)
+        images <- reduce_colors(img_data=img_data, labels=labels, n_colors=n_colors, color_model=color_model,
+                                show_images=show_images, out_png_filenames=out_png_filenames)
 
         ## Checks whether this script reduced the number of colors in the input image
-        verify_data <- read_image(in_png_filename=out_png_filenames$post, labels=NULL)
-        assertthat::assert_that(n_colors == verify_data$n_colors)
-        images
+        verify_data <- read_image(in_png_filename=out_png_filenames$post, color_model=g_color_rgb, labels=NULL)
+        if (g_color_rgb == color_model) {
+            assertthat::assert_that(n_colors == verify_data$n_colors)
+        }
+
+        if (no_reduced_images == TRUE) {
+            NA
+        } else {
+            images
+        }
     })
 
-    list(img_data=img_data, images=images)
+    if (no_reduced_images == TRUE) {
+        list(img_data=img_data, images=NA)
+    } else {
+        list(img_data=img_data, images=images)
+    }
 }
 
 reduce_image_colors <- function(args, n_color_set) {
     parser <- OptionParser()
     parser <- optparse::add_option(parser, c('-i', '--input'), type='character', action='store',
-                         dest='input_filename', default='incoming/input.png', help='Input original image file')
+                                   dest='input_filename', default='incoming/input.png', help='Input original image file')
 
     parser <- optparse::add_option(parser, c('-o', '--outdir'), type='character', action='store',
-                         dest='out_dirname', default='out', help='Output directory')
+                                   dest='out_dirname', default='out', help='Output directory')
 
     ## The text is drawn on copies of the input images to show its credit or byline.
     parser <- optparse::add_option(parser, c('-t', '--text'), type='character', action='store',
-                         dest='text', default='by whom', help='Text on the original image')
+                                   dest='text', default='by whom', help='Text on the original image')
+
+    parser <- optparse::add_option(parser, c('-x', '--no_reduced_images'), action='store_true',
+                                   dest='no_reduced_images', default=FALSE, help='Do not keep generated images on memory')
+
+    parser <- optparse::add_option(parser, c('-s', '--show_images'), action='store_true',
+                                   dest='show_images', default=FALSE, help='Show interactive 2D and 3D images')
+
+    parser <- optparse::add_option(parser, c('-m', '--color_model'), type='character', action='store',
+                                   dest='color_model', default=g_color_rgb, help='Color model')
 
     opts <- optparse::parse_args(parser, args=args)
 
@@ -194,8 +281,9 @@ reduce_image_colors <- function(args, n_color_set) {
                    colors_x=2, colors_y=2, color='white', opacity=1, fsize=6)
 
     result <- reduce_n_color_set(original_filename=original_filename, labels=labels,
-                                 n_color_set=n_color_set, out_dirname=out_dirname)
-    list(original=result$img_data, images=result$images, out_dirname=out_dirname)
+                                 n_color_set=n_color_set, color_model=opts$color_model, show_images=opts$show_images,
+                                 out_dirname=out_dirname, no_reduced_images=opts$no_reduced_images)
+    list(original=result$img_data, images=result$images, color_model=opts$color_model, out_dirname=out_dirname)
 }
 
 get_args <- function() {
@@ -216,8 +304,14 @@ get_args <- function() {
 }
 
 write_8_level_images <- function() {
-    n_color_set <- c(2, 4, 8, 16, 32, 64, 128, 256)
+##  n_color_set <- c(2, 4, 8, 16, 32, 64, 128, 256)
+    n_color_set <- c(256)
     result <- reduce_image_colors(args=get_args(), n_color_set=n_color_set)
+    if (is.na(result$images)) {
+        return(NA)
+    }
+
+    color_model <- result$color_model
     out_dirname <- result$out_dirname
 
     ## Do not write to /
@@ -237,12 +331,16 @@ write_8_level_images <- function() {
     img_wide_12 <- imager::imappend(imlist=list(img_wide_1, img_wide_2), axis='x')
     img_all <- imager::imappend(imlist=list(img_wide_12, result$original$img_label), axis='x')
 
-    imager::save.image(im=img_wide_1, file=file.path(out_dirname, 'img_wide_1.png'))
-    imager::save.image(im=img_wide_2, file=file.path(out_dirname, 'img_wide_2.png'))
-    imager::save.image(im=img_square_1, file=file.path(out_dirname, 'img_square_1.png'))
-    imager::save.image(im=img_square_2, file=file.path(out_dirname, 'img_square_2.png'))
-    imager::save.image(im=img_wide_12, file=file.path(out_dirname, 'img_wide_12.png'))
-    imager::save.image(im=img_all, file=file.path(out_dirname, 'img_all.png'))
+    make_png_filename <- function(filename) {
+        paste0(filename, color_model, '.png')
+    }
+
+    imager::save.image(im=img_wide_1, file=file.path(out_dirname, make_png_filename('img_wide_1')))
+    imager::save.image(im=img_wide_2, file=file.path(out_dirname, make_png_filename('img_wide_2')))
+    imager::save.image(im=img_square_1, file=file.path(out_dirname, make_png_filename('img_square_1')))
+    imager::save.image(im=img_square_2, file=file.path(out_dirname, make_png_filename('img_square_2')))
+    imager::save.image(im=img_wide_12, file=file.path(out_dirname, make_png_filename('img_wide_12')))
+    imager::save.image(im=img_all, file=file.path(out_dirname, make_png_filename('img_all')))
     result
 }
 
