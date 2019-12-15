@@ -1,7 +1,8 @@
 library(assertthat)
-library(extrafont)
-library(ineq)
 library(dplyr)
+library(extrafont)
+library(ggplot2)
+library(ineq)
 library(readxl)
 library(stringr)
 
@@ -23,6 +24,7 @@ read_population_sheet <- function(in_filename) {
     pref_df <- all_df %>%
         dplyr::filter(is.na(city)) %>%
         dplyr::select(c(pref, population))
+    assertthat::assert_that(NROW(pref_df)==47)
 
     ## 政令指定都市-区、群-町村の両階層が混じっているので、
     ## 市町村と東京特別区だけ取り出す
@@ -81,10 +83,67 @@ draw_all <- function(in_filename, out_filename) {
     df_set
 }
 
-## Data source : 総務省
+draw_pref_pareto_chart <- function(input_df, out_filename) {
+    ## 昇順にソートすると、人口の多い順に手前に描く
+    df <- input_df %>% dplyr::filter(population > 0) %>% dplyr::arrange(population)
+    df$rank <- seq(NROW(df),1,-1)
+    label_size_set <- log10(1 + df$population) * 1.25 + 1.5
+
+    left_offset <- 0.75
+    right_offset <- max(df$rank * 0.25)
+
+    png(out_filename, width = 800, height = 480)
+    g <- ggplot(df, aes(x=rank, y=population, label=pref))
+    g <- g + geom_label(size=label_size_set, alpha=0.6, family=g_font_name)
+    g <- g + scale_x_log10(limits=c(left_offset, NROW(df) + right_offset))
+    g <- g + scale_y_log10()
+    g <- g + theme(text=element_text(family=g_font_name),
+                   axis.text=element_text(family=g_font_name, size=24),
+                   axis.title=element_text(family=g_font_name, size=24),
+                   strip.text=element_text(family=g_font_name, size=24),
+                   plot.title=element_text(family=g_font_name, size=24))
+    plot(g)
+    dev.off()
+}
+
+draw_city_pareto_chart <- function(input_df, out_filename) {
+    ## 昇順にソートすると、人口の多い順に手前に描く
+    df <- input_df %>% dplyr::filter(population > 0) %>% dplyr::arrange(population)
+    df$rank <- seq(NROW(df),1,-1)
+
+    n_cities <- NROW(df)
+    n_head_labels <- 20
+    n_tail_labels <- 2
+    head_labels <- (df$city)[(n_cities - n_head_labels + 1):n_cities]
+    tail_labels <- (df$city)[1:n_tail_labels]
+    na_labels <- rep(NA, n_cities - n_head_labels - n_tail_labels)
+    df$label <- c(tail_labels, na_labels, head_labels)
+
+    left_offset <- 0.70
+    right_offset <- max(df$rank * 0.5)
+
+    png(out_filename, width = 800, height = 480)
+    g <- ggplot(df, aes(x=rank, y=population, label=label))
+    g <- g + geom_point(size=3, color='royalblue2')
+    g <- g + geom_label(size=5, alpha=0.6, family=g_font_name)
+    g <- g + scale_x_log10(limits=c(left_offset, NROW(df) + right_offset))
+    g <- g + scale_y_log10()
+    g <- g + theme(text=element_text(family=g_font_name),
+                   axis.text=element_text(family=g_font_name, size=24),
+                   axis.title=element_text(family=g_font_name, size=24),
+                   strip.text=element_text(family=g_font_name, size=24),
+                   plot.title=element_text(family=g_font_name, size=24))
+    plot(g)
+    dev.off()
+}
+
+
+## 出典 data source : 総務省
 ## 【総計】平成30年住民基本台帳人口・世帯数、平成29年人口動態（市区町村別）
 ## https://www.soumu.go.jp/menu_news/s-news/01gyosei02_02000177.html
 ## https://www.soumu.go.jp/main_content/000563140.xls
 in_filename <- 'incoming/000563140.xls'
 out_filename <- 'population_gini_coef.png'
 df_set <- draw_all(in_filename=in_filename, out_filename=out_filename)
+draw_pref_pareto_chart(input_df=df_set$pref_df, out_filename='pref_pareto.png')
+draw_city_pareto_chart(input_df=df_set$city_df, out_filename='city_pareto.png')
