@@ -83,7 +83,7 @@ draw_all <- function(in_filename, out_filename) {
     df_set
 }
 
-draw_pref_pareto_chart <- function(input_df, out_filename) {
+draw_pref_ranking_chart <- function(input_df, out_filename) {
     ## 昇順にソートすると、人口の多い順に手前に描く
     df <- input_df %>% dplyr::filter(population > 0) %>% dplyr::arrange(population)
     df$rank <- seq(NROW(df),1,-1)
@@ -106,7 +106,7 @@ draw_pref_pareto_chart <- function(input_df, out_filename) {
     dev.off()
 }
 
-draw_city_pareto_chart <- function(input_df, out_filename) {
+draw_city_ranking_chart <- function(input_df, out_filename) {
     ## 昇順にソートすると、人口の多い順に手前に描く
     df <- input_df %>% dplyr::filter(population > 0) %>% dplyr::arrange(population)
     df$rank <- seq(NROW(df),1,-1)
@@ -145,5 +145,5 @@ draw_city_pareto_chart <- function(input_df, out_filename) {
 in_filename <- 'incoming/000563140.xls'
 out_filename <- 'population_gini_coef.png'
 df_set <- draw_all(in_filename=in_filename, out_filename=out_filename)
-draw_pref_pareto_chart(input_df=df_set$pref_df, out_filename='pref_pareto.png')
-draw_city_pareto_chart(input_df=df_set$city_df, out_filename='city_pareto.png')
+draw_pref_ranking_chart(input_df=df_set$pref_df, out_filename='pref_ranking.png')
+draw_city_ranking_chart(input_df=df_set$city_df, out_filename='city_ranking.png')
