@@ -56,7 +56,7 @@ protected:
     };
 };
 
-TEST_F(TestTypeCast, AnyCast) {
+TEST_F(TestTypeCast, AnyCastBoost) {
     boost::any func = arg1;
     auto result1 = (boost::any_cast<Arg1Type>(func))(10);
     EXPECT_EQ(12, result1);

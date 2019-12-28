@@ -4,6 +4,7 @@
 #include <charconv>
 #endif
 
+#include <any>
 #include <array>
 #include <iostream>
 #include <limits>
@@ -151,6 +152,17 @@ TEST_F(TestStructuredBinding, Double) {
         EXPECT_EQ(DivisionResult::OK, result);
         EXPECT_DOUBLE_EQ(0.0, quotient);
     }
+}
+
+class TestAnyCastCpp17 : public ::testing::Test {};
+
+TEST_F(TestAnyCastCpp17, AnyCast17) {
+    int n = 10;
+    int* p = &n;
+    std::any obj = p;
+    auto pResult = std::any_cast<int*>(p);
+    EXPECT_EQ(n, *pResult);
+    ASSERT_ANY_THROW(std::any_cast<const int*>(p));
 }
 
 // CSV風に、書式を指定して数値を文字列にしたものをjoinする

@@ -1,12 +1,6 @@
-# やめるのだフェネックで学ぶC++
+# プログラマたんbot 実証コード集
 
-「やめるのだフェネックで学ぶシリーズ」の慣例に従って、C++およびソフトウェア開発でやっていいことと悪いことをまとめました。
-
-## C++でやっていいこと悪いこと
-
-[cppDosAndDonts.md](cppDosAndDonts.md)にまとめました。この語り口はあくまでネタなので、普段の私はもっと柔らかい口調で話しています、念のため。最近は更新していないので、botのツイート一覧[cppFriendsBot.txt](cppFriendsBot.txt)を直接ご参照ください。
-
-### フェネックとアライさんのやり取りを一通り実行する
+### 一通り実行する
 
 Cygwin 64bitのターミナルから、
 
@@ -242,10 +236,6 @@ c0,ff,ee  sar bh,0xee
 * [Use reentrant functions for safer signal handling](https://www.ibm.com/developerworks/library/l-reent/index.html)
 * http://stackoverflow.com/ などの各記事
 
-「やめるのだフェネック! たとえ英語が嫌いでも、プログラマに英語は必要なのだ! 英語が読み書きできて、語彙が十分でないと、stackoverflow.com で解決策を調べられないのだ! 」
-
 ## ライセンス
 
 本レポジトリのライセンスは、[MITライセンス](LICENSE.txt)です。
-
-ちなみに、けものフレンズ公式には[二次創作に関するガイドライン](http://kemono-friends.jp/)があります。私にはあいにく絵心がないです。
