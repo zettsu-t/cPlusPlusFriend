@@ -26,38 +26,74 @@ INCLUDES_GXX=$(addprefix -isystem ,$(ISYSTEM_MINGW_INCLUDE_DIR))
 INCLUDES_CLANGXX=$(addprefix -isystem ,$(ISYSTEM_MINGW_CLANG_INCLUDE_DIRS))
 endif
 
+## double precision SIMD oriented Fast Mersenne Twister (dSFMT)
+## Set a directory in which dSFMT.h exists to DSFMT_PATH
+DSFMT_PATH=$(HOME)/dSFMT
+INCLUDES_DSFMT=$(addprefix -isystem ,$(DSFMT_PATH))
+
+DSFMT_SOURCE=dSFMT.c
+OBJ_DSMFT_GCC=dsfmt_gcc.o
+OBJ_DSMFT_CLANG=dsfmt_clang.o
+
 SOURCE=cpp_optimize.cpp
 ASM_GCC=cpp_optimize_gcc.s
 ASM_CLANG=cpp_optimize_clang.s
-OBJ_CLANG=cpp_optimize_clang.o
-TARGET_GCC=cpp_optimize_gcc
-TARGET_CLANG=cpp_optimize_clang
-
-TARGETS=$(TARGET_GCC) $(TARGET_CLANG)
-OBJS=$(OBJ_CLANG)
 ASMS=$(ASM_GCC) $(ASM_CLANG)
 
-CXXFLAGS_COMMON=-std=c++17 -O3 -mavx2 -Wall -W -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
-CASMFLAGS=-S -masm=intel
-GXX_CFLAGS=$(INCLUDES_GXX) $(CXXFLAGS_COMMON)
-CLANGXX_CFLAGS=$(CLANG_TARGET) $(INCLUDES_CLANGXX) $(CXXFLAGS_COMMON)
+OBJ_GCC=cpp_optimize_gcc.o
+OBJ_CLANG=cpp_optimize_clang.o
+OBJS_GCC=$(OBJ_GCC) $(OBJ_DSMFT_GCC)
+OBJS_CLANG=$(OBJ_CLANG) $(OBJ_DSMFT_CLANG)
+OBJS=$(OBJS_GCC) $(OBJS_CLANG)
 
-.PHONY: all clean rebuild
+TARGET_GCC=cpp_optimize_gcc
+TARGET_CLANG=cpp_optimize_clang
+TARGETS=$(TARGET_GCC) $(TARGET_CLANG)
+
+OPT=-O3
+STD=-std=c++17
+CFLAGS_DSFMT=$(INCLUDES_DSFMT) -DDSFMT_MEXP=19937
+CFLAGS_COMMON=$(OPT) $(CFLAGS_DSFMT) -mavx2 -Wall -W -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wconversion -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CASMFLAGS=-S -masm=intel
+GXX_CFLAGS=$(INCLUDES_GXX) $(CFLAGS_COMMON)
+CLANGXX_CFLAGS=$(CLANG_TARGET) $(INCLUDES_CLANGXX) $(CFLAGS_COMMON)
+GXX_CPPFLAGS=$(STD) $(GXX_CFLAGS)
+CLANGXX_CPPFLAGS=$(STD) $(CLANGXX_CFLAGS)
+
+.PHONY: all run clean rebuild
+
+ARGS_TARGETS=100000000 10
+VPATH=$(DSFMT_PATH)
 
 all: $(TARGETS)
 
-$(TARGET_GCC) : $(SOURCE)
-	g++ -v
-	g++ $(GXX_CFLAGS) $(CASMFLAGS) -o $(ASM_GCC) $<
-	g++ $(GXX_CFLAGS) -o $@ $<
-	time ./$@
+$(TARGET_GCC) : $(OBJS_GCC)
+	g++ -o $@ $^
 
-$(TARGET_CLANG) : $(SOURCE)
+$(TARGET_CLANG) : $(OBJS_CLANG)
+	g++ -o $@ $^
+
+run: $(TARGETS)
+	./$(TARGET_GCC)
+	./$(TARGET_CLANG)
+	./$(TARGET_GCC) $(ARGS_TARGETS)
+	./$(TARGET_CLANG) $(ARGS_TARGETS)
+
+$(OBJ_GCC) : $(SOURCE) Makefile
+	g++ -v
+	g++ $(GXX_CPPFLAGS) $(CASMFLAGS) -o $(ASM_GCC) $<
+	g++ $(GXX_CPPFLAGS) -c -o $@ $<
+
+$(OBJ_CLANG) : $(SOURCE) Makefile
 	clang++ -v
-	clang++ $(CLANGXX_CFLAGS) $(CASMFLAGS) -o $(ASM_CLANG) $<
-	clang++ $(CLANGXX_CFLAGS) -c -o $(OBJ_CLANG) $<
-	g++ -o $@ $(OBJ_CLANG)
-	time ./$@
+	clang++ $(CLANGXX_CPPFLAGS) $(CASMFLAGS) -o $(ASM_CLANG) $<
+	clang++ $(CLANGXX_CPPFLAGS) -c -o $@ $<
+
+$(OBJ_DSMFT_GCC) : $(DSFMT_SOURCE) Makefile
+	gcc $(GXX_CFLAGS) -c -o $@ $<
+
+$(OBJ_DSMFT_CLANG) : $(DSFMT_SOURCE) Makefile
+	clang $(CLANGXX_CFLAGS) -c -o $@ $<
 
 clean:
 	$(RM) $(TARGETS) $(OBJS) $(ASMS)
