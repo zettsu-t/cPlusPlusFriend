@@ -56,10 +56,10 @@ void generateNumbers(Numbers& v) {
     dsfmt_t dsfmt;
     dsfmt_init_gen_rand(&dsfmt, seed);
 
-    // dsfmt_fill_array_open_close takes size as int
+    // dsfmt_fill_array_close_open takes size as int
     const auto intSize = static_cast<int>(v.size());
     assert(static_cast<decltype(v.size())>(intSize) == v.size());
-    dsfmt_fill_array_open_close(&dsfmt, v.data(), intSize);
+    dsfmt_fill_array_close_open(&dsfmt, v.data(), intSize);
     std::cout << "generateNumbers(dSFMT) " << laptime.GetElapsedTime() << "sec\n";
 }
 
