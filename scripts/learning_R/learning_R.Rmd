@@ -1,0 +1,809 @@
+---
+title: "C++プログラマがRプログラマに転生したら"
+author: "プログラマたんbot"
+date: "2020/1/5"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H')
+```
+
+```{r import_packages, include=FALSE, warning=FALSE}
+library(assertthat)
+library(bit64)
+library(car)
+library(dplyr)
+library(extrafont)
+library(forcats)
+library(functional)
+library(ggplot2)
+library(lubridate)
+library(profmem)
+library(purrr)
+library(purrrlyr)
+library(reshape2)
+library(stringr)
+library(tibble)
+```
+
+## 情報源
+
+### 参考書
+
+以下の本が参考になるので、一読するとよい。
+
+|書名|著者|発行年|出版社|
+|:---|:---|:---|:---|
+|みんなのR 第2版|Jared P. Lander 著/ \ 高柳慎一, 津田真樹, 牧山幸史, 松村杏子, 簑田高志 監修|2018/12|マイナビ出版|
+|パーフェクトR|Rサポーターズ 著|2017/03|技術評論社|
+
+どちらから読んでもよいが、強いて言えば
+
+- プログラミングの経験は全くないが統計処理をコンピュータにさせたい方 : みんなのR
+- プログラミングの経験があり、プログラミング言語としてのRを知りたい方 : パーフェクトR
+
+がおすすめである。旧版ではなく最新版を買うのがよく、理由は後述するtidyverseという今どきのパッケージの使い方を学ぶ必要があるからである。
+
+統計処理はRで行うが、Rでは速度が出ない処理 (ビット操作など) をC++で書きたい、という方向けには、パーフェクトRに詳しい解説がある。
+
+### 公式マニュアル
+
+プログラミング言語Rについては、CRAN (The Comprehensive R Archive Network)による[公式マニュアル](https://cran.r-project.org/manuals.html)がある。 **中の人はまだ読んでいません、ごめんなさい。**
+
+Rのパッケージ (ライブラリ) についても、やはり[CRANによる一覧](https://cran.r-project.org/web/packages/available_packages_by_name.html)がある。ここから探さなくても、たいていはネットで検索すればたどり着くし、CRANではなくGitHubなど他で配布されているものも見つかるだろう。
+
+### 質疑集
+
+分からないことがあったら、関数名やエラーメッセージネットで検索すれば、たいていは答えが見つかる。おそらく[Stack Overflow](https://stackoverflow.com/)の質疑にたどり着くはずである。日本語ではなく英語で検索する方が、適切な答えが速くみつかる。
+
+
+## インストール
+
+詳細な手順は略すので探して欲しい。
+
+### Windows
+
+[R本体](https://cran.r-project.org/bin/windows/base/)をインストールし、次に[RStudio](https://rstudio.com/products/rstudio/)をインストールする。
+
+RはRStudioのウィンドウから実行する他に、GUI無しでコマンドラインからも実行できる (__Rscript.exe__)。このとき __Rscript.exe__ のディレクトリ名に空白が入っているとめんどくさい (Makefileが煩雑になる) ので、 __C:/Program Files__ ではなく __C:/bin__ などにR本体をインストールしておくとよい。
+
+RStudioの言語設定は英語にしておく。エラーメッセージが英語で出れば、そのままブラウザにコピペして解決策を探せる。
+
+### Linux
+
+まずR本体をインストールする。Linuxをデスクトップから使っているならWindowsと同様にRStudioを使えばよいが、そうでなければ[RStudio Server](https://rstudio.com/products/rstudio/download-server/)をインストールして、リモートからWebブラウザ経由でアクセスできるようにする。WindowsにXをインストールしてLinuxのRStudioを表示させると、画面の更新が遅くて耐えられないだろう。
+
+
+## はじめてのRプログラミング
+
+### Hello, World!
+
+RStudioを起動し、Consoleタブにスクリプトを入力すると、実行結果が表示される。もちろんスクリプトを記述したファイルを読み込んで実行することもできるが、しばらくはConsoleで試してみよう。定番のアレを実行してみる。このファイルはRスクリプトの実行結果を埋め込んでいるので出力結果は ## に続いて出力されるが、RStudioでは表示されない。
+
+```{r hello_world}
+print("Hello, World!")
+```
+
+Consoleのプロンプトは>だが、複数行にまたがっているときはプロンプトが+になる。意図せずプロンプトが+になったら、引用符や括弧の対応が取れなくなっているかもしれない。そのときはESCキーを連打すると>プロンプトに戻れる。
+
+先頭に [1] とついているのは、この行は結果の1番目の要素から順に表示している、という意味である。どういうことかというと、Rにはスカラー変数(ある型の変数を一つだけ収める変数)がないのだ。 __1:50__ は1以上50以下の整数を昇順に並べたものである。表示してみよう。一行の長さはウィンドウのサイズ次第だが、例えば以下のように折り返し表示される。
+
+```{r print_1_to_50}
+print(1:50)
+```
+
+この例では、printを付けなくても結果が表示される。ちなみにRの要素番号は、0ではなく1から始まる。先頭要素を確認しよう。
+
+```{r no_print_1_to_50}
+(1:50)[1]
+```
+
+### すべてはベクトルである
+
+Rにはスカラー変数がなくベクトル変数がある。要するにC++などでいうスカラー変数は、要素が一つだけあるベクトルである。
+
+ベクトルはc()で作ることができる。 __c__ はcombineの略である。cという名前の変数を作るのはややこしいのでやめよう。変数に代入するには __<-__ を使う(最近は=でもよいが、どちらかに統一しよう)。
+
+```{r combine_integers}
+x <- c(1, 3, 2)
+x
+```
+
+最大値を得る関数に、maxとpmaxがある。 __max__ は最大の要素を返す。結果を見ると、長さ1のベクトルを返すことが分かる。
+
+```{r max_integer_vector}
+max(x)
+```
+
+__pmax__ は、複数のベクトルの先頭要素の最大の要素、二番目の要素の最大の要素...、から成るベクトルを返す。
+
+```{r pmax_integer_vector}
+pmax(c(1, 20, 300), c(40, 500, 6), c(700, 8, 90))
+```
+
+ベクトルどうしの足し算は、要素ごとの和になる。
+
+```{r add_vectors}
+x <- c(1, 2, 3, 4)
+y <- c(50, 60, 70, 80)
+x + y
+```
+
+ベクトルxにスカラーっぽいもの、つまり要素が一つのベクトルyを足すと、xの各要素にyを足す。要素が一つのベクトルは、c()を使わなくてもよい("Hello, World!"がそうだったように)。
+
+```{r add_a_vector_and_a_scalar}
+y <- 50
+x + y
+```
+
+より正確には、ベクトルの長さが異なる場合、短い方のベクトルの要素が繰り返される。長い方のベクトルの要素数を、短い方のベクトルの要素数で割り切れなければ警告が出る。要素数がnのときnと1は必ずnの約数になるので、さきほどの例が動くのだった。
+
+```{r add_and_repeat_vectors, warning=FALSE}
+y <- c(50, 60)
+x + y
+```
+
+### NAとNaN
+
+Rの特徴として、欠測値 (NA : Not Available)がある。C++だとstd::optional やnullptrを使わなけばならないが、Rなら単にNAを代入するだけである。
+
+```{r add_nas}
+x <- c(1, NA, 3, 4)
+y <- c(50, 60, 70, NA)
+x + y
+```
+
+NAはNaN (Not a Number)とは区別される。例えば負の数の平方根は取れないので、NaNが返る。
+
+```{r sqrt_negative}
+sqrt(-1)
+```
+
+NAであることは __is.na__ で、NaNであることは __is.nan__ で調べる。結果は論理値のベクトル (logical vector)として返る。Rにはスカラー変数はないことを思い出そう。それとベクトル同士をc()で連結できる。
+
+```{r is_na_nan, warning=FALSE}
+a <- NA
+b <- sqrt(-1)
+c(is.na(a), is.na(b), is.nan(a), is.nan(b))
+```
+
+TRUEとFALSEはそれぞれ真、偽を表す定数で、すべて大文字である。それとNaNに対するis.naはTRUEである。
+
+## 型と変数
+
+基本型を示す。表形式(data frame)とか行列などの複雑な型、必要に応じて後で説明する。
+
+|値|C++|R|
+|:---|:---|:---|
+|真理値|bool (true, false)|logical (TRUE, FALSE)|
+|32ビット整数|int32_t|integer|
+|64ビット浮動小数|double|numeric|
+|文字列|std::string|character|
+
+### 数値
+
+64ビット整数は標準では用意されていない。doubleの仮数部が52ビットあるので別に困らないはずだが、どうしても必要なら __bit64__ というパッケージを __install.packages__ 関数でインストールして使う。
+
+```{r bit64}
+bit64::as.integer64("123456789123456789")
+```
+
+パッケージ名bit64を::でつけるのは、C++にそっくりである。パッケージ名を省略すると意図したパッケージとは異なるパッケージの関数を呼び出すことがあるので、省略しないのがよい作法である。
+
+### 文字列
+
+Rの文字列はUTF-8をサポートしており、かな漢字も扱える。正規表現も使える。 __stringr__ パッケージを活用しよう。
+
+```{r regex_match}
+matched <- stringr::str_match(
+  string=c("神奈川県横浜市鶴見区", "神奈川県横浜市西区", "神奈川県川崎市中原区"),
+  pattern="横浜市(.*)(区)")
+matched
+```
+
+いろいろ詰め込んだので順に説明する。まずヘルプを見るには、 __?関数名__ と入力する。RStudioで __?stringr::str_match__ のヘルプをみると、第一引数が文字列ベクトル、第二引数が正規表現であることが分かる。上記ではキーワード引数を使って、どの引数がどういう意味なのか明確にしている。
+
+文字列マッチングの結果の型を __class__ 関数で調べる。文字列を要素とする行列だと分かる。
+
+```{r class_matched}
+class(matched)
+class(matched[1,1])
+```
+
+行ごとに入力した3文字列の結果が入る。一列目には正規表現にマッチングした部分全体、二列目およびそれ以降に正規表現の()でキャプチャした文字列が入る。正規表現にマッチしなければNAが入る。
+
+文字列の長さは、 __stringr::str_length__ で得られる。かな漢字ならきちんと文字数を返し、UTF-8のbyte数でない。アクセント記号とか絵文字でも文字数が返るかどうかは分からないけど。
+
+```{r string_length}
+s <- "東京23区"
+stringr::str_length(s)
+```
+
+### 型変換
+
+__as.型名__ 関数で型を変換をすることができる。FALSEは0に、TRUEは1に変換される。
+
+```{r convert_types}
+as.integer(2.1)
+as.integer("345")
+as.numeric("6.5")
+2 + FALSE + TRUE
+```
+
+数値から文字列への変換は __as.character__ でもできるが、paste0でもできるし、sprintfを使うと書式を細かく指定できる。paste0は文字列を連結する。
+
+```{r format_numbers}
+m <- 8
+x <- 31.2
+paste0(m, '月', x, '度')
+sprintf('%-d月%.1f度', m, x)
+```
+
+pasteはC++のboost::algorithm::joinと同様、文字列を区切り文字で連結する。デフォルトの区切り文字は半角空白である。英単語をつなげて英文を作るならこれでもよいが、おそらくは区切り文字を明示する必要があるだろう。
+
+```{r paste_strings}
+paste(2020, 3, 31, sep="/")
+```
+
+文字列処理は別章で述べる。
+
+### リスト
+
+ベクトルの要素は、すべて同じ型でなければならない。異なる型の値をまとめるには、listを使う。C++でいう構造体であるが、要素を先頭からの番号でも参照できるし、要素名を変数で与えることもできる。
+
+```{r create_list}
+x <- list(city="横浜市", population=3749972)
+x[[1]]
+x[[2]]
+x$city
+x$population
+name <- "city"
+x[[name]]
+```
+
+後から要素を追加することもできる。
+
+```{r concatenate_list}
+y <- list(household=1712830)
+z <- c(x, y)
+```
+
+listをベクトルにするには、 __unlist__ を使う。仕様が複雑なのでヘルプを見て頂きたいが、listの要素がすべて同じでlistが入れ子になっていない場合は、listの先頭からの要素をベクトルの先頭からの要素に並べる。
+
+```{r unlist}
+v <- unlist(list(a=1:2, b=3:5))
+v
+```
+
+### ベクトルの要素名
+
+上記の例で、unlistして作ったベクトルに名前{a1, a2, b1, b2, b3}がついていることが分かる。確かめてみよう。
+
+```{r vector_names}
+names(v)
+v[[3]]
+v[['b1']]
+```
+
+ベクトルに列名を設定することもできる。
+
+```{r vector_new_names}
+names(v) <- c("C1", "C2", "C3", "C4", "C5")
+v
+```
+
+ベクトルの長さは __NROW__ で取得する。 __length__ でも取得できるが、すぐ後で説明するdata frameの列数などと共通で使える __NROW__ が好ましい。
+
+```{r length_vector}
+NROW(v)
+```
+
+## 表形式(data frame)
+
+### CSVファイルを読む
+
+Excelシートのような表形式は、いくつかの形式がある。Rの標準ではdata.frameである。そう、C++と異なり、Rでは型や変数の名前に __.__ を含めることができる。他にdata.frameとだいだい同じ動作をする (が完全互換ではない) data.table, tibble などがある。ここでは加工のしやすさを考えてtibbleを使うが、呼び方はdata frameとする。
+
+まず用意したCSVファイルを読み込む。このデータは、平成30年住民基本台帳人口・世帯数、平成29年人口動態（市区町村別）[出典は総務省](https://www.soumu.go.jp/menu_news/s-news/01gyosei02_02000177.html) を加工したものである。ダウンロードしたxlsファイルをCSVに加工するたスクリプトは別に用意している (learning_R_population_tocsv.R)。
+
+```{r read_population_csv}
+df <- readr::read_csv("population.csv")
+class(df)
+```
+
+### CSVファイルの中身を確認する
+
+表形式ではExcelと同様、行 (縦方向)が標本、列 (横方向)が標本の特徴量にするのが一般的である。このデータの各行は市区町村(市町村と東京23区で、政令指定都市の各区は含まない)である。行の数は __NROW__ で、列の数は __NCOL__ で分かる。__dim__ は列と行の数を要素とする、長さ2の整数ベクトルを返す。
+
+```{r dim_population_csv}
+NROW(df)
+NCOL(df)
+dim(df)
+```
+
+__colnames__ で列の名前、つまりそれぞれの行=市区町村に対応する項目名が分かる。
+
+```{r colnames_population_csv}
+colnames(df)
+```
+
+列名を変えることができる。ここでは元のdata frameを変えたくないので、コピーしてから書き換える。
+
+```{r view_population_csv}
+df_jp <- df
+colnames(df_jp) <- c('都道府県', '市区町村', '人口', '世帯数', '転入数', '出生数',
+  '転出数', '死亡数', '自然増減率', '社会増減率')
+```
+
+列名が変わったかどうかは、 __df_jp__ を表示すると分かる。全部表示する必要はないので、headで先頭数行だけ表示しよう。 __View(df_jp)__ でdata farme全体を表示できる。この例ではすぐに表示されるが、巨大なdata frameを表示すると処理がいつまで経っても終わらないので、data frameのサイズに注意しよう。
+
+```{r head_population_csv, size = 'tiny'}
+head(df_jp)
+# View(df_jp)
+```
+
+Data frameそのものとは関係ないが、市区町村に都道府県名を付けているのは、東京都府中市と広島県府中市があるからだ。
+
+## Data frameを加工する
+
+### 列名を選ぶ
+
+先ほど読み込んだ、市区町村人口を加工してみる。ここではtidyverseという、関数型プログラミングで処理を書けるイマドキのライブラリを活用する。tidyverseというパッケージ郡は、F#とUNIXシェルパイプラインを基に作られている。まず人口を上位から並べよう。
+
+```{r arrange_population_init, include=FALSE}
+df <- readr::read_csv("population.csv")
+```
+
+```{r arrange_population_arrange}
+df %>% dplyr::arrange(desc(population)) %>%
+  dplyr::select(c(city, population)) %>% head(5)
+```
+
+__dplyr::arrange__ はdata frameで並び替え、 __dplyr::select__ で列を取り出し、__head(5)__ で先頭5行を取り出す。UNIXシェルパイプラインのsort, cut, headにそっくりである。
+
+ここでは列名を引用符で囲まなかった。__dplyr::arrange__ の引数を引用符で囲むとエラーになるが、__dplyr::select__ は囲める。だから列名は変数で与えることができる。
+
+```{r arrange_population_string}
+name_set <- c("city", "population")
+df %>% dplyr::arrange(desc(population)) %>% dplyr::select(name_set) %>% head(1)
+```
+
+__dplyr::arrange__ の列名も変数で与えたいことがある。そういうときは __!!(rlang::sym())__ を使って、単一の文字列を単一シンボル名に変える。
+
+```{r arrange_population_sym}
+col_name <- "population"
+df %>% dplyr::arrange(desc(!!(rlang::sym(col_name)))) %>% dplyr::select(name_set) %>% head(1)
+```
+
+### 集計する
+
+都道府県別の人口と世帯数を集計する。都道府県、人口、世帯数の列を __dplyr::select__ で抜き出し、都道府県ごとに __dplyr::group_by__ でまとめ、 __dplyr::summarize_each(sum)__ で人口と世帯数を合計する。
+
+```{r arrange_population_str_sum}
+df %>%
+  dplyr::select(c("prefecture", "population", "households")) %>%
+  dplyr::group_by(prefecture) %>%
+  dplyr::summarize_each(sum) %>%
+  dplyr::ungroup() %>% head(5)
+```
+
+都道府県名がばらばら(おそらく漢字読みのあいうえお順)だが、これはすぐ後で直す。 __dplyr::group_by__ で指定する列名も変数で与えることができる。複数の列をまとめることができるので、複数形 __!!!(rlang::syms())__ を使う。
+
+```{r arrange_population_sym_sum}
+col_names <- "prefecture"
+pref_df <- df %>%
+  dplyr::select(c("prefecture", "population", "households")) %>%
+  dplyr::group_by(!!!(rlang::syms(col_names))) %>%
+  dplyr::summarize_each(sum) %>%
+  dplyr::ungroup()
+pref_df %>% head(5)
+```
+
+都道府県名を元通りにしよう。まずは都道府県名だけのdata frameを作る。元の順の都道府県名を取り出して並べ、都道府県別の人口と世帯を __dplyr::inner_join__ でくっつける。SQLでおなじみの操作だが速いので積極的に使おう。
+
+```{r arrange_population_sort}
+pref_base <- tibble(prefecture=unique(df$prefecture))
+key_names <- "prefecture"
+merged_pref_df <- dplyr::inner_join(pref_base, pref_df, by=key_names)
+merged_pref_df %>% head(5)
+```
+
+Join操作が正しかったかどうか確認するために、C++的なassertが書ける。assert条件が成立しない場合はエラーになる。
+
+```{r arrange_population_assert}
+assertthat::assert_that(NROW(merged_pref_df) == NROW(pref_df))
+assertthat::assert_that(NROW(merged_pref_df) == 47)
+```
+
+### ファイルに保存する
+
+最後に結果をCSVファイルに保存する。Excelで読めるように、BOMつきUTF-8形式にする。ExcelはUTF-8にあBOMがないと文字化けする (日本語環境ではShift_JIS = CP932とみなすようだ)。
+
+```{r arrange_population_write}
+readr::write_excel_csv(x=merged_pref_df, path="out.csv")
+```
+
+表形式はCSVファイルのような、汎用性のあるテキストで保存すると後で処理しやすい。他の方法として、オブジェクトをまるごとシリアライズして、後でRのコードで読めるようにする。
+
+```{r arrange_population_save}
+rds_filename <- "out.rds"
+saveRDS(object=merged_pref_df, file=rds_filename)
+```
+
+ファイルから読み込むと、少なくともOSとRとパッケージのバージョンが同じなら元に戻ることが分かる。
+
+```{r arrange_population_load}
+readRDS(rds_filename) %>% head(5)
+```
+
+### カテゴリ化する
+
+最後に、都道府県で人口が最大の市区町村を選んで、都道府県庁所在地かどうか確認しよう。都道府県ごとに、人口上位3位の市区町村を選ぶ。
+
+```{r arrange_population_top}
+top_df <- df %>%
+  dplyr::select(c("prefecture", "city", "population")) %>%
+  dplyr::group_by(prefecture) %>%
+  dplyr::arrange_all(.funs=list(~desc(population)), .by_group=TRUE) %>%
+  dplyr::top_n(n=3, wt=population) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(desc(prefecture))
+head(top_df)
+```
+
+ここには一部しか表示していないが、東京都は[別として](https://www.seisakukikaku.metro.tokyo.lg.jp/information/syozaichi.html)、福島県郡山市、福島県いわき市、群馬県高崎市、静岡県浜松市、三重県四日市市、山口県下関市は県庁所在地より人口が多いことが分かる。
+
+またもや都道府県の順序が崩れてしまった。これまで都道府県を文字列で扱ってきたが、カテゴリ(順序関係に必ずしも意味が無い離散値)として扱おう。Rではfactorと呼ぶ。元々の都道府県順に北海道=1から沖縄県=47まで順番に整数を割り当てる。今後は都道府県が上手く並んでいる。
+
+```{r arrange_population_relevel}
+pref_ordefed <- unique(df$prefecture)
+top_df <- top_df %>%
+  dplyr::mutate(prefecture=forcats::fct_relevel(prefecture, pref_ordefed)) %>%
+  dplyr::arrange(prefecture)
+head(top_df)
+```
+
+factorを整数に変換すると、確かに1から順になっている。
+
+```{r arrange_population_level_int}
+head(as.integer(top_df$prefecture), 15)
+```
+
+文字列をカテゴリ化すると、同じカテゴリ=文字列が複数回出てくるときに文字列はまとめて一つ覚えておけばよいので、その分メモリを節約できる。CSVファイルを展開したdata frameがメモリに載りきるかどうかぎりぎりのときは、CSVファイルを読み込む時点でカテゴリ化すればよい。そうするには列の型を明示する。f,c,i,dはそれぞれfactor, character, integer, doubleを意味する。
+
+```{r read_population_with_types}
+df <- readr::read_csv(file="population.csv", col_types="fciiiiiidd")
+class(df$prefecture)
+class(df$city)
+```
+
+
+## 関数型プログラミング
+
+Data frameだけでなく、ベクトルやlistに対しても関数型プログラミングができる。
+
+### Mapとreduce
+
+関数型言語でいうmap、つまり集合の要素にそれぞれ関数を適用した結果を、新たな集合として返すことができる。例えば実数ベクトルに対して、要素ごとの絶対値を取る。sapply, purrr::map_dbl, lapplyに違いは、結果がベクトルかlistかの違いである。
+
+```{r map_vector_list}
+v <- c(1.1, -2.2, 3.3)
+num_list <- list(c1=1.1, c2=-2.2, c3=3.3, c4=4.4, c5=-5.5)
+sapply(v, abs)
+sapply(num_list, abs)
+purrr::map_dbl(v, abs)
+purrr::map_dbl(num_list, abs)
+lapply(v, abs)
+lapply(num_list, abs)
+```
+
+関数型言語でいうreduceは、C++でいうところのstd::accumulateである。Rではそのものずばりreduceである。
+
+```{r reduce_vector}
+Reduce(function(acc, x) { acc + abs(x) } , v)
+Reduce(function(acc, x) { acc + abs(x) } , num_list)
+purrr::reduce(v, function(acc, x) { acc + abs(x) })
+purrr::reduce(num_list, function(acc, x) { acc + abs(x) })
+```
+
+ここで初めてfunctionが出てきた。functionは、引数を受け取って、最後に評価した式の値を返すオブジェクトを定義する。C++でいうところのラムダ式である。C++同様に変数に入れることもでき、これがいわゆる普通の関数定義である。もちろんL1ノルムの計算を自作しなくても、 __norm__ が用意されている。
+
+```{r define_function}
+l1_norm <- function(acc, x) {
+  acc + abs(x)
+}
+purrr::reduce(v, l1_norm)
+norm(as.matrix(v), type=c("O"))
+```
+
+### Filter
+
+当然filterもある。. をplaceholderとして条件を書ける。
+
+```{r filter_vector}
+v %>% purrr::keep(. > 0.0)
+v %>% purrr::discard(. > 0.0)
+```
+
+ベクトルに条件を適用すると、条件に合うかどうかの真理値ベクトルを返す。これを利用してfilterと同様に条件に合う要素を取得したり、__which__ を利用して条件が一致した要素の番号を整数ベクトルとして取得したりできる。要素番号として __-c()__ を指定すると、取り除く要素番号を指定したことになる。
+
+```{r condition_vector}
+conds <- v > 0.0
+v[conds]
+true_indexes <- which(conds)
+false_indexes <- which(!conds)
+true_indexes
+false_indexes
+v[true_indexes]
+v[-true_indexes]
+v[false_indexes]
+```
+
+### Compose
+
+__functional::Compose__ で関数合成ができる。実数ベクトルは飽きたから、もっと実用的な例を出そう。
+
+lubridateはさまざまな日付時刻表記を扱うパッケージである。日付を表記する二つの文字列を適切なオブジェクトに変換して、両者の日数の差を取る。
+
+```{r lubridate_diff}
+start_date <- lubridate::as_date("2020/1/31")
+end_date <- lubridate::as_date("2020/2/29")
+diff_date <- end_date - start_date
+lubridate::day(lubridate::days(diff_date))
+```
+
+これを二引数の関数として定義してもよいが、関数合成をすることができる。
+
+```{r compuse_lubridate_2}
+f <- functional::Compose(lubridate::as_date, diff, lubridate::days, lubridate::day)
+f(c("2020/1/31", "2020/2/29"))
+```
+
+こうするとn個の日付に対して、両隣の日付の経過日数をまとめて返す。
+
+```{r compuse_lubridate_3}
+f(c("2020/1/31", "2020/2/29", "2020/3/2", "2020/3/12"))
+```
+
+### 関数のスコープ
+
+Rの変数のスコープは、環境(environment)と結びついている。雑にいうと、functionの中ではそのfunctionで定義された変数と、字面上(lexical)その外側で定義されている変数を参照することができる。C++と違って{}は、スコープの区分には意味をなさない。
+
+変数を使う場所と同じfunctionで定義された変数は読み書きできるが、外側の変数はそのままでは読むことはできても書き込むことはできない。外側の変数に書き込むには<<-またはassignを使う。Pythonのnonlocalのようなものだと思えばよい。
+
+試してみよう、以下のコードは外側のxを書き換えない。
+
+```{r local_assignment}
+x <- c(4,5,6)
+func <- function(i) {
+  x[[i]] <- i
+}
+func(1)
+x[[1]]
+```
+
+以下のコードは外側のxを書き換える。
+
+```{r non_local_assignment}
+x <- c(4,5,6)
+func <- function(i) {
+  x[[i]] <<- i
+}
+func(1)
+x[[1]]
+```
+
+同じ理屈で、関数の引数を書き換えても、関数の呼び出し元に書き換えは伝搬しない。
+
+```{r parameter_and_argument}
+a <- 1
+b <- 1
+func <- function(a) {
+  print(a)
+  a <- 2
+  b <<- 2
+}
+func(a)
+a
+b
+```
+
+Rの引数は、参照渡しでCopy on Write (CoW)である。引数の変数から値を読み取るときは、元のオブジェクトにアクセスするのでコピーは発生しない。引数の変数を書き換えるような代入が行われると、元のオブジェクトをコピーして新しいオブジェクトを作る。コピー後はコピー先のオブジェクトを参照するので、関数の呼び出し元の変数が指すオブジェクトは変更されない。
+
+メモリ割り当て状況を追跡して確かめよう。 __profmem__ はメモリ割り当てalloc呼び出しの一覧を返す。__seq__ は等差数列を作る(浮動小数の等差数列は丸め誤差が要注意だが、この例では重要ではないので無視する)。
+
+```{r copy_on_write}
+reader <- function(v) {
+  mean(v)
+}
+modifier <- function(v) {
+  v <- v + 1
+}
+arg <- seq(from=1.5, to=5000000.5, by=1.0)
+profmem::profmem(expr={reader(arg)}, threshold=4096)
+profmem::profmem(expr={modifier(arg)}, threshold=4096)
+```
+
+実行すると、__reader__ は等差数列を読み取るだけなのでメモリ割り当てをしないが、 __modifier__ は新たな等差数列を作るのでメモリを割り当てる。メモリの使用量は、48 bytes + 要素数 * 8 bytes (double 1個分)と分かる。
+
+RではC++と異なり、使わなくなったオブジェクトを明示的に削除しない。それはガベージコレクタ(Tracing GC)の役割である。しかしtracing GCは参照されているオブジェクトを残して参照がないオブジェクトを削除するので、プログラマが使わなくなったオブジェクトであっても参照が残っているとメモリを解放できない。解放するには、別のオブジェクトを指すようにすればよい。
+
+メモリが解放される様子を __gc__ で確認しよう。Vcellsが減っているのが分かる。
+
+```{r garbage_collection}
+gc()
+arg <- NA
+gc()
+```
+
+
+## NAとNULL
+
+まだ説明していなかったが、実はRにはNULLがある。
+
+### Null Object
+
+デザインパターンの一種にnull object patternがある。有名な例として、シェルで出力が要らなければ > /dev/nullにリダイレクトする、C言語のfree(NULL)は何もしないし異常も起きない、というのがある。
+
+複数のdata frameの列を結合する。
+
+```{r bind_cols_two}
+left_df <- tibble(key=c("foo", "bar", "poi"), value=c(1, 2, 3))
+right_df <- tibble(score=c(40, 50, 60))
+dplyr::bind_cols(left_df, right_df)
+```
+
+さて結合する相手がいなかったらどうだろう。
+
+```{r bind_cols_one}
+dplyr::bind_cols(NULL, right_df)
+dplyr::bind_cols(left_df, NULL)
+# dplyr::bind_cols(NA, right_df)
+# dplyr::bind_cols(left_df, NA)
+```
+
+片方がNULLならもう一方がそのまま返ってくる。つまりNULLかどうかを呼び出し前に判断する必要はない。なおNULLではなくNAを指定するとエラーになる。これを利用して、null判定なしで、reduceを使って複数のdata frameを列結合できる。C++の多くの作法とは異なり、結合した結果を新たなオブジェクトして返し、引数は変更しない (inplaceでない)。
+
+```{r bind_cols_three}
+middle_df <- tibble(name=c("p", "q", "e"))
+merged_df <- purrr::reduce(.x=list(left_df, middle_df, right_df), .f=dplyr::bind_cols, .init=NULL)
+merged_df
+```
+
+ちなみにdplyr::inner_joinは、NULLを指定するとエラーになる。
+
+### NAを除去する
+
+NAの振る舞いを追ってみよう。NAを含む数値ベクトルに対して、要素の平均値を取ると、NAになる。
+
+```{r sum_na}
+v <- c(4, NA, 5, 6)
+mean(v)
+```
+
+これはこれで正しいとも言えるが、NAをなかったことにして欲しい場合もあるだろう。一つ目の方法は、mean()に対してNAを無視するよう指定する。
+
+```{r sum_expect_na}
+mean(x=v, na.rm=TRUE)
+```
+
+もう一つの方法は、入力するベクトルからNAを除くことである。
+
+```{r strip_sum_expect_na}
+w <- na.omit(v)
+w
+mean(w)
+```
+
+Data frame に __complete.cases__ を使うと、それぞれの列つまり標本に、欠測がない=TRUEか欠測がある=FALSEかを返す。__na.omit__ を使うと、NAがある行を取り除いた、新たなdata frameを返す。元のオブジェクトは変更しない。
+
+```{r remove_na_rows}
+merged_df[2, "name"] <- NA
+complete.cases(merged_df)
+na.omit(merged_df)
+```
+
+NAがある列を除く方法は標準にないので一工夫いる。Stack Overflowの[回答](https://stackoverflow.com/questions/2643939/remove-columns-from-dataframe-where-all-values-are-na)を参考にする。
+
+```{r remove_na_columns}
+merged_df %>% dplyr::select_if(function(x) all(!is.na(x)))
+```
+
+## Data frameを加工して図示する
+
+### 列を加工する
+
+標本の値を加工することがある。例えば市区町村別の人口調査で、世帯当たり人員は人口を世帯数で割ると求まる。C++ならfor_eachで回すところだが、Rではフィルタを使う。
+
+```{r person_per_household_read, include=FALSE}
+base_df <- readr::read_csv("population.csv")
+```
+
+```{r person_per_household_mutate}
+df <- base_df %>% dplyr::mutate(person_per_household = population / households) %>%
+  dplyr::select(c(city, population, households, person_per_household))
+df %>% head(5)
+```
+
+この例では素直にmutateするのが速いが、行ごとにデータを柔軟に加工するために __purrrlyr::by_row__ がある。
+
+```{r person_per_household_by_row}
+base_df %>% purrrlyr::by_row (..f=function(row) {
+   row$population / row$households
+}, .collate=c("cols"), .to="person_per_household") %>%
+  dplyr::select(c(city, population, households, person_per_household)) %>% head(5)
+```
+
+### 表示する
+
+そろそろ図を描いてみよう。Rの醍醐味は、データを加工したら簡単に図を描けることである。
+
+```{r person_per_household_plot}
+plot(df$population, df$person_per_household)
+```
+
+確かにお手軽だが、報告書にはもっときれいな図を描きたいだろう。gglot2を使う。
+**はずなのだが、おびただしいエラーメッセージが出て描けない**
+
+```{r person_per_household_ggplot}
+#g <- ggplot(df, aes(x=population, y=person_per_household))
+#g <- g + geom_point(size=2, color="navy", alpha=0.5)
+#g <- g + scale_x_log10()
+#g <- g + ggtitle("全国の市区町村")
+#g <- g + xlab("人口")
+#g <- g + ylab("世帯当たり人数")
+#plot(g)
+```
+
+点の代わりに文字を使うこともできる。 __extrafont__ パッケージを使うことで、好きなフォントを指定できる。例えばMigu 1MをWindowsとLinuxにインストールして使う。
+
+```{r person_per_household_tokyo}
+pref <- "東京都"
+tokyo_df <- df %>% dplyr::filter(stringr::str_starts(city, pref))
+tokyo_df$city <- unlist(purrr::map(tokyo_df$city, ~ stringr::str_remove(.x, pref)))
+font_name <- 'Migu 1M'
+#g <- ggplot(tokyo_df, aes(x=population, y=person_per_household, label=city))
+#g <- g + geom_label(size=4, alpha=0.6, family=font_name)
+#g <- g + scale_x_log10()
+#g <- g + ggtitle(pref)
+#g <- g + xlab("人口")
+#g <- g + ylab("世帯当たり人数")
+#g <- g + theme(text=element_text(family=font_name, size=16),
+#               axis.text=element_text(family=font_name, size=16),
+#               axis.title=element_text(family=font_name, size=16),
+#               strip.text=element_text(family=font_name, size=16),
+#               plot.title=element_text(family=font_name, size=16))
+# plot(g)
+```
+
+変数が三つあれば3D表示もできる。PDFでお見せできないのが残念だが。
+
+```{r person_per_household_3d}
+normalize <- function(v) {
+    min_v <- min(v)
+    range_v <- max(v) - min_v
+    (v - min_v) / range_v
+}
+
+x <- log10(base_df$population)
+y <- base_df$natural_change_rate
+z <- base_df$net_migration_rate
+g <- factor(1:NROW(x))
+surface_colors <- grDevices::rgb(normalize(x), normalize(y), normalize(z))
+car::scatter3d(x=x, y=y, z=z,
+               axis.col=rep('black', 3), surface.col=surface_colors,
+               surface=FALSE, sphere.size=2, groups=g)
+```
+
