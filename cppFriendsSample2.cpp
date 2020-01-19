@@ -1,4 +1,5 @@
-// やめるのだフェネックで学ぶC++の実証コード(ライブラリの使い方)
+// プログラマたんbot(やめるのだフェネックで学ぶC++)の実証コード(ライブラリの使い方)
+#include <cassert>
 #include <cctype>
 #include <ctime>
 #include <cstdlib>
@@ -29,7 +30,11 @@
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/date_time/time_facet.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/fusion/algorithm/transformation/zip.hpp>
 #include <boost/fusion/container/vector.hpp>
+#include <boost/fusion/include/zip.hpp>
+#include <boost/fusion/include/make_vector.hpp>
+#include <boost/iterator/zip_iterator.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/locale.hpp>
 #include <boost/logic/tribool.hpp>
@@ -2038,6 +2043,33 @@ TEST_F(TestDayOfYear, All) {
 
     date theProgrammersDay2020 = boost::gregorian::from_string("2020/09/12");
     EXPECT_EQ(256, theProgrammersDay2020.day_of_year());
+}
+
+class TestZipIterator : public ::testing::Test {};
+
+// http://boost.cppll.jp/HEAD//libs/iterator/doc/zip_iterator.html
+TEST_F(TestZipIterator, Iter) {
+    const std::vector<std::string> numStrSet {"1", "2", "3"};
+    const std::vector<int> numIntSet {10, 20, 30};
+
+    using T = boost::tuple<std::string, int>;
+    auto iBegins = boost::make_zip_iterator(boost::make_tuple(numStrSet.begin(), numIntSet.begin()));
+    auto iEnds = boost::make_zip_iterator(boost::make_tuple(numStrSet.end(), numIntSet.end()));
+    std::for_each(iBegins, iEnds,
+        [&](const T& t) {
+//      [&](const auto& t) {
+            ASSERT_EQ(t.get<1>(), 10 * boost::lexical_cast<int>(t.get<0>()));
+        });
+}
+
+// https://www.boost.org/doc/libs/1_72_0/libs/fusion/doc/html/fusion/algorithm/transformation/functions/zip.html
+TEST_F(TestZipIterator, Fusion) {
+    boost::fusion::vector<std::string, std::string> numStrSet("1", "2");
+    boost::fusion::vector<int, int> numIntSet(10, 20);
+
+    assert(boost::fusion::zip(numStrSet, numIntSet) ==
+           boost::fusion::make_vector(boost::fusion::make_vector("1", 10),
+                                      boost::fusion::make_vector("2", 20)));
 }
 
 /*
