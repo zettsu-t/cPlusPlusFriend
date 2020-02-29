@@ -3,10 +3,10 @@ title: "ダミー化と補間いろいろ"
 author: "プログラマたんbot"
 date: "2020/2/29"
 output:
-  html_document:
-    toc: false
   pdf_document:
     latex_engine: xelatex
+  html_document:
+    toc: false
   beamer_presentation:
     pandoc_args:
     - --latex-engine
@@ -176,14 +176,32 @@ tidyr::fillを使って、各列を補間する。purrr::reduceを使うと、�
 ```{r matrix_interpolate1}
 mat_interpolated_1 <- purrr::reduce(.x=colnames(mat), .init=mat, .f=function(df, col_name) {
   df %>%
-    tidyr::fill(col_name, .direction="down") %>%
-    tidyr::fill(col_name, .direction="up")
+    tidyr::fill(col_name, .direction='down') %>%
+    tidyr::fill(col_name, .direction='up')
 })
 ```
 
 ```{r show_matrix_interpolate1, echo=FALSE}
 mat_interpolated_1 %>% kable() %>% kable_styling()
 ```
+
+以下のようにするとメッセージが出なくなる。
+
+```{r matrix_interpolate2}
+mat_interpolated_2 <- purrr::reduce(.x=colnames(mat), .init=mat, .f=function(df, col_name) {
+  df %>%
+    dplyr::mutate(.prev_val=col_name, .next_val=col_name) %>%
+    tidyr::fill(col_name, .direction='down') %>%
+    tidyr::fill(col_name, .direction='up') %>%
+    dplyr::mutate(col_name=ifelse(.prev_val == .next_val, .prev_val, col_name)) %>%
+    dplyr::select(-c(.prev_val, .next_val))
+})
+```
+
+```{r show_matrix_interpolate2, echo=FALSE}
+mat_interpolated_2 %>% kable() %>% kable_styling()
+```
+
 
 ## Pythonでダミー化して補間する
 
