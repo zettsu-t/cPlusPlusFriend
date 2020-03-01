@@ -236,6 +236,16 @@ c0,ff,ee  sar bh,0xee
 * [Use reentrant functions for safer signal handling](https://www.ibm.com/developerworks/library/l-reent/index.html)
 * http://stackoverflow.com/ などの各記事
 
+## Rの一般的な情報源
+
+* みんなのR 第2版 (Jared P. Lander 著/高柳慎一, 津田真樹, 牧山幸史, 松村杏子, 簑田高志 監修, 2018/12, マイナビ出版)
+* パーフェクトR (Rサポーターズ 著, 2017/03, 技術評論社)
+* 再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3) (高橋康介 著/石田基広 監修/市川太祐, 高橋康介, 高柳慎一, 福島真太朗, 松浦健太郎 編, 2018/05, 共立出版)
+* Rクックブック 第2版 (J.D. Long, Paul Teetor 著/大橋真也 監訳/木下哲也 訳, 2020/01, オライリー・ジャパン)
+* [Rの公式マニュアル](https://cran.r-project.org/manuals.html)
+* [Advanced R by Hadley Wickham](https://adv-r.hadley.nz/)
+* [R for Data Science by Garrett Grolemund and Hadley Wickham](https://r4ds.had.co.nz/)
+
 ## ライセンス
 
 本レポジトリのライセンスは、[MITライセンス](LICENSE.txt)です。

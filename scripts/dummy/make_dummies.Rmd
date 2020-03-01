@@ -3,10 +3,10 @@ title: "ダミー化と補間いろいろ"
 author: "プログラマたんbot"
 date: "2020/2/29"
 output:
-  pdf_document:
-    latex_engine: xelatex
   html_document:
     toc: false
+  pdf_document:
+    latex_engine: xelatex
   beamer_presentation:
     pandoc_args:
     - --latex-engine
@@ -222,14 +222,16 @@ pd.set_option('display.width', None)
 
 ### Pandasでダミー化する
 
-PythonではPandasを使う。WindowsではAnadondaのpython.exeをPATHで見つけられるようにすると、Pythonの実行結果をこのR markdownファイルに埋め込むことができる。
+PandasでCSVファイルを読み込む。RのNAは、PythonではNaNである。
 
 ```{python python_read, echo=TRUE}
 df = pd.read_csv('with_na.csv')
 print(df)
 ```
 
-NカテゴリをN変数およびはN-1変数にする。Data frameのNAはNAのまま残り、デフォルトでは「NAというカテゴリ」は作らない。ダミー化前の列はなくなる。列の順序は __保存されない__ 。ダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。fastDummies::dummy_cols(remove_selected_columns=TRUE) と同様の出力になる。
+NカテゴリをN変数およびはN-1変数にする。Data frameのNAはNAのまま残り、デフォルトでは「NAというカテゴリ」は作らない。ダミー化前の列はなくなる。
+
+列の順序は __保存されない__ 。ダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。fastDummies::dummy_cols(remove_selected_columns=TRUE) と同様の出力になる。
 
 ```{python python_dummy, echo=TRUE}
 df_dummy_n = pd.get_dummies(data=df, drop_first=False)
@@ -238,7 +240,7 @@ df_dummy_n_1 = pd.get_dummies(data=df, drop_first=True)
 print(df_dummy_n_1)
 ```
 
-dummy_na=True にすると、NAをいうカテゴリを作る。RのNAは、PythonではNaNである。
+dummy_na=True にすると、NAをいうカテゴリを作る。
 
 ```{python python_dummy_na, echo=TRUE}
 df_dummy_n_na = pd.get_dummies(data=df, dummy_na=True)
