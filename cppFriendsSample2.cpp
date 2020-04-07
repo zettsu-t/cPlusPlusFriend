@@ -2055,11 +2055,10 @@ TEST_F(TestZipIterator, Iter) {
     using T = boost::tuple<std::string, int>;
     auto iBegins = boost::make_zip_iterator(boost::make_tuple(numStrSet.begin(), numIntSet.begin()));
     auto iEnds = boost::make_zip_iterator(boost::make_tuple(numStrSet.end(), numIntSet.end()));
-    std::for_each(iBegins, iEnds,
-        [&](const T& t) {
+    std::for_each(iBegins, iEnds, [&](const T& t) {
 //      [&](const auto& t) {
-            ASSERT_EQ(t.get<1>(), 10 * boost::lexical_cast<int>(t.get<0>()));
-        });
+        ASSERT_EQ(t.get<1>(), 10 * boost::lexical_cast<int>(t.get<0>()));
+    });
 }
 
 // https://www.boost.org/doc/libs/1_72_0/libs/fusion/doc/html/fusion/algorithm/transformation/functions/zip.html

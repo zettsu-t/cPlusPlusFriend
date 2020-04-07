@@ -69,6 +69,48 @@ TEST_F(TestSaturationArithmetic, Sub) {
     EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
 }
 
+TEST_F(TestSaturationArithmetic, ShiftLeft) {
+    using Reg32 = uint32_t;
+    Reg32 expected = 1;
+
+    for(Reg32 width = 0; width < 35; ++width) {
+        Reg32 src = 1;
+        Reg32 temp = 0;
+        Reg32 actual = 3;
+
+        asm volatile (
+            "xor   %%ebx, %%ebx \n\t"
+            "cmp   $0x1f, %%ecx \n\t"
+            "shlx  %%ecx, %%edx, %%eax \n\t"
+            "cmova %%ebx, %%eax  \n\t"
+            :"=a"(actual),"=b"(temp):"d"(src),"c"(width):);
+
+        EXPECT_EQ(expected, actual);
+        expected <<= 1;
+    }
+}
+
+TEST_F(TestSaturationArithmetic, ShiftRight) {
+    using Reg32 = uint32_t;
+    Reg32 expected = 0x80000000;
+    for(Reg32 width = 0; width < 35; ++width) {
+        Reg32 src = 0x80000000;
+        Reg32 temp = 0;
+        Reg32 actual = 1;
+
+        asm volatile (
+            "mov   %%edx, %%ebx \n\t"
+            "sar   $0x1f, %%ebx \n\t"
+            "cmp   $0x1f, %%ecx \n\t"
+            "sarx  %%ecx, %%edx, %%eax \n\t"
+            "cmova %%ebx, %%eax  \n\t"
+            :"=a"(actual),"=b"(temp):"d"(src),"c"(width):);
+
+        EXPECT_EQ(expected, actual);
+        expected = expected | (expected >> 1);
+    }
+}
+
 namespace {
     using ProcessorClock = uint64_t;
     using ProcessorClockSet = std::vector<ProcessorClock>;
