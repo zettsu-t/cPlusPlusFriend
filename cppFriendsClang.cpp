@@ -204,95 +204,138 @@ namespace CheckWarning {
 namespace {
     template <typename T,
               std::enable_if_t<std::is_integral<T>::value, std::nullptr_t> = nullptr>
-    class MyDivider {
+    class MulDiv {
     public:
-        using MyInt = typename std::make_signed<T>::type;
-        using MyUint = typename std::make_unsigned<T>::type;
-        static_assert(sizeof(T) == sizeof(MyInt), "Must keep its bit width");
-        static_assert(sizeof(T) == sizeof(MyUint), "Must keep its bit width");
-        static_assert(std::is_unsigned<MyUint>::value, "Must be unsigned");
-        static_assert(std::is_signed<MyInt>::value, "Must be signed");
+        using Int = typename std::make_signed<T>::type;
+        using Uint = typename std::make_unsigned<T>::type;
+        static_assert(sizeof(T) == sizeof(Int), "Must keep its bit width");
+        static_assert(sizeof(T) == sizeof(Uint), "Must keep its bit width");
+        static_assert(std::is_unsigned<Uint>::value, "Must be unsigned");
+        static_assert(std::is_signed<Int>::value, "Must be signed");
 
-        static MyInt DivInt(MyInt dividend, MyInt divider) {
+        static Int MulInt(Int a, Int b) {
+            return a * b;
+        }
+
+        static Uint MulUint(Uint a, Uint b) {
+            return a * b;
+        }
+
+        static Int DivInt(Int dividend, Int divider) {
             return dividend / divider;
         }
 
-        static MyUint DivUint(MyUint dividend, MyUint divider) {
+        static Uint DivUint(Uint dividend, Uint divider) {
             return dividend / divider;
         }
 
-        static std::pair<MyInt, MyInt> DivRemInt(MyInt dividend, MyInt divider) {
-            return std::pair<MyInt, MyInt> {dividend / divider, dividend % divider};
+        static std::pair<Int, Int> DivRemInt(Int dividend, Int divider) {
+            return std::pair<Int, Int> {dividend / divider, dividend % divider};
         }
 
-        static std::pair<MyUint, MyUint> DivRemUint(MyUint dividend, MyUint divider) {
-            return std::pair<MyUint, MyUint> {dividend / divider, dividend % divider};
+        static std::pair<Uint, Uint> DivRemUint(Uint dividend, Uint divider) {
+            return std::pair<Uint, Uint> {dividend / divider, dividend % divider};
         }
     };
 }
 
+int8_t MulInt8(int8_t dividend, int8_t divider) {
+    return MulDiv<int8_t>::MulInt(dividend, divider);
+}
+
+uint8_t MulUint8(uint8_t dividend, uint8_t divider) {
+    return MulDiv<uint8_t>::MulUint(dividend, divider);
+}
+
 int8_t DivInt8(int8_t dividend, int8_t divider) {
-    return MyDivider<int8_t>::DivInt(dividend, divider);
+    return MulDiv<int8_t>::DivInt(dividend, divider);
 }
 
 uint8_t DivUint8(uint8_t dividend, uint8_t divider) {
-    return MyDivider<uint8_t>::DivUint(dividend, divider);
+    return MulDiv<uint8_t>::DivUint(dividend, divider);
 }
 
 std::pair<int8_t, int8_t> DivRemInt8(int8_t dividend, int8_t divider) {
-    return MyDivider<int8_t>::DivRemInt(dividend, divider);
+    return MulDiv<int8_t>::DivRemInt(dividend, divider);
 }
 
 std::pair<uint8_t, uint8_t> DivRemUint8(uint8_t dividend, uint8_t divider) {
-    return MyDivider<uint8_t>::DivRemUint(dividend, divider);
+    return MulDiv<uint8_t>::DivRemUint(dividend, divider);
+}
+
+
+int16_t MulInt16(int16_t dividend, int16_t divider) {
+    return MulDiv<int16_t>::MulInt(dividend, divider);
+}
+
+uint16_t MulUint16(uint16_t dividend, uint16_t divider) {
+    return MulDiv<uint16_t>::MulUint(dividend, divider);
 }
 
 int16_t DivInt16(int16_t dividend, int16_t divider) {
-    return MyDivider<int16_t>::DivInt(dividend, divider);
+    return MulDiv<int16_t>::DivInt(dividend, divider);
 }
 
 uint16_t DivUint16(uint16_t dividend, uint16_t divider) {
-    return MyDivider<uint16_t>::DivUint(dividend, divider);
+    return MulDiv<uint16_t>::DivUint(dividend, divider);
 }
 
 std::pair<int16_t, int16_t> DivRemInt16(int16_t dividend, int16_t divider) {
-    return MyDivider<int16_t>::DivRemInt(dividend, divider);
+    return MulDiv<int16_t>::DivRemInt(dividend, divider);
 }
 
 std::pair<uint16_t, uint16_t> DivRemUint16(uint16_t dividend, uint16_t divider) {
-    return MyDivider<uint16_t>::DivRemUint(dividend, divider);
+    return MulDiv<uint16_t>::DivRemUint(dividend, divider);
+}
+
+
+int32_t MulInt32(int32_t dividend, int32_t divider) {
+    return MulDiv<int32_t>::MulInt(dividend, divider);
+}
+
+uint32_t MulUint32(uint32_t dividend, uint32_t divider) {
+    return MulDiv<uint32_t>::MulUint(dividend, divider);
 }
 
 int32_t DivInt32(int32_t dividend, int32_t divider) {
-    return MyDivider<int32_t>::DivInt(dividend, divider);
+    return MulDiv<int32_t>::DivInt(dividend, divider);
 }
 
 uint32_t DivUint32(uint32_t dividend, uint32_t divider) {
-    return MyDivider<uint32_t>::DivUint(dividend, divider);
+    return MulDiv<uint32_t>::DivUint(dividend, divider);
 }
 
 std::pair<int32_t, int32_t> DivRemInt32(int32_t dividend, int32_t divider) {
-    return MyDivider<int32_t>::DivRemInt(dividend, divider);
+    return MulDiv<int32_t>::DivRemInt(dividend, divider);
 }
 
 std::pair<uint32_t, uint32_t> DivRemUint32(uint32_t dividend, uint32_t divider) {
-    return MyDivider<uint32_t>::DivRemUint(dividend, divider);
+    return MulDiv<uint32_t>::DivRemUint(dividend, divider);
+}
+
+
+int64_t MulInt64(int64_t dividend, int64_t divider) {
+    return MulDiv<int64_t>::MulInt(dividend, divider);
+}
+
+uint64_t MulUint64(uint64_t dividend, uint64_t divider) {
+    return MulDiv<uint64_t>::MulUint(dividend, divider);
 }
 
 int64_t DivInt64(int64_t dividend, int64_t divider) {
-    return MyDivider<int64_t>::DivInt(dividend, divider);
+    return MulDiv<int64_t>::DivInt(dividend, divider);
 }
 
 uint64_t DivUint64(uint64_t dividend, uint64_t divider) {
-    return MyDivider<uint64_t>::DivUint(dividend, divider);
+    return MulDiv<uint64_t>::DivUint(dividend, divider);
 }
 
 std::pair<int64_t, int64_t> DivRemInt64(int64_t dividend, int64_t divider) {
-    return MyDivider<int64_t>::DivRemInt(dividend, divider);
+    return MulDiv<int64_t>::DivRemInt(dividend, divider);
 }
 
 std::pair<uint64_t, uint64_t> DivRemUint64(uint64_t dividend, uint64_t divider) {
-    return MyDivider<uint64_t>::DivRemUint(dividend, divider);
+    return MulDiv<uint64_t>::DivRemUint(dividend, divider);
 }
 
 /*

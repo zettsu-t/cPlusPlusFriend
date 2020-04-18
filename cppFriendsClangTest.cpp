@@ -286,6 +286,85 @@ TEST_F(TestInferVariadicTemplate, All) {
 #endif
 }
 
+
+class TestMultiplier : public ::testing::Test{};
+
+TEST_F(TestMultiplier, Int8) {
+    using Number = int8_t;
+    constexpr Number a = 13;
+    constexpr Number b = 3;
+    constexpr Number expected = 39;
+    EXPECT_EQ(expected, MulInt8(a, b));
+    EXPECT_EQ(-expected, MulInt8(-a, b));
+    EXPECT_EQ(-expected, MulInt8(a, -b));
+    EXPECT_EQ(expected, MulInt8(-a, -b));
+}
+
+TEST_F(TestMultiplier, Uint8) {
+    using Number = uint8_t;
+    constexpr Number a = 15;
+    constexpr Number b = 14;
+    constexpr Number expected = 210;
+    EXPECT_EQ(expected, MulUint8(a, b));
+}
+
+TEST_F(TestMultiplier, Int16) {
+    using Number = int16_t;
+    constexpr Number a = 270;
+    constexpr Number b = 5;
+    constexpr Number expected = 1350;
+    EXPECT_EQ(expected, MulInt16(a, b));
+    EXPECT_EQ(-expected, MulInt16(-a, b));
+    EXPECT_EQ(-expected, MulInt16(a, -b));
+    EXPECT_EQ(expected, MulInt16(-a, -b));
+}
+
+TEST_F(TestMultiplier, Uint16) {
+    using Number = uint16_t;
+    constexpr Number a = 251;
+    constexpr Number b = 231;
+    constexpr Number expected = 57981;
+    EXPECT_EQ(expected, MulUint16(a, b));
+}
+
+TEST_F(TestMultiplier, Int32) {
+    using Number = int32_t;
+    constexpr Number a = 160000;
+    constexpr Number b = 12345;
+    constexpr Number expected = 1975200000;
+    EXPECT_EQ(expected, MulInt32(a, b));
+    EXPECT_EQ(-expected, MulInt32(-a, b));
+    EXPECT_EQ(-expected, MulInt32(a, -b));
+    EXPECT_EQ(expected, MulInt32(-a, -b));
+}
+
+TEST_F(TestMultiplier, Uint32) {
+    using Number = uint32_t;
+    constexpr Number a = 320000u;
+    constexpr Number b = 12345u;
+    constexpr Number expected = 3950400000u;
+    EXPECT_EQ(expected, MulUint32(a, b));
+}
+
+TEST_F(TestMultiplier, Int64) {
+    using Number = int64_t;
+    constexpr Number a = 0x1fffffffffffffffll;
+    constexpr Number b = 2;
+    constexpr Number expected = 0x3ffffffffffffffell;
+    EXPECT_EQ(expected, MulInt64(a, b));
+    EXPECT_EQ(-expected, MulInt64(-a, b));
+    EXPECT_EQ(-expected, MulInt64(a, -b));
+    EXPECT_EQ(expected, MulInt64(-a, -b));
+}
+
+TEST_F(TestMultiplier, Uint64) {
+    using Number = uint64_t;
+    constexpr Number a = 0xfffffffffffffffull;
+    constexpr Number b = 16ull;
+    constexpr Number expected = 0xfffffffffffffff0ull;
+    EXPECT_EQ(expected, MulUint64(a, b));
+}
+
 class TestMyDivider : public ::testing::Test{};
 
 TEST_F(TestMyDivider, Int8) {
