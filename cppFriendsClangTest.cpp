@@ -286,6 +286,128 @@ TEST_F(TestInferVariadicTemplate, All) {
 #endif
 }
 
+class TestMyDivider : public ::testing::Test{};
+
+TEST_F(TestMyDivider, Int8) {
+    using Number = int8_t;
+    constexpr Number dividend = 13;
+    constexpr Number divider = 3;
+    constexpr Number expectedQuo = 4;
+    constexpr Number expectedRem = 1;
+    EXPECT_EQ(expectedQuo, DivInt8(dividend, divider));
+
+    const auto actual = DivRemInt8(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+
+    const auto actualNegative = DivRemInt8(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualNegative.first);
+    EXPECT_EQ(-expectedRem, actualNegative.second);
+}
+
+TEST_F(TestMyDivider, Uint8) {
+    using Number = uint8_t;
+    constexpr Number dividend = 133;
+    constexpr Number divider = 33;
+    constexpr Number expectedQuo = 4;
+    constexpr Number expectedRem = 1;
+    EXPECT_EQ(expectedQuo, DivUint8(dividend, divider));
+
+    const auto actual = DivRemUint8(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+}
+
+TEST_F(TestMyDivider, Int16) {
+    using Number = int16_t;
+    constexpr Number dividend = 23333;
+    constexpr Number divider = 7;
+    constexpr Number expectedQuo = 3333;
+    constexpr Number expectedRem = 2;
+    EXPECT_EQ(expectedQuo, DivInt16(dividend, divider));
+
+    const auto actual = DivRemInt16(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+
+    const auto actualNegative = DivRemInt16(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualNegative.first);
+    EXPECT_EQ(-expectedRem, actualNegative.second);
+}
+
+TEST_F(TestMyDivider, Uint16) {
+    using Number = uint16_t;
+    constexpr Number dividend = 53333;
+    constexpr Number divider = 17;
+    constexpr Number expectedQuo = 3137;
+    constexpr Number expectedRem = 4;
+    EXPECT_EQ(expectedQuo, DivUint16(dividend, divider));
+
+    const auto actual = DivRemUint16(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+}
+
+TEST_F(TestMyDivider, Int32) {
+    using Number = int32_t;
+    constexpr Number dividend = 1333333333;
+    constexpr Number divider = 19;
+    constexpr Number expectedQuo = 70175438;
+    constexpr Number expectedRem = 11;
+    EXPECT_EQ(expectedQuo, DivInt32(dividend, divider));
+
+    const auto actual = DivRemInt32(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+
+    const auto actualNegative = DivRemInt32(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualNegative.first);
+    EXPECT_EQ(-expectedRem, actualNegative.second);
+}
+
+TEST_F(TestMyDivider, Uint32) {
+    using Number = uint32_t;
+    constexpr Number dividend = 3333333333u;
+    constexpr Number divider = 19u;
+    constexpr Number expectedQuo = 175438596u;
+    constexpr Number expectedRem = 9u;
+    EXPECT_EQ(expectedQuo, DivUint32(dividend, divider));
+
+    const auto actual = DivRemUint32(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+}
+
+TEST_F(TestMyDivider, Int64) {
+    using Number = int64_t;
+    constexpr Number dividend = 8070450532247928832ll;
+    constexpr Number divider = 23ll;
+    constexpr Number expectedQuo = 350889153575996905ll;
+    constexpr Number expectedRem = 17ll;
+    EXPECT_EQ(expectedQuo, DivInt64(dividend, divider));
+
+    const auto actual = DivRemInt64(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+
+    const auto actualNegative = DivRemInt64(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualNegative.first);
+    EXPECT_EQ(-expectedRem, actualNegative.second);
+}
+
+TEST_F(TestMyDivider, Uint64) {
+    using Number = uint64_t;
+    constexpr Number dividend = 0xf0000000000000ffull;
+    constexpr Number divider = 256ull;
+    constexpr Number expectedQuo = 0xf0000000000000ull;
+    constexpr Number expectedRem = 255ull;
+    EXPECT_EQ(expectedQuo, DivUint64(dividend, divider));
+
+    const auto actual = DivRemUint64(dividend, divider);
+    EXPECT_EQ(expectedQuo, actual.first);
+    EXPECT_EQ(expectedRem, actual.second);
+}
+
 /*
 Local Variables:
 mode: c++

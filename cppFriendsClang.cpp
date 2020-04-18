@@ -201,6 +201,100 @@ namespace CheckWarning {
     }
 }
 
+namespace {
+    template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, std::nullptr_t> = nullptr>
+    class MyDivider {
+    public:
+        using MyInt = typename std::make_signed<T>::type;
+        using MyUint = typename std::make_unsigned<T>::type;
+        static_assert(sizeof(T) == sizeof(MyInt), "Must keep its bit width");
+        static_assert(sizeof(T) == sizeof(MyUint), "Must keep its bit width");
+        static_assert(std::is_unsigned<MyUint>::value, "Must be unsigned");
+        static_assert(std::is_signed<MyInt>::value, "Must be signed");
+
+        static MyInt DivInt(MyInt dividend, MyInt divider) {
+            return dividend / divider;
+        }
+
+        static MyUint DivUint(MyUint dividend, MyUint divider) {
+            return dividend / divider;
+        }
+
+        static std::pair<MyInt, MyInt> DivRemInt(MyInt dividend, MyInt divider) {
+            return std::pair<MyInt, MyInt> {dividend / divider, dividend % divider};
+        }
+
+        static std::pair<MyUint, MyUint> DivRemUint(MyUint dividend, MyUint divider) {
+            return std::pair<MyUint, MyUint> {dividend / divider, dividend % divider};
+        }
+    };
+}
+
+int8_t DivInt8(int8_t dividend, int8_t divider) {
+    return MyDivider<int8_t>::DivInt(dividend, divider);
+}
+
+uint8_t DivUint8(uint8_t dividend, uint8_t divider) {
+    return MyDivider<uint8_t>::DivUint(dividend, divider);
+}
+
+std::pair<int8_t, int8_t> DivRemInt8(int8_t dividend, int8_t divider) {
+    return MyDivider<int8_t>::DivRemInt(dividend, divider);
+}
+
+std::pair<uint8_t, uint8_t> DivRemUint8(uint8_t dividend, uint8_t divider) {
+    return MyDivider<uint8_t>::DivRemUint(dividend, divider);
+}
+
+int16_t DivInt16(int16_t dividend, int16_t divider) {
+    return MyDivider<int16_t>::DivInt(dividend, divider);
+}
+
+uint16_t DivUint16(uint16_t dividend, uint16_t divider) {
+    return MyDivider<uint16_t>::DivUint(dividend, divider);
+}
+
+std::pair<int16_t, int16_t> DivRemInt16(int16_t dividend, int16_t divider) {
+    return MyDivider<int16_t>::DivRemInt(dividend, divider);
+}
+
+std::pair<uint16_t, uint16_t> DivRemUint16(uint16_t dividend, uint16_t divider) {
+    return MyDivider<uint16_t>::DivRemUint(dividend, divider);
+}
+
+int32_t DivInt32(int32_t dividend, int32_t divider) {
+    return MyDivider<int32_t>::DivInt(dividend, divider);
+}
+
+uint32_t DivUint32(uint32_t dividend, uint32_t divider) {
+    return MyDivider<uint32_t>::DivUint(dividend, divider);
+}
+
+std::pair<int32_t, int32_t> DivRemInt32(int32_t dividend, int32_t divider) {
+    return MyDivider<int32_t>::DivRemInt(dividend, divider);
+}
+
+std::pair<uint32_t, uint32_t> DivRemUint32(uint32_t dividend, uint32_t divider) {
+    return MyDivider<uint32_t>::DivRemUint(dividend, divider);
+}
+
+int64_t DivInt64(int64_t dividend, int64_t divider) {
+    return MyDivider<int64_t>::DivInt(dividend, divider);
+}
+
+uint64_t DivUint64(uint64_t dividend, uint64_t divider) {
+    return MyDivider<uint64_t>::DivUint(dividend, divider);
+}
+
+std::pair<int64_t, int64_t> DivRemInt64(int64_t dividend, int64_t divider) {
+    return MyDivider<int64_t>::DivRemInt(dividend, divider);
+}
+
+std::pair<uint64_t, uint64_t> DivRemUint64(uint64_t dividend, uint64_t divider) {
+    return MyDivider<uint64_t>::DivRemUint(dividend, divider);
+}
+
 /*
 Local Variables:
 mode: c++
