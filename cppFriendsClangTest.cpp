@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <boost/lexical_cast.hpp>
@@ -112,7 +113,7 @@ TEST_F(TestMacroExpansion, SingleStatement) {
     std::string log = message;
     log += "@";
     log += __PRETTY_FUNCTION__;
-    log += "in cppFriendsClangTest.cpp : 118";
+    log += "in cppFriendsClangTest.cpp : 119";
 
     bool cond = !out.tellp();
     if (cond) DEBUG_PRINT_COUT(out, message);
@@ -439,9 +440,17 @@ TEST_F(TestMyDivider, Int32) {
     EXPECT_EQ(expectedQuo, actual.first);
     EXPECT_EQ(expectedRem, actual.second);
 
+    const auto actualStd = std::div(dividend, divider);
+    EXPECT_EQ(expectedQuo, actualStd.quot);
+    EXPECT_EQ(expectedRem, actualStd.rem);
+
     const auto actualNegative = DivRemInt32(-dividend, divider);
     EXPECT_EQ(-expectedQuo, actualNegative.first);
     EXPECT_EQ(-expectedRem, actualNegative.second);
+
+    const auto actualStdNegative = std::div(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualStdNegative.quot);
+    EXPECT_EQ(-expectedRem, actualStdNegative.rem);
 }
 
 TEST_F(TestMyDivider, Uint32) {
@@ -469,9 +478,17 @@ TEST_F(TestMyDivider, Int64) {
     EXPECT_EQ(expectedQuo, actual.first);
     EXPECT_EQ(expectedRem, actual.second);
 
+    const auto actualStd = std::lldiv(dividend, divider);
+    EXPECT_EQ(expectedQuo, actualStd.quot);
+    EXPECT_EQ(expectedRem, actualStd.rem);
+
     const auto actualNegative = DivRemInt64(-dividend, divider);
     EXPECT_EQ(-expectedQuo, actualNegative.first);
     EXPECT_EQ(-expectedRem, actualNegative.second);
+
+    const auto actualStdNegative = std::lldiv(-dividend, divider);
+    EXPECT_EQ(-expectedQuo, actualStdNegative.quot);
+    EXPECT_EQ(-expectedRem, actualStdNegative.rem);
 }
 
 TEST_F(TestMyDivider, Uint64) {

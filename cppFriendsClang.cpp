@@ -210,8 +210,8 @@ namespace {
         using Uint = typename std::make_unsigned<T>::type;
         static_assert(sizeof(T) == sizeof(Int), "Must keep its bit width");
         static_assert(sizeof(T) == sizeof(Uint), "Must keep its bit width");
-        static_assert(std::is_unsigned<Uint>::value, "Must be unsigned");
         static_assert(std::is_signed<Int>::value, "Must be signed");
+        static_assert(std::is_unsigned<Uint>::value, "Must be unsigned");
 
         static Int MulInt(Int a, Int b) {
             return a * b;
