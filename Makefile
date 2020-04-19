@@ -10,9 +10,11 @@ GCC_CPP17_AVAILABLE=$(shell echo "$(GCC_VERSION_NUMBER) >= $(GCC_CPP17_VERSION)"
 ifeq ($(OS),Windows_NT)
 ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
 BUILD_ON_CYGWIN=yes
+HOME_MAKEFILE=$(shell cygpath $(HOME))
 
 else
 BUILD_ON_MINGW=yes
+HOME_MAKEFILE=$(HOME)
 ifeq (,$(findstring x86_64,$(shell gcc -dumpmachine)))
 BUILD_ON_MINGW32=yes
 CLANG_TARGET=-target i686-pc-windows-gnu
@@ -31,6 +33,8 @@ ISYSTEM_MINGW_CLANG_INCLUDE_DIRS = $(ISYSTEM_MINGW_INCLUDE_DIR) $(ISYSTEM_MINGW_
 # 必要であれば設定する
 BOOST_LIB_POSTFIX=
 endif
+
+HOME_MAKEFILE=$(HOME)
 endif
 
 # コンソール出力に色を付ける
@@ -38,7 +42,7 @@ ECHO_START="\e[104m
 ECHO_END=\e[0m"
 
 # Google Test / Google Mockがあるディレクトリ
-GTEST_GMOCK_TOP_DIR=$(HOME)/googletest
+GTEST_GMOCK_TOP_DIR=$(HOME_MAKEFILE)/googletest
 GTEST_TOP_DIR=$(GTEST_GMOCK_TOP_DIR)/googletest
 GMOCK_TOP_DIR=$(GTEST_GMOCK_TOP_DIR)/googlemock
 GTEST_GMOCK_INCLUDE=$(addprefix -isystem, $(GTEST_TOP_DIR)/include $(GTEST_TOP_DIR) $(GMOCK_TOP_DIR)/include $(GMOCK_TOP_DIR))

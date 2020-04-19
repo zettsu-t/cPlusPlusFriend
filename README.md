@@ -2,7 +2,7 @@
 
 ### 一通り実行する
 
-Cygwin 64bitのターミナルから、
+Cygwin 64bitのターミナルまたは、MinGWをコマンドプロンプトから、
 
 ```bash
 make
@@ -10,21 +10,24 @@ make
 
 を実行すると、一通りテストをビルドして実行します。最後はコンパイルエラーで終わりますが、これはコンパイルエラーを意図的に再現しているものです。
 
-当方の実行環境は以下の通りです。Google Test / Mockは$HOME直下にあると仮定していますので、それ以外の場合はMakefileを変更してください。AVX命令を使用することが前提ですので、サポートしていないプロセッサの場合は、Makefileの _CPPFLAGS_ARCH_ をコメントアウトしてください。
+当方の実行環境は以下の通りです。Google Test / Mockは$HOME直下にあると仮定していますので、それ以外の場合はMakefileを変更してください(C:\home\usernameから/cygdrive/c/home/usernameへの変換は、Makefile中で行います)。AVX命令を使用することが前提ですので、サポートしていないプロセッサの場合は、Makefileの _CPPFLAGS_ARCH_ をコメントアウトしてください。
 
-* Windows 10 Creators Update 64bit Edition
-* Cygwin 64bit version (2.10.0)
+* Windows 10 November 2019 Update (バージョン 1909、OSビルド 18363.778)
 * Google Test / Mock [(最新)](https://github.com/google/googletest)
-* Boost C++ Libraries (1.64.0)
-* gcc (6.4.0)
-* clang (5.0.1)
-* Ruby (2.3.6p384)
+
+|Tools|Cygwin 64-bit|MinGW-w64|
+|:------|:------|:------|
+|Base|3.1.4|MinGW Distro 17.1|
+|GCC (g++)|9.3.0|9.2.0|
+|LLVM (clang++)|8.0.1|9.0.1|
+|Boost C++ Libraries|1.66.0|1.71.0|
+|Ruby|2.6.4p104|2.7.0p0|
 
 RDTSC命令の下の桁に偏りがある、という判定は実行環境によっては失敗するようです。何回か試して失敗するようでしたら、閾値を期待値に寄せるか、諦めてコメントアウトしてください。
 
 ### MinGWで実行する
 
-[こちら](upgradeCompiler.md)にまとめました。Cygwinでは実行するが、MinGWでは実行しないテストがあります。コンパイラのバージョンによって動作が異なる件も記載しています。
+[こちら](upgradeCompiler.md)にまとめましたが、情報が古いです。Cygwinでは実行するが、MinGWでは実行しないテストがあります。コンパイラのバージョンによって動作が異なる件も記載しています。
 
 ## その他もろもろ
 
