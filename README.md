@@ -246,8 +246,9 @@ c0,ff,ee  sar bh,0xee
 * 再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3) (高橋康介 著/石田基広 監修/市川太祐, 高橋康介, 高柳慎一, 福島真太朗, 松浦健太郎 編, 2018/05, 共立出版)
 * Rクックブック 第2版 (J.D. Long, Paul Teetor 著/大橋真也 監訳/木下哲也 訳, 2020/01, オライリー・ジャパン)
 * [Rの公式マニュアル](https://cran.r-project.org/manuals.html)
-* [Advanced R by Hadley Wickham](https://adv-r.hadley.nz/)
 * [R for Data Science by Garrett Grolemund and Hadley Wickham](https://r4ds.had.co.nz/)
+* [Advanced R by Hadley Wickham](https://adv-r.hadley.nz/)
+* [R packages by Hadley Wickham](http://r-pkgs.had.co.nz/)
 
 ## ライセンス
 
