@@ -90,7 +90,7 @@ I get plenty of exercises - move, jump, spin, load, carry, and push in my assemb
 私の英語リスニング能力だと、英語を聞くときは集中力を全振りしないと聞き取れないです。つまり流れてきた言葉をなんとなく聞くと理解できないのです。それと、日本語の歌詞を聞きながらだと英文を読めない、ということはありませんか。
 バージョン3.2およびそれ以降と英語で表記するとき\n3.2 and later\n3.2 and newer\n3.2 and up\n3.2<=\n3.2+\nなどがありそうですが、先日、\nfrom version 3.2 onward\nという表現を見かけました。\nhttps://english.stackexchange.com/questions/112257/above-or-later-when-referencing-a-range-of-versions-of-software
 バージョン番号の比較、つまり 2.9.30 < 2.10.2 < 3.0.0 を、自分が推しているプログラミングでエレガントに実装する、というのを連休明けで社内で開いたら盛り上がるかもしれませんよ。正解の実装としては、Rだとnumeric_version()があります。
-GitHubの草は、ログイン(sign in)するとログインしたPCのlocal timeを基準に一日が決まるようですが、ログインしないとUTCが基準になります。つまり日本時間で午前9時前にpushすると、午前9時までは見えていない草を仕込むことができます。
+GitHubの草はUTC基準のようですね。日本時間で5月5日午前8時は、UTCでは5月4日です。GitHubに日本から午前8時にログイン(sign in)すると5月5日のマスができて"No contributions on May 5, 2020"になりますが、ログインしないと5月5日のマス自体がまだ見えないようです。
 NOPを何もしないこと、という意味ではもう使えないのです。今どきのCPUでは、NOPは命令をアラインメントするために使うのです。
 グラフと聞くと、点の集合とそれらを結ぶ枝の集合と思ってしまうので、円グラフとか棒グラフはチャート(pie char, bar chart)と呼んで欲しい気持ちになります。確かにbar graphでも英語としては正しいのですが...
 MinとMaxが双対だと感じるのは、最大10行のときの行数を min(n_lines, 10) で求めるときです。最大と言っておきながらminなのは不思議ではありませんか。
