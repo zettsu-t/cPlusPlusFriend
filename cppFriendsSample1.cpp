@@ -344,6 +344,51 @@ TEST_F(TestTypeId, SharedPtr) {
     EXPECT_EQ(4, pSub->GetValue());
 }
 
+// https://twitter.com/kuina_ch/status/1256547386958032896
+TEST_F(TestInheritingConstructors, IsSame) {
+    constexpr int arg = 5;
+    constexpr int expected = 10;
+    BaseDoubler instBase(arg);
+    DerivedDoubler instDerived(arg);
+    EXPECT_EQ(expected, instBase.Get());
+    EXPECT_EQ(expected, instDerived.Get());
+
+    static_assert(!std::is_same<BaseDoubler, DerivedDoubler>::value, "Failed");
+    static_assert(std::is_base_of<BaseDoubler, DerivedDoubler>::value, "Failed");
+    static_assert(!std::is_same<decltype(instBase), decltype(instDerived)>::value, "Failed");
+    static_assert(std::is_base_of<decltype(instBase), decltype(instDerived)>::value, "Failed");
+
+    const BaseDoubler constBase(arg);
+    const DerivedDoubler constDerived(arg);
+    EXPECT_EQ(expected, constBase.Get());
+    EXPECT_EQ(expected, constDerived.Get());
+    static_assert(std::is_base_of<decltype(instBase), decltype(constDerived)>::value, "Failed");
+    static_assert(std::is_base_of<decltype(constBase), decltype(instDerived)>::value, "Failed");
+
+    auto pBase = std::make_unique<BaseDoubler>(arg);
+    auto pDoubler = std::make_unique<DerivedDoubler>(arg);
+    auto pRawBase = pBase.get();
+    auto pRawDoubler = pDoubler.get();
+    static_assert(!std::is_same<decltype(pRawBase), decltype(pRawDoubler)>::value, "Failed");
+    static_assert(std::is_base_of<
+                  typename std::remove_pointer<decltype(pRawBase)>::type,
+                  typename std::remove_pointer<decltype(pRawDoubler)>::type>::value, "Failed");
+
+    // Upcast
+    const BaseDoubler* pConstBase = pRawDoubler;
+    const DerivedDoubler* pConstDoubler = pRawDoubler;
+    static_assert(!std::is_same<decltype(pConstDoubler), const BaseDoubler*>::value, "Failed");
+    static_assert(std::is_same<decltype(pConstDoubler), const DerivedDoubler*>::value, "Failed");
+    static_assert(!std::is_same<decltype(pConstDoubler), BaseDoubler*>::value, "Failed");
+    static_assert(!std::is_same<decltype(pConstDoubler), DerivedDoubler*>::value, "Failed");
+    static_assert(!std::is_same<typename std::remove_cv<decltype(pConstBase)>::type,
+                  BaseDoubler*>::value, "Failed");
+    static_assert(std::is_same<
+                  typename std::remove_cv<
+                  typename std::remove_pointer<decltype(pConstBase)>::type>::type,
+                  BaseDoubler>::value, "Failed");
+}
+
 namespace {
     struct StandardLayoutObject {
         uint64_t memberA_;
