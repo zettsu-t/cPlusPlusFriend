@@ -65,7 +65,7 @@ mat_predict <- predict(caret::dummyVars(~.,df), df)
 mat_predict %>% kable() %>% kable_styling()
 ```
 
-以下でcache=TRUEにすると、メモリ8GBではlazyLoadDBinsertVariableできないというエラーが発生する。
+以下のcode chunkをcache=TRUEにしなおかつ `df_large <- NULL, mat_predict_large <- NULL` でメモリを解放しないと、PCのDRAMが8GBだとlazyLoadDBinsertVariableできないというエラーが発生する。
 
 ```{r caret_large, cache=FALSE}
 n_cols <- 10000
@@ -78,8 +78,13 @@ df_large <- purrr::map(1:n_cols, function(x) {
 mat_predict_large <- predict(caret::dummyVars(~.,df_large), df_large)
 print(pryr::object_size(df_large))
 print(pryr::object_size(mat_predict_large))
-df_large <- NULL
-mat_predict_large <- NULL
+```
+
+n_cols <- 20000にすると、プロテクションスタックがあふれる。
+
+```{r caret_large_clean, echo=FALSE}
+# df_large <- NULL
+# mat_predict_large <- NULL
 ```
 
 ### dummies::dummy.data.frame
