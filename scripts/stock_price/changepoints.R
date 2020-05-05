@@ -91,6 +91,8 @@ draw_change_points <- function(df, beta, margin, n_betas, n_diffs, up_only, out_
     font_name <- 'Tahoma'
     png(filename=out_filename, width=1600, height=800)
     g <- ggplot()
+    g <- g + geom_line(data=df, aes(x=date, y=close), lwd=2, color='gray50')
+    g <- g + geom_line(data=df, aes(x=date, y=beta), lwd=1, color='black')
     g <- g + geom_vline(xintercept=df$date[diffs], linetype='dotted', color='orchid', size=1, alpha=0.7)
     g <- g + geom_text(data=df[diffs,], aes(x=date, label=date,
                                             y=log10(((2 + ceiling(1:NROW(diffs))) %% 9) * 5 + 32)),
@@ -108,8 +110,6 @@ draw_change_points <- function(df, beta, margin, n_betas, n_diffs, up_only, out_
                            colour="royalblue4", angle=30, vjust = -1, size=4)
     }
 
-    g <- g + geom_line(data=df, aes(x=date, y=close), lwd=2, color='gray50')
-    g <- g + geom_line(data=df, aes(x=date, y=beta), lwd=1, color='black')
     g <- g + labs(title=g_title, x='Year', y='log10 (VIX value : daily close)')
     g <- g + theme(text=element_text(family=font_name),
                    legend.position="top",
