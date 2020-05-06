@@ -23,6 +23,9 @@ popcountr <- function(x) {
     ##  This does not work.
     ##  .Call('popcountr_impl', x)
     count_set <- popcountr_(x)
+
+    stopifnot(length(na_set) == length(x))
+    stopifnot(length(na_set) == length(count_set))
     count_set[na_set] <- NA
     count_set
 }

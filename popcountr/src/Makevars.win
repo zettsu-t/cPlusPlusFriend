@@ -1,0 +1,1 @@
+PKG_CPPFLAGS=-mtune=native -march=native
