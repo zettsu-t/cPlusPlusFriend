@@ -1,7 +1,6 @@
 data {
   int<lower=1> K;
   int<lower=1> N;
-  int CAT[N];
   vector[N] Y;
 }
 
@@ -11,8 +10,14 @@ parameters {
 }
 
 model {
+  vector[K] lp;
+  mu ~ normal(1, 1);
   sd_set ~ exponential(1);
+
   for(i in 1:N) {
-    target += normal_lpdf(Y[i] | mu[CAT[i]], sd_set[CAT[i]]);
+    for(j in 1:K) {
+      lp[j] = normal_lpdf(Y[i] | mu[j], sd_set[j]);
+    }
+    target += log_sum_exp(lp);
   }
 }

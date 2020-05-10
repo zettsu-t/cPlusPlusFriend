@@ -26,6 +26,7 @@ library(rstan)
 library(tibble)
 library(purrr)
 library(purrrlyr)
+library(Rfast)
 ```
 
 Stanの結果を埋め込む。まずデータを用意する。混合正規分布にしよう。
@@ -34,16 +35,32 @@ Stanの結果を埋め込む。まずデータを用意する。混合正規分�
 mus <- c(0.0, 1.0, 1.5)
 sds <- c(0.35, 0.45, 0.2)
 ns <- c(100, 200, 150)
+mu_sd_given <- tibble(mu=mus, sd=sds, category=seq(NROW(mus)))
 ys <- unlist(purrr::pmap(list(ns, mus, sds), rnorm))
 ys <- ys + rnorm(NROW(ys), 0, 0.05)
 categories <- as.factor(rep(seq_len(NROW(ns)), ns))
 
 df <- tibble(x=ys, category=categories)
 color_set <- c('navy', 'gray50', 'brown')
-g <- ggplot(df, aes(x=x, color=category, fill=category, alpha=category))
-g <- g + geom_histogram(position = 'identity', alpha=0.75)
+
+g <- ggplot(df)
+g <- g + geom_histogram(aes(x=x, y=..density.., color=category, fill=category, alpha=category),
+                        position='identity', alpha=0.75)
 g <- g + scale_color_manual(values=color_set)
 g <- g + scale_fill_manual(values=color_set)
+purrrlyr::by_row(mu_sd_given, function(row_data) {
+    g <<- g + stat_function(fun=dnorm, args=list(mean=row_data$mu, sd=row_data$sd),
+                            color=color_set[row_data$category], size=2)
+    invisible(0)
+})
+plot(g)
+```
+
+3種類の正規分布だとは知っているが、各標本が3種類のどこから来たかは分からない。
+
+```{r draw_input}
+g <- ggplot(df, aes(x=x))
+g <- g + geom_histogram(color='black', fill='gray30')
 plot(g)
 ```
 
@@ -51,10 +68,9 @@ Stanの変数を用意する。
 
 ```{r prepare_inline_stan}
 ## factorはstanに渡せない
-input_data <- list(K=NROW(ns), N=NROW(ys), CAT=as.integer(categories), Y=ys)
+input_data <- list(K=NROW(ns), N=NROW(ys), Y=ys)
 stan_K <- input_data$K
 stan_N <- input_data$N
-stan_CAT <- input_data$CAT
 stan_Y <- input_data$Y
 ```
 
@@ -64,7 +80,6 @@ StanのコードをR Markdownに埋め込むことができる。
 data {
   int<lower=1> stan_K;
   int<lower=1> stan_N;
-  int stan_CAT[stan_N];
   vector[stan_N] stan_Y;
 }
 
@@ -74,9 +89,15 @@ parameters {
 }
 
 model {
+  vector[stan_K] lp;
+  stan_mu ~ normal(1, 1);
   stan_sd_set ~ exponential(1);
+
   for(i in 1:stan_N) {
-    target += normal_lpdf(stan_Y[i] | stan_mu[stan_CAT[i]], stan_sd_set[stan_CAT[i]]);
+    for(j in 1:stan_K) {
+      lp[j] = normal_lpdf(stan_Y[i] | stan_mu[j], stan_sd_set[j]);
+    }
+    target += log_sum_exp(lp);
   }
 }
 ```
@@ -97,43 +118,55 @@ draw_stan_result <- function(model) {
     plot(ggs_geweke(s))
 }
 
-draw_stan_predict <- function(model, df, mu_predicted, sd_predicted) {
+draw_stan_predict <- function(model, df, mu_name, sd_name) {
     result <- extract(model)
-    df_result <- tibble(mu=mu_predicted, sd=sd_predicted, col=color_set)
-    g <- ggplot(df, aes(x=x, color=category, fill=category, alpha=category))
-    g <- g + geom_histogram(aes(y=..density..), position='identity', alpha=0.75)
+    mu_predicted <- colMeans(result[[mu_name]])
+    sd_predicted <- colMeans(result[[sd_name]])
+    mu_sd_predicted <- tibble(mu_predicted=mu_predicted, sd_predicted=sd_predicted, category=seq(NROW(mu_predicted)))
+
+    mat <- as.matrix(purrrlyr::by_row(mu_sd_predicted, function(row_data) {
+        dnorm(x=df$x, mean=row_data$mu_predicted, sd=row_data$sd_predicted)
+    })$.out %>% bind_cols())
+    max_indexes <- rowMaxs(mat)
+    df$category_predicted <- as.factor(max_indexes)
+    df$prob_predicted <- mat[cbind(seq_along(max_indexes), max_indexes)] / rowSums(mat)
+
+    g <- ggplot(df)
+    g <- g + geom_histogram(aes(x=x, y=..density.., color=category, fill=category, alpha=category),
+                            position='identity', alpha=0.75)
     g <- g + scale_color_manual(values=color_set)
     g <- g + scale_fill_manual(values=color_set)
-    purrrlyr::by_row(df_result, function(row_data) {
-        g <<- g + stat_function(fun=dnorm, args=list(mean=row_data$mu, sd=row_data$sd), color=row_data$col, size=2)
+    purrrlyr::by_row(mu_sd_predicted, function(row_data) {
+        g <<- g + stat_function(fun=dnorm, args=list(mean=row_data$mu_predicted, sd=row_data$sd_predicted),
+                                color=color_set[row_data$category], size=2)
         invisible(0)
     })
+    g <- g + geom_point(aes(x=x, y=prob_predicted, color=category), alpha=0.5, size=1)
     plot(g)
 }
 ```
 
-埋め込んだStanのコードを実行する。
-
-```{r fit_inline_stan, cache=FALSE, results='hide'}
+```{r fit_inline_stan, cache=TRUE, results='hide'}
 fit_inline_stan <- rstan::sampling(inline_stan)
 ```
 
 ```{r draw_inline_stan, cache=FALSE}
 draw_stan_result(fit_inline_stan)
-result <- extract(fit_inline_stan)
-draw_stan_predict(model=fit_inline_stan, df=df,
-                  mu_predicted=colMeans(result$stan_mu), sd_predicted=colMeans(result$stan_sd_set))
+```
+
+埋め込んだStanのコードを実行する。実線は推定した分布の確率密度である。点線はそれぞれのサンプルについて、3種類の分布に属する確率(dnorm)の合計に対して、確率が最も高い分布の確率が占める割合である。点の色は標本が真に属する種類の分布を示す。分布は重なっているのできれいに分かれない。
+
+```{r draw_inline_predict, cache=FALSE}
+draw_stan_predict(model=fit_inline_stan, df=df, mu_name='stan_mu', sd_name='stan_sd_set')
 ```
 
 もちろん別ファイルにあるStanのコードを実行することもできる。
 
-```{r fit_offline_stan, cache=FALSE, results='hide'}
-fit_offline_stan <- stan(file='offline.stan', data=input_data, iter=1000, warmup=500, chains=4)
+```{r fit_offline_stan, cache=TRUE, results='hide'}
+fit_offline_stan <- stan(file='offline.stan', data=input_data, iter=5000, warmup=2500, chains=4)
 ```
 
 ```{r draw_offline_stan, cache=FALSE}
 draw_stan_result(fit_offline_stan)
-result <- extract(fit_offline_stan)
-draw_stan_predict(model=fit_offline_stan, df=df,
-                  mu_predicted=colMeans(result$mu), sd_predicted=colMeans(result$sd_set))
+draw_stan_predict(model=fit_offline_stan, df=df, mu_name='mu', sd_name='sd_set')
 ```
