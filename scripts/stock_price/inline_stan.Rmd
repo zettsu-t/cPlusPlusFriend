@@ -1,0 +1,139 @@
+---
+title: 'Stanの結果を埋め込む'
+author: 'プログラマたんbot'
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    toc: false
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r load, include=FALSE}
+library(dplyr)
+library(ggmcmc)
+library(ggplot2)
+library(rstan)
+library(tibble)
+library(purrr)
+library(purrrlyr)
+```
+
+Stanの結果を埋め込む。まずデータを用意する。混合正規分布にしよう。
+
+```{r prepare}
+mus <- c(0.0, 1.0, 1.5)
+sds <- c(0.35, 0.45, 0.2)
+ns <- c(100, 200, 150)
+ys <- unlist(purrr::pmap(list(ns, mus, sds), rnorm))
+ys <- ys + rnorm(NROW(ys), 0, 0.05)
+categories <- as.factor(rep(seq_len(NROW(ns)), ns))
+
+df <- tibble(x=ys, category=categories)
+color_set <- c('navy', 'gray50', 'brown')
+g <- ggplot(df, aes(x=x, color=category, fill=category, alpha=category))
+g <- g + geom_histogram(position = 'identity', alpha=0.75)
+g <- g + scale_color_manual(values=color_set)
+g <- g + scale_fill_manual(values=color_set)
+plot(g)
+```
+
+Stanの変数を用意する。
+
+```{r prepare_inline_stan}
+## factorはstanに渡せない
+input_data <- list(K=NROW(ns), N=NROW(ys), CAT=as.integer(categories), Y=ys)
+stan_K <- input_data$K
+stan_N <- input_data$N
+stan_CAT <- input_data$CAT
+stan_Y <- input_data$Y
+```
+
+StanのコードをR Markdownに埋め込むことができる。
+
+```{stan, output.var='inline_stan'}
+data {
+  int<lower=1> stan_K;
+  int<lower=1> stan_N;
+  int stan_CAT[stan_N];
+  vector[stan_N] stan_Y;
+}
+
+parameters {
+  ordered[stan_K] stan_mu;
+  real<lower=0> stan_sd_set[stan_K];
+}
+
+model {
+  stan_sd_set ~ exponential(1);
+  for(i in 1:stan_N) {
+    target += normal_lpdf(stan_Y[i] | stan_mu[stan_CAT[i]], stan_sd_set[stan_CAT[i]]);
+  }
+}
+```
+
+```{r draw_stan_result, echo=FALSE, cache=FALSE}
+## Based on
+## https://cran.r-project.org/web/packages/ggmcmc/vignettes/using_ggmcmc.html
+draw_stan_result <- function(model) {
+    s <- ggs(model)
+    plot(ggs_Rhat(s))
+    plot(ggs_histogram(s))
+    plot(ggs_density(s))
+    plot(ggs_traceplot(s))
+    plot(ggs_running(s))
+    plot(ggs_compare_partial(s))
+    plot(ggs_autocorrelation(s))
+    plot(ggs_crosscorrelation(s))
+    plot(ggs_geweke(s))
+}
+
+draw_stan_predict <- function(model, df, mu_predicted, sd_predicted) {
+    result <- extract(model)
+    df_result <- tibble(mu=mu_predicted, sd=sd_predicted, col=color_set)
+    g <- ggplot(df, aes(x=x, color=category, fill=category, alpha=category))
+    g <- g + geom_histogram(aes(y=..density..), position='identity', alpha=0.75)
+    g <- g + scale_color_manual(values=color_set)
+    g <- g + scale_fill_manual(values=color_set)
+    purrrlyr::by_row(df_result, function(row_data) {
+        g <<- g + stat_function(fun=dnorm, args=list(mean=row_data$mu, sd=row_data$sd), color=row_data$col, size=2)
+        invisible(0)
+    })
+    plot(g)
+}
+```
+
+埋め込んだStanのコードを実行する。
+
+```{r fit_inline_stan, cache=FALSE, results='hide'}
+fit_inline_stan <- rstan::sampling(inline_stan)
+```
+
+```{r draw_inline_stan, cache=FALSE}
+draw_stan_result(fit_inline_stan)
+result <- extract(fit_inline_stan)
+draw_stan_predict(model=fit_inline_stan, df=df,
+                  mu_predicted=colMeans(result$stan_mu), sd_predicted=colMeans(result$stan_sd_set))
+```
+
+もちろん別ファイルにあるStanのコードを実行することもできる。
+
+```{r fit_offline_stan, cache=FALSE, results='hide'}
+fit_offline_stan <- stan(file='offline.stan', data=input_data, iter=1000, warmup=500, chains=4)
+```
+
+```{r draw_offline_stan, cache=FALSE}
+draw_stan_result(fit_offline_stan)
+result <- extract(fit_offline_stan)
+draw_stan_predict(model=fit_offline_stan, df=df,
+                  mu_predicted=colMeans(result$mu), sd_predicted=colMeans(result$sd_set))
+```
