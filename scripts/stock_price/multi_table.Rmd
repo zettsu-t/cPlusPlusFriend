@@ -133,3 +133,50 @@ catをprintにすると、テーブルを描くことはできないし、PDF化
 ```{r print and_make_table, eval=FALSE, echo=TRUE, results='asis'}
 print(make_table(df))
 ```
+
+上記と話題が変わるが、geom_boxplotで箱ひげ図を描くときに、色を付けたいことがある。このときNAだけで何も描かれない箱の色は指定できない。つまりNAだけのカテゴリを除いて色を指定する必要がある。
+
+```{r draw_boxplot, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+## NAだけのfactorを追加する
+add_na_category <- function(df) {
+    xs_new <- c(xs, NA)
+    ## NAなfactorは途中に入れる
+    na_factor <- 'none'
+    fs <- mu_to_factor(sort(unique(mus)))
+    fs <- c(head(fs, 1), na_factor, tail(fs, -1))
+    categories_new <- forcats::fct_relevel(c(mu_to_factor(mus), na_factor), fs)
+    tibble(index=1:NROW(xs_new), value=xs_new, category=categories_new)
+}
+
+draw_boxplot <- function(df) {
+    g <- ggplot(df, aes(x=category, y=value, color=category, fill=category))
+    g <- g + geom_boxplot()
+    g <- g + scale_color_manual(values=c('gray30', 'royalblue3', 'orange3'))
+    g <- g + scale_fill_manual(values=c('gray90', 'azure', 'ivory'))
+    g <- g + theme_bw()
+    g <- g + theme(legend.position='none')
+    plot(g)
+}
+
+df_new <- add_na_category(df)
+draw_boxplot(df_new)
+```
+
+```{r png_boxplot, include=FALSE, results='hide', message=FALSE, warning=FALSE}
+png_boxplot <- function(df, png_filename) {
+    png(filename=png_filename, width=400, height=225)
+    g <- ggplot(df, aes(x=category, y=value, color=category, fill=category))
+    g <- g + geom_boxplot()
+    g <- g + scale_color_manual(values=c('gray30', 'royalblue3', 'orange3'))
+    g <- g + scale_fill_manual(values=c('gray90', 'azure', 'ivory'))
+    g <- g + theme_bw()
+    g <- g + theme(legend.position='none',
+                   axis.text.x=element_text(size=16),
+                   axis.text.y=element_text(size=16),
+                   axis.title.x=element_text(size=16),
+                   axis.title.y=element_text(size=16))
+    plot(g)
+    dev.off()
+}
+png_boxplot(df=df_new, png_filename='boxplot.png')
+```
