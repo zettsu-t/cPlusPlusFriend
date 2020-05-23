@@ -1,0 +1,135 @@
+---
+title: "R Markdownでテーブルを複数埋め込む"
+author: "プログラマたんbot"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: false
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r load, include=FALSE}
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(purrr)
+library(tibble)
+library(kableExtra)
+```
+
+関数の中でテーブルを作って、このR Markdownから作った文書に埋め込みたい。
+
+例えばこんな元データをランダムに作る。三つの正規分布から標本を作る。
+
+```{r prepare, echo=TRUE}
+n <- 200
+k <- 3
+mus <- sample(x=(1:k)-(1 + (k %/% 2)), size=n*k, replace=TRUE)
+xs <- rnorm(n=NROW(mus), mean=mus, sd=1+abs(mus))
+
+mu_to_factor <- function(x) sprintf('mu%+d', x)
+categories <- forcats::fct_relevel(mu_to_factor(mus), mu_to_factor(sort(unique(mus))))
+df_values <- tibble(index=1:NROW(xs), value=xs, category=categories)
+
+name_set <- c('min', 'max', 'mean', 'sd')
+df_base <- tibble(category=categories, value=xs)
+df <- dplyr::inner_join(df_base %>%
+        dplyr::group_by(category) %>%
+        dplyr::count() %>%
+        dplyr::ungroup(),
+    df_base %>%
+        dplyr::group_by(category) %>%
+        dplyr::summarise_each(name_set) %>%
+        dplyr::ungroup(),
+    by='category')
+```
+
+標本を図にするとこうなる。
+
+```{r draw df, echo=FALSE}
+g <- ggplot(df_values, aes(x=index, y=value, color=category, shape=category))
+g <- g + geom_point()
+g <- g + scale_shape_manual(values=c(16,3,21))
+plot(g)
+```
+
+標本の元となる三つの分布ごとに、基本統計量を求める。
+
+```{r print df, echo=TRUE}
+df %>% kable() %>% kable_styling()
+```
+
+kable()を関数の中で実行してグローバルな返り値にすることもできる。
+
+```{r draw_table, echo=TRUE}
+draw_table <- function(df) {
+    df %>% kable() %>% kable_styling()
+}
+draw_table(df)
+```
+
+しかし返り値でなければ表にならない。
+
+```{r draw_table_nrow, echo=TRUE}
+draw_table_nrow <- function(df) {
+    df %>% kable() %>% kable_styling()
+    NCOL(df)
+}
+draw_table_nrow(df)
+```
+
+では複数の表を表示したければどうすればよいのだろう。以下のコードでは何も表示されない。
+
+```{r drawing_tables_fails, echo=TRUE}
+for(i in 2:NCOL(df)) {
+    df[,c(1,i)] %>% kable() %>% kable_styling()
+}
+```
+
+以下のコードではHTMLのテーブルタグがそのまま表示されて残念なことになる。
+
+```{r drawing_tables_asis, eval=FALSE, echo=TRUE}
+for(i in 2:NCOL(df)) {
+    print(df[,c(1,i)] %>% kable() %>% kable_styling())
+}
+```
+
+[こちらの通り](https://stackoverflow.com/questions/39650166/r-why-kable-doesnt-print-inside-a-for-loop)、code chunkにresults='asis'と書くと、結果をHTMLタグとして埋め込むことができる。PDF出力もできる。
+
+```{r drawing_tables_global, echo=TRUE, results='asis'}
+invisible(purrr::map(2:NCOL(df), function(i) {
+    print(df[,c(1,i)] %>% kable() %>% kable_styling())
+    cat('\n')
+    1
+}))
+```
+
+テーブルを関数で作って、catで表示することもできる。このとき、表を作る関数ではなく、表を表示するcode chunkにresults='asis'と書く
+
+```{r make_table, eval=TRUE, echo=TRUE}
+make_table <- function(df) {
+    paste0(purrr::map_chr(2:NCOL(df), function(i) {
+        paste0(df[,c(1,i)] %>% kable() %>% kable_styling(), '\n')
+    }), collapse='\n')
+}
+```
+
+```{r cat and_make_table, eval=TRUE, echo=TRUE, results='asis'}
+cat(make_table(df))
+```
+
+catをprintにすると、テーブルを描くことはできないし、PDF化に失敗する。
+
+```{r print and_make_table, eval=FALSE, echo=TRUE, results='asis'}
+print(make_table(df))
+```
