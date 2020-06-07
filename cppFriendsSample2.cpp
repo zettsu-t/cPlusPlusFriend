@@ -1962,6 +1962,18 @@ TEST_F(TestOddEven, All) {
 
 class TestBoostStat : public ::testing::Test {};
 
+TEST_F(TestBoostStat, Sum) {
+    using namespace boost::accumulators;
+    using T = int;
+    accumulator_set<T, stats<tag::sum>> acc;
+
+    acc(1);
+    acc(2);
+    acc(4);
+    const T expected = 7;
+    EXPECT_EQ(expected, sum(acc));
+}
+
 TEST_F(TestBoostStat, MeanVar) {
     using namespace boost::accumulators;
     using T = double;
