@@ -1,6 +1,7 @@
 // やめるのだフェネックで学ぶC++の実証コード
 #define  __STDC_LIMIT_MACROS
 #include <cstdint>
+#include <cstring>
 #include <climits>
 #include <atomic>
 #include <cmath>
@@ -1911,6 +1912,132 @@ TEST_F(TestShortCircuit, NullPointer) {
     }
 
     EXPECT_EQ(3, actual);
+}
+
+namespace {
+    std::ostringstream g_actual_message;
+
+    class TooBigObject {
+        class MemPool {
+        public:
+            using Pool = std::vector<uint8_t>;
+            MemPool(int serial, size_t s) :
+                serial_(serial), p_(new Pool(s, 0)) {}
+
+            virtual ~MemPool(void) {
+                g_actual_message << "MemPool " << serial_ << " Released!";
+            }
+        private:
+            int serial_ {0};
+            std::unique_ptr<Pool> p_;
+        };
+    public:
+        TooBigObject(size_t s) : p1_(1, 0x4), p2_(2, s) {}
+        virtual ~TooBigObject(void) = default;
+    private:
+        MemPool p1_;
+        MemPool p2_;
+    };
+
+    void MakeTooBigObject(void) {
+        TooBigObject small(0x4);
+        TooBigObject big(0x1000000000000000ull);
+    }
+
+    using MonthSetType = short;
+    enum class MonthSet : MonthSetType {
+        Jan = 1,
+        Dec = 12,
+    };
+    static_assert(sizeof(MonthSet::Dec) == sizeof(MonthSetType));
+    static_assert(sizeof(std::uintptr_t) > sizeof(int));
+
+    // 元記事の要所だけ再現
+    // http://www.gotw.ca/gotw/005.htm
+    class BaseWithValue {
+    public:
+        BaseWithValue(long long int value) : value_(value) {}
+        virtual ~BaseWithValue(void) = default;
+
+        virtual void Say(int a=1) {
+            g_actual_message << a << "b";
+        }
+    private:
+        long long int value_ {0};
+    };
+
+    class DerivedWithValue : public BaseWithValue {
+    public:
+        DerivedWithValue(long long int value) : BaseWithValue(value) {}
+        virtual ~DerivedWithValue(void) = default;
+
+        virtual void Say(int a=2) override {
+            g_actual_message << a << "d";
+        }
+    };
+
+    using Array4 = int[4];
+    int Sum4(Array4& a) {
+        int s = 0;
+        for(auto i = std::begin(a); i != std::end(a); ++i) {
+            s += *i;
+        }
+        return s;
+    }
+}
+
+class TestCppSpecifications : public ::testing::Test {
+    virtual void SetUp() override {
+        clear();
+    }
+
+    virtual void TearDown() override {
+        clear();
+    }
+
+    void clear() {
+        std::ostringstream oss;
+        std::swap(oss, g_actual_message);
+    }
+};
+
+TEST_F(TestCppSpecifications, BadAlloc) {
+    ASSERT_THROW(MakeTooBigObject(), std::bad_alloc);
+    EXPECT_EQ("MemPool 1 Released!MemPool 2 Released!MemPool 1 Released!", g_actual_message.str());
+}
+
+TEST_F(TestCppSpecifications, DefaultParameters) {
+    BaseWithValue base(1);
+    DerivedWithValue derived(2);
+
+    base.Say();
+    derived.Say();
+    base.Say(3);
+    derived.Say(4);
+
+    BaseWithValue& refBase = derived;
+    refBase.Say();
+    EXPECT_EQ("1b2d3b4d1d", g_actual_message.str());
+}
+
+TEST_F(TestCppSpecifications, Compare) {
+    BaseWithValue base1(1);
+    BaseWithValue base2(2);
+    DerivedWithValue derived1(1);
+    DerivedWithValue derived2(2);
+
+    EXPECT_FALSE(std::memcmp(&base1, &base1, sizeof(base1)));
+    EXPECT_FALSE(std::memcmp(&derived1, &derived1, sizeof(base1)));
+    EXPECT_FALSE(std::memcmp(&derived1, &derived1, sizeof(derived1)));
+
+    EXPECT_TRUE(std::memcmp(&base1, &base2, sizeof(base1)));
+    EXPECT_TRUE(std::memcmp(&derived1, &derived2, sizeof(derived1)));
+    EXPECT_TRUE(std::memcmp(&base1, &derived1, sizeof(base1)));
+}
+
+TEST_F(TestCppSpecifications, ArrayParameters) {
+    Array4 a {1,3,5,10};
+    EXPECT_EQ(19, Sum4(a));
 }
 
 /*
