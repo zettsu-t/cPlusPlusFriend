@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,6 +6,9 @@
 #include <windows.h>
 #include "cFriends.h"
 #include "cFriendsCommon.h"
+
+#undef NDEBUG
+#include <assert.h>
 
 #ifndef static_assert
 #define static_assert _Static_assert
@@ -171,6 +173,68 @@ int divide_integers(int op1, int op2) {
     return op1 / op2;
 }
 
+
+
+typedef struct tagTwoLongs {
+    long long a;
+    long long b;
+} TwoLongs;
+
+typedef struct tagFourLongs {
+    long long a;
+    long long b;
+    long long c;
+    long long d;
+} FourLongs;
+
+void alloc_badly1(void) {
+    TwoLongs *p = malloc(sizeof(TwoLongs));
+    p->a = 1;
+    p->b = 2;
+    assert((p->a + 1) == p->b);
+
+    free(p);
+    p = NULL;
+    _Static_assert(sizeof(TwoLongs) == 16, "");
+}
+
+void alloc_badly2(void) {
+    FourLongs *p = malloc(sizeof(FourLongs));
+    p->a = 3;
+    p->b = 4;
+    p->c = 2;
+    p->d = 6;
+    assert((p->a * p->b) == (p->c * p->d));
+
+    free(p);
+    p = NULL;
+    _Static_assert(sizeof(FourLongs) == 32, "");
+}
+
+void alloc_safely1(void) {
+    TwoLongs *p = malloc(sizeof(*p));
+    p->a = 1;
+    p->b = 2;
+    assert((p->a + 1) == p->b);
+
+    free(p);
+    p = NULL;
+    _Static_assert(sizeof(*p) == 16, "");
+}
+
+void alloc_safely2(void) {
+    FourLongs *p = malloc(sizeof(*p));
+    p->a = 3;
+    p->b = 4;
+    p->c = 2;
+    p->d = 6;
+    assert((p->a * p->b) == (p->c * p->d));
+
+    free(p);
+    p = NULL;
+    _Static_assert(sizeof(*p) == 32, "");
+}
+
 int main(int argc, char* argv[]) {
     exec_my_memcpy();
     exec_snprintf();
@@ -192,6 +256,11 @@ int main(int argc, char* argv[]) {
            (unsigned long)(emptyTime  - startTime),
            (unsigned long)(lengthTime - emptyTime),
            (unsigned long)(stopTime   - lengthTime));
+
+    alloc_badly1();
+    alloc_badly2();
+    alloc_safely1();
+    alloc_safely2();
     return 0;
 }
 

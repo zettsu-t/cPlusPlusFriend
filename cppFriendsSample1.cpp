@@ -80,6 +80,9 @@ TEST_F(TestTypeCast, EnumCast) {
 
     // ついでに
     static_assert(std::is_signed<std::ptrdiff_t>::value, "ptrdiff_t is unsigned");
+    int anArray[2];
+    static_assert(sizeof(std::ptrdiff_t) != sizeof(int), "std::ptrdiff_t is same as int here");
+    static_assert(std::is_same<decltype((anArray + 1) - anArray), std::ptrdiff_t>::value, "Not std::ptrdiff_t?");
 
     EXPECT_EQ(31, __builtin_popcount(intEnum));
     // __builtin_popcountの引数はunsigned int : テンプレートではない
