@@ -41,11 +41,21 @@ merge_wards <- function(df, from_ward, to_ward) {
 
 parse_wards <- function(in_filename, wards, old_wards, ward_map) {
     df <- read_population_sheet(in_filename)
-    assertthat::assert_that(NROW(setdiff(unique(df$ward), wards)) == 0)
+    ward_names <- unique(df$ward)
+    old_ward_names <- stringr::str_replace(old_wards, '旧', '')
+    assertthat::assert_that(NROW(setdiff(ward_names, wards)) == 0)
+    assertthat::assert_that(NROW(setdiff(wards, ward_names)) == 0)
+    assertthat::assert_that(NROW(setdiff(old_ward_names, ward_names)) == 0)
+    assertthat::assert_that(NROW(setdiff(old_ward_names, purrr::map_chr(ward_map, ~ .x$from_ward))) == 0)
 
     ## https://www.city.yokohama.lg.jp/city-info/yokohamashi/ku-shokai/division.html
     df <- purrr::reduce(.x=ward_map, .init=df, .f=function(acc, ward_set) {
-        merge_wards(df=acc, from_ward=ward_set$from_ward, to_ward=ward_set$to_wards)
+        from_ward <- ward_set$from_ward
+        to_ward <- ward_set$to_wards
+        assertthat::assert_that(NROW(setdiff(unique(df$ward), c(wards, old_wards))) == 0)
+        assertthat::assert_that(NROW(setdiff(unique(from_ward), wards)) == 0)
+        assertthat::assert_that(NROW(setdiff(unique(to_ward), wards)) == 0)
+        merge_wards(df=acc, from_ward=from_ward, to_ward=to_ward)
     })
     assertthat::assert_that(NROW(setdiff(unique(df$ward), c(wards, old_wards))) == 0)
 
@@ -64,7 +74,7 @@ draw_wards <- function(df, wards, old_wards, ward_colors, ward_styles) {
     g <- g + geom_line(alpha=0.75, size=1)
     g <- g + geom_dl(method=list(dl.combine('first.points', 'last.points'), cex=0.75, fontfamily=font_name))
     g <- g + scale_x_continuous(breaks=seq(1950, 2020, 10), limits=c(1945, 2025))
-    g <- g + scale_y_continuous(breaks=seq(0, 900000, 100000), limits=c(0, 900000))
+    g <- g + scale_y_continuous(breaks=seq(0, 1100000, 100000), limits=c(0, 1100000))
     g <- g + scale_color_manual(values=ward_colors)
     g <- g + scale_linetype_manual(values=ward_styles)
     g <- g + guides(color=guide_legend(ncol=1))
@@ -102,7 +112,7 @@ ward_colors <- c('black',
                  'yellow4', 'yellow3',
                  'navy', 'orchid4', 'slategray4', 'orangered', 'yellow4')
 
-ward_map <- list(list(from_ward='港北', to_wards=c('緑', '青葉', '都築')),
+ward_map <- list(list(from_ward='港北', to_wards=c('緑', '青葉', '都筑')),
                  list(from_ward='保土ケ谷', to_wards=c('旭')),
                  list(from_ward='南', to_wards=c('港南')),
                  list(from_ward='戸塚', to_wards=c('瀬谷', '栄', '泉')))
