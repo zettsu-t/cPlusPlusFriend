@@ -53,7 +53,7 @@ g <- ggplot()
 g <- g + geom_sf(data=pref, mapping=aes(geometry=geometry))
 g <- g + geom_sf_text(data=pref, mapping=aes(geometry=geometry, label=city),
                       size=label_font_size, family=font_name, color='black')
-g <- g + geom_sf(mapping=aes(geometry=geometry, fill=n), data=geo_data, alpha=0.8)
+g <- g + geom_sf(mapping=aes(geometry=geometry, fill=n), data=geo_data, color=NA, alpha=0.6, lwd=0)
 g <- g + ggtitle('宿泊業，飲食サービス業 (神奈川県 : 500mメッシュ)')
 g <- g + scale_fill_gradient2(low='white', high='purple4', name=guide_legend(title='事業所数'),
                               breaks=c(1,3,10,31,100,310), guide='colourbar', trans='log10')
@@ -68,3 +68,4 @@ g <- g + theme(text=element_text(family=font_name),
                plot.title=element_text(family=font_name, size=font_size))
 plot(g)
 ggsave('outgoing/kanagawa_hotel_restaurant.png', plot=g, dpi=200)
+ggsave('outgoing/kanagawa_hotel_restaurant.svg', plot=g)
