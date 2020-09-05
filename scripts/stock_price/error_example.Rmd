@@ -1,0 +1,43 @@
+---
+title: "Make errors"
+author: "プログラマたんbot"
+date: "2020/9/5"
+output:
+  html_document:
+    toc: false
+header-includes:
+  \usepackage{float}
+---
+
+```{r load, include=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+## 正解
+
+```{r setup1}
+n <- 1000
+df <- tibble(p=1:n, q=rnorm(n), r=sample(1:n))
+```
+
+```{r draw2}
+g <- ggplot(df)
+g <- g + geom_histogram(aes(x=q))
+plot(g)
+```
+
+
+## Backtickが足りない
+
+```{r setup}
+n <- 1000
+df <- tibble(p=1:n, q=rnorm(n), r=sample(1:n))
+``
+
+```{r draw}
+g <- ggplot(df)
+g <- g + geom_histogram(aes(x=q))
+plot(g)
+```
+
