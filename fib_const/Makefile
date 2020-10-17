@@ -30,7 +30,7 @@ TIMEOUT=timeout 10
 OBJDUMP=objdump
 OBJDUMP_DISASM_OPT=-d -M intel --demangle
 
-.PHONY: all clean rebuild
+.PHONY: all clean
 
 all: $(TARGETS)
 

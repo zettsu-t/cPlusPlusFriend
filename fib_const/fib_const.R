@@ -4,7 +4,7 @@ purrr::reduce(.x=1:11, .init=c(), .f=function(v, i) {
         c(0)
     } else if (NROW(v) == 1) {
         c(v, 1)
-    } else{
+    } else {
         c(v, sum(tail(v, 2)))
     }
 })
