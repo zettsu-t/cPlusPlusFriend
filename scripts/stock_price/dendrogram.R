@@ -6,7 +6,7 @@ library(ggdendro)
 
 hc <- hclust(dist(USArrests), "ave")
 plot(ggdendrogram(hc, rotate=TRUE, size=2))
-name_set <- rownames(USArrests)
+name_set <- hc$labels
 
 groups <- purrr::reduce2(.x=hc$merge[,1], .y=hc$merge[,2], .init=c(),
                          .f=function(acc, left, right) {
