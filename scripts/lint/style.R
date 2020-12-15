@@ -1,0 +1,5 @@
+library(styler)
+library(lintr)
+assertthat::assert_that(system("cp original.R new.R") == 0)
+styler::style_file("new.R")
+lintr::lint("new.R")
