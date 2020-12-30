@@ -1,0 +1,318 @@
+---
+title: "Pythonのmergeとjoinとconcat"
+author: "プログラマたんbot"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r setup_r_packages, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(tibble)
+library(assertthat)
+library(kableExtra)
+library(reticulate)
+```
+
+```{r, echo=TRUE, eval=FALSE}
+## WindowsからPythonを起動するには、 .Rprofile にこう書く
+## Sys.setenv(PATH=paste0(c("C:\bin\anaconda", Sys.getenv("PATH")), sep="", collapse=";"))
+```
+
+## データを準備する
+
+Python の Pandas.merge を使って、二つのテーブル(DataFrame)をキー **key** を基に結合することを考える。
+
+架空データとして df_left と df_right を用意する。両 DataFrame ともに行=標本は4つあり、キー **key** の集合は同じだが出現順が異なる。
+
+```{python setup_python_packages}
+import pandas as pd
+print(pd.__version__)
+```
+
+```{python setup_left}
+df_left = pd.DataFrame.from_dict({"key": ["a", "b", "c", "d"],
+  "value_left": [1, 2, 3, 4]})
+```
+
+```{python print_df_left, echo=FALSE, results="asis"}
+print(df_left.to_markdown())
+```
+
+```{python setup_right}
+df_right = pd.DataFrame.from_dict({"key": ["b", "a", "d", "c"],
+  "value_right": [62, 51, 82, 71]})
+```
+
+```{python print_df_right, echo=FALSE, results="asis"}
+print(df_right.to_markdown())
+```
+
+## pandas.DataFrame.merge で結合する
+
+**pandas.DataFrame.merge** で inner joinすると素直な結果になる。それぞれのキー **key** には、対応する値 **value_left, value_right** が同じ行につく。
+
+```{python inner_join}
+df_merged = df_left.merge(df_right, how="inner")
+```
+
+```{python print_inner_join, echo=FALSE, results="asis"}
+print(df_merged.to_markdown())
+```
+
+```{python, echo=FALSE, eval=TRUE, results="asis"}
+print("\n")
+```
+
+ここでは結合する列名を省略したので、両DataFrameに共通する列名でをキーにした。明示的に指定してもよい。
+
+```{python inner_join_on}
+df_merged = df_left.merge(df_right, how="inner", on="key")
+```
+
+```{python print_inner_join_on, echo=FALSE, results="asis"}
+print(df_merged.to_markdown())
+```
+
+列の数は、両者を単純に足したものより、キーの数(1個)少ないはずである。
+
+```{python assert_inner_join}
+assert df_merged.shape[1] == (df_left.shape[1] + df_right.shape[1] - 1)
+assert df_merged.shape[0] == df_left.shape[0]
+assert df_merged.shape[0] == df_right.shape[0]
+```
+
+キーがDataFrameで一意ならこのような結果になる。しかしkeyに重複があるときは、結果は行の直積になる。値がcのキーが2つずつあるので、inner joinすると2x2で4行できる。
+
+```{python duplicated_keys}
+df_dup_left = pd.DataFrame.from_dict({"key": ["a", "b", "c", "c"],
+  "value_left": [1, 2, 3, 4]})
+df_dup_right = pd.DataFrame.from_dict({"key": ["b", "a", "c", "c"],
+  "value_right": [62, 51, 82, 71]})
+```
+
+```{python inner_join_duplicated_keys, results="asis"}
+df_merged_dup = df_dup_left.merge(df_dup_right, how="inner")
+```
+
+```{python print_inner_join_duplicated_keys, echo=FALSE, results="asis"}
+print(df_merged_dup.to_markdown())
+```
+
+## pandas.DataFrame.join で結合する
+
+**pandas.DataFrame.merge** の代わりに　**pandas.DataFrame.join** を使って結合することもできる。注意点は二つ。
+
+- 結合方法(how)のデフォルトが left である(merge は inner)
+- DataFrameにインデックスが適切に設定されていないとおかしな動作をする。後で詳しく述べる。
+
+最初に正しく動くコードを示す。インデックスを使って結合する。
+
+```{python set_index}
+df_indexed_left = df_left.set_index("key")
+df_indexed_right = df_right.set_index("key")
+```
+
+```{python set_index_join}
+df_indexed_joined = df_indexed_left.join(df_indexed_right, how="inner")
+```
+
+```{python print_set_index_join, echo=FALSE, results="asis"}
+print(df_indexed_joined.to_markdown())
+```
+
+この **pandas.DataFrame.set_index**  は immutable 、つまり df_left を変更せず、インデックスをつけた新たな DataFrame を返す。つまり返り値を受け取らない場合は、何もしないと同じである。setとついているのだからmutableだと思ってうっかり返り値を受け取るのを忘れても、処理系は警告を出さない(C++17のnodiscardてきなdecoratorが、Pythonにもあるとよいのだが)。
+
+なおset_indexは、引数がinplace=Trueなら、mutableな動作、つまり自身にインデックス付けてNoneを返す。これもRubyのsortとsort!のように、関数を分けた方がよいと思うのだが...
+
+次に正しく動かないコードを示す。キーを指定せず、インデックスもつけないとどうなるだろう。エラーになって欲しいし、実際にエラーになる。
+
+```{python error_in_join, error=TRUE, results="asis"}
+df_left.join(df_right, how="inner")
+```
+
+```{python error_in_join_on_key, error=TRUE, results="asis"}
+df_left.join(df_right, on=['key'], how="inner")
+```
+
+ここでは **key** が両DataFrameにあるからエラーになった。では共通のキーがなかったらどうなるだろう? **df_right** のキーを **key_r** に変えてみよう。
+
+```{python rename}
+df_renamed_right = df_right.rename({'key' : 'key_r'}, axis=1)
+```
+
+```{python print_rename, echo=FALSE, results="asis"}
+print(df_renamed_right.to_markdown())
+```
+
+さてjoinすると、エラーが出ずに列結合できてしまった。 **key** と **key_r** の順番はばらばらなので、これは意図したものではないだろう。
+
+```{python rename_join, results="asis"}
+df_ill_joined = df_left.join(df_renamed_right, how="inner")
+```
+
+```{python print_rename_join, echo=FALSE, results="asis"}
+print(df_ill_joined.to_markdown())
+```
+
+キーの名前を変えずに、rsuffixを指定しても同じである。なお Pandasは列名の重複を認めている。
+
+```{python rsuffix_join, results="asis"}
+df_rsuffix_joined = df_left.join(df_right, rsuffix="_r", how="inner")
+```
+
+```{python print_rsuffix_join, echo=FALSE, results="asis"}
+print(df_rsuffix_joined.to_markdown())
+```
+
+## pandas.concat で結合する
+
+実はこの動作は、concat、つまり行を問答無用で結合するのとほぼ同じである。ちなみにconcatは3個以上のDataFrameを結合できる代わりに、aDataFrame.concat(otherDataFrame)とは書けない(これはこれで用意しておけばと思うが...)。
+
+```{python concat, results="asis"}
+df_concat = pd.concat([df_left, df_right], axis=1)
+```
+
+```{python print_concat, echo=FALSE, results="asis"}
+print(df_concat.to_markdown())
+```
+
+concatは、行の長さが異なるときに、足りない行をNaN (欠測値)で埋める。Left joinやouter joinに似ているが動作は異なる。この動作を確認するために、行の長さが違う DataFrame を用意しよう。
+
+```{python df_long, results="asis"}
+df_long = pd.DataFrame.from_dict(
+  {'key_l': ['g', 'f', 'e', 'd', 'c', 'b'], 'value': [6, 5, 4, 3, 2, 1]})
+```
+
+```{python print_df_long, echo=FALSE, results="asis"}
+print(df_long.to_markdown())
+```
+
+結合すると、下の行がNaNで埋まるのが分かる。
+
+```{python concat_long_left, results="asis"}
+df_concat_long_left = pd.concat([df_long, df_right], axis=1)
+assert df_long.shape[0] == df_concat_long_left.shape[0]
+```
+
+```{python print_concat_long_left, echo=FALSE, results="asis"}
+print(df_concat_long_left.to_markdown())
+```
+
+```{python concat_long_right, results="asis"}
+df_concat_long_right = pd.concat([df_left, df_long], axis=1)
+assert df_long.shape[0] == df_concat_long_right.shape[0]
+```
+
+```{python print_concat_long_right, echo=FALSE, results="asis"}
+print(df_concat_long_right.to_markdown())
+```
+
+これがinner joinだと、行の長さは短いほうにそろえられる。エラーにならないし警告も出ない。
+
+```{python join_inner_long_left, results="asis"}
+df_join_inner_long_left = df_long.join(df_right, how="inner")
+assert df_right.shape[0] == df_join_inner_long_left.shape[0]
+```
+
+```{python print_join_inner_long_left, echo=FALSE, results="asis"}
+print(df_join_inner_long_left.to_markdown())
+```
+
+```{python join_inner_long_right, results="asis"}
+df_join_inner_long_right = df_left.join(df_long, how="inner")
+assert df_left.shape[0] == df_join_inner_long_right.shape[0]
+```
+
+```{python print_join_inner_long_right, echo=FALSE, results="asis"}
+print(df_join_inner_long_right.to_markdown())
+```
+
+Left joinだと、行の長さは左側にそろえられる。エラーにならないし警告も出ない。
+
+```{python join_left_long_left, results="asis"}
+df_join_left_long_left = df_long.join(df_right, how="left")
+```
+
+```{python print_join_left_long_left, echo=FALSE, results="asis"}
+print(df_join_left_long_left.to_markdown())
+```
+
+```{python join_left_long_right, results="asis"}
+df_join_left_long_right = df_left.join(df_long, how="left")
+```
+
+```{python print_join_left_long_right, echo=FALSE, results="asis"}
+print(df_join_left_long_right.to_markdown())
+```
+
+## R + dplyr で結合する
+
+Rならこう書ける。set_indexに相当するものはないが、却って間違いが起きなくてよいだろう。
+
+```{r merge, message=FALSE}
+df_left <- tibble(key = c('a', 'b', 'c', 'd'), value_left = c(1, 2, 3, 4))
+df_right <- tibble(key = c('b', 'a', 'd', 'c'), value_right = c(62, 51, 82, 71))
+df_merged <- dplyr::inner_join(df_left, df_right)
+
+assertthat::assert_that(NCOL(df_merged) == (NCOL(df_left) + NCOL(df_right) - 1))
+assertthat::assert_that(NROW(df_merged) == NROW(df_left))
+assertthat::assert_that(NROW(df_merged) == NROW(df_right))
+```
+
+```{r print_merge}
+df_merged %>% kable() %>% kable_styling()
+```
+
+Pandasと同様、keyに重複があるときは、結果は直積になる。
+
+```{r merge_dup, message=FALSE}
+df_dup_left <- tibble(key = c('a', 'b', 'c', 'c'), value_left = c(1, 2, 3, 4))
+df_dup_right <- tibble(key = c('b', 'a', 'c', 'c'), value_right = c(62, 51, 82, 71))
+df_dup_merged <- dplyr::inner_join(df_dup_left, df_dup_right)
+assertthat::assert_that(NROW(df_dup_merged) > NROW(df_dup_left))
+assertthat::assert_that(NROW(df_dup_merged) > NROW(df_dup_right))
+```
+
+```{r print_merge_dup}
+df_dup_merged %>% kable() %>% kable_styling()
+```
+
+行数が異なる列結合はconcatできない。
+
+```{r bind_cols, error=TRUE}
+df_long <- tibble(key = c('g', 'f', 'e', 'd', 'c', 'b'), value = c(6, 5, 4, 3, 2, 1))
+dplyr::bind_cols(df_left, df_long)
+```
+
+inner joinは、キーが一致する行数になる。
+
+```{r print_inner_left_long, message=FALSE}
+dplyr::inner_join(df_left, df_long) %>% kable() %>% kable_styling()
+```
+
+left join の結果はこの通り。
+
+```{r print_left_left_long, message=FALSE}
+dplyr::left_join(df_left, df_long) %>% kable() %>% kable_styling()
+```
+
+```{r print_left_long_left, message=FALSE}
+dplyr::left_join(df_long, df_left) %>% kable() %>% kable_styling()
+```
+
