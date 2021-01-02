@@ -35,7 +35,9 @@ library(reticulate)
 
 R と RStudioをインストールする。
 
-## 基本型
+## プログラミング言語Rの基本
+
+### 基本型
 
 基本型として、とりあえず 論理型(logical : Pythonのbool)、数値(numeric)、文字列 (character) を知っておけばよい。characterは文字列で、文字型は無い。文字コードはUnicode、エンコードは UTF-8 一択。Shift_JIS はもう忘れよう。
 
@@ -43,7 +45,7 @@ R と RStudioをインストールする。
 
 まずPythonの実行結果を示す。
 
-```{python add_int_bool_python}
+```{python add_int_bool_python, result="asis"}
 2 + True
 ```
 
@@ -120,13 +122,13 @@ int_vec[c(1, 4)]
 int_vec[c(-2, -3)]
 ```
 
-0を指定すると何も選ばない。
+0を指定すると何も選ばない。PythonやC++の癖で、先頭要素を0にするとこうなる。敢えて0を含めることで条件分岐を省けることがあるかもしれない。
 
 ```{r vector_no_elements}
 int_vec[0]
 ```
 
-## 演算
+### 演算
 
 Rにスカラー変数はなく、ベクトルはあるので、演算はベクトル同士の演算になる。まず足し算 c(10, 20, 30) + c(4, 5, 6) は、要素ごとの和になる。これは要素が1個のベクトル 10 + 4 = 14 の拡張と考えれば素直だろう。
 
@@ -146,7 +148,7 @@ NumPyてきなbroadcastingを、Rでも行うことができる。 c(10, 20, 30)
 c(10, 20, 30) + 4
 ```
 
-## ベクトルの要素数とrange
+### ベクトルの要素数とrange
 
 要素数はNROW()で調べる。length()は忘れていい。
 
@@ -175,9 +177,15 @@ seq(-2)
 1:-2
 ```
 
-## リスト
+ベクトル同士はcで結合する。
 
-型が混在する集合はlistに格納する。Pythonのlistと似ている。 "" が無い箇所があることに注意する。
+```{r concat_vectors}
+c(1:3, 4:6, 7:9)
+```
+
+### リスト
+
+型が混在する集合はlistに格納する。Pythonのlist、C言語の構造体と似ている。 "" が無い箇所があることに注意する。
 
 ```{r list}
 a_lst <- list(name="foo", score=80, year=2019)
@@ -210,7 +218,34 @@ a_lst[1:2]
 a_lst[c("name", "score")]
 ```
 
-## DataFrame
+リスト同士はcで結合する。Pythonもそうだが、リストを長くするのか、リストにリストを入れて入れ子にするのかで、コードを使い分ける必要がある。
+
+こちらは
+
+```{r concat_lists}
+list_1 <- list("foo")
+list_2 <- list(80)
+list_3 <- list(2019)
+list_3_elements <- c(list_1, list_2, list_3)
+list_3_elements
+NROW(list_3_elements)
+```
+
+```{r nested_lists}
+nested_list <- list(first=list_1, second=list_2)
+nested_list
+```
+
+要素の型がすべて同じリストは、ベクトルに変換することができる。逆も然り。Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
+
+```{r vectors_from_to_lists}
+original_vec <- 1:5
+list_from_vec <- as.list(original_vec)
+converted_vec <- unlist(list_from_vec)
+assertthat::assert_that(identical(original_vec, converted_vec))
+```
+
+### DataFrame
 
 まず必要なパッケージをインストールする。
 
@@ -279,13 +314,13 @@ df[1, ]
 ここでは一列ずつ、一行ずつ取り出したが、リストと同様に複数の要素を取り出すこともできる。
 
 
-## 関数
+### 関数
 
 Rの関数は、Pythonのラムダ式である。
 
 Pythonでは以下のように、引数の二乗を返す無名関数を定義して、それをmy_squareという変数に格納し、こう呼び出せる。
 
-```{python lambda_python}
+```{python lambda_python, result="asis"}
 my_square = lambda n: n * n
 my_square(9)
 ```
@@ -316,6 +351,9 @@ do.callを使って、Pythonのunpack, Rubyのsplatのように、名前付きli
 args <- list(base=3, index=2)
 do.call(my_pow, args)
 ```
+
+
+
 
 さて、Rの関数はすべて式(expression)である。関数が最後に評価したこと(雑に言うと{}の最後の行)が関数の返り値になる。関数定義の途中で処理を終えるのでなければ、returnと明示する必要ない(この辺はRubyっぽい)。
 
@@ -387,11 +425,148 @@ my_fib <- function(xs) {
 my_fib(1:10)
 ```
 
-## Assertionとデフォルト値
+Pythonで、 lexical scope の外にある変数を変更するには、nonlocalを使う。以下のコードでは、outer()は1を返す。
+
+```{python nonlocal_python, result="asis"}
+def outer():
+  z = 0
+  def inner():
+     nonlocal z
+     z = z + 1
+     return -2
+  inner()
+  return z
+
+outer()
+```
+
+Rでは \<\<- を使って、 lexical scope の外にある変数に代入する。
+
+```{r nonlocal_r}
+outer <- function () {
+  z <- 0
+  inner <- function () {
+     z <<- z + 1
+     -2
+  }
+  inner()
+  z
+}
+
+outer()
+```
+
+PythonもRも、lexical scopeの範囲は、ざっくりいうと関数(defやfunction)である。なので関数が入れ子になっている場合は、nonlocalが必要になることがある。C++はif{}や何もキーワードがつかない {} も自動変数の範囲と寿命を決めているが、Rはそうではないので注意すること(ifなどはスコープを変えない)。
+
+## いろいろな処理と込み入った話題
+
+### 文字列処理
+
+Rでは文字列の整形をするには、昔ながらのsprintfを使う。
+
+```{r sprintf}
+sprintf("地点=%s, 温度=%.1f", "横浜", 11.8)
+```
+
+文字列を連結するときは、pasteを使う。sepが文字列の区切り文字であるが、デフォルトは半角空白1個である。区切り文字を~文字列にするには明示的にしているか、paste0を使う。Rの文字列は + 演算子で連結できない。
+
+```{r paste}
+paste("神奈川県", "横浜市", "中区")
+paste0("神奈川県", "横浜市", "中区")
+paste("神奈川県", "横浜市", "中区", sep=":")
+```
+
+以下のコードは意外にも、要素が3個のベクトルを返す。pasteはベクトルをベクトルにmapする関数である。
+
+```{r paste_map}
+words <- c("神奈川県", "横浜市", "中区")
+paste(words)
+```
+
+collapseを指定すると、文字列を区切り文字で連結して、単一の文字列を返す。
+
+```{r paste_reduce}
+paste(words, sep="", collapse=":")
+```
+
+より高度な文字列処理はstringrパッケージを使う。PythonもRもたくさんの関数があるが、代表的なものとして正規表現で文字列を分解する例を示そう。
+
+```{python str_match_pythoon, eval=TRUE, result="asis"}
+import re
+re.match(r"(\D+)(\d+)", "Year2021").groups()
+```
+
+```{r str_match_r}
+stringr::str_match("Year2021", "(\\D+)(\\d+)")
+```
+
+### 強制型変換
+
+既に書いたが、logical, numeric, character の右側への変換は、必要なら暗黙に行われる。paste関数で試そう。書式を指定しなければ、よきに計らった文字列表記になる。
+
+```{r coerce_paste}
+paste("Bool", exp(1), 2, FALSE)
+```
+
+リストとベクタの変換で既に示したように。型変換は一般に as.型名 でできる。
+
+```{r coerce_types}
+as.numeric("-2.7")
+as.integer("-2.7")
+as.character(-2.7)
+```
+
+### 参照渡しと copy-on-modify
+
+Rでは、呼び出された関数は引数を変更できるが、その変更は呼び出し側には伝わらない。これはPythonとの大きな違いである。より正確に言うと、引数を変更するとcopy-on-modifyされる。変更しなければcopyのコストが発生しないので、実質的には低コストな参照渡しのように動作する。
+
+Pythonで、配列の要素をすべて2倍にするとき、こう書ける。
+
+```{python double_python}
+import numpy as np
+
+def doubler(x):
+  for i, item in enumerate(x):
+    x[i] = item * 2
+  print(np.sum(x))
+
+v = np.ones(10)
+doubler(v)
+v
+```
+
+rで同様のコードを書くとどうなるだろうか? 忘れていたfor文を敢えて使って書こう。
+
+```{r double_for_r}
+doubler <- function(x) {
+  for (i in 1:NROW(x)) {
+    x[i] = x[i] * 2
+  }
+  print(sum(x))
+}
+
+v <- rep(1, 10)
+doubler(v)
+v
+```
+
+doublerの中では二倍になったようだが(和が20なので)、呼び出し元の変数vは変わらなかった。これがcopy-on-modifyである。
+
+Rでは引数を上書きすることは諦めて、値を返す関数を素直にmapで書こう。"~ .x * 2" は無名関数の略記法である。いずれ役に立つことがあるだろう。
+
+```{r double_map_r}
+doubler <- function(x) {
+  purrr::map_dbl(x, ~ .x * 2)
+}
+
+doubler(rep(1, 10))
+```
+
+### Assertionとデフォルト値
 
 Pythonでは、()をつけずにassertを書く。
 
-```{python assert_python}
+```{python assert_python, result="asis"}
 assert 2 ** 4 == 16
 ```
 
@@ -420,4 +595,80 @@ suspicious_func <- function(x) {
 safe_func <- purrr::possibly(suspicious_func, NA)
 safe_func(1)
 ```
+
+変数が存在するかどうかは、Pythonでは、locals() と globals() を調べると分かる。
+
+```{python check_vars_python, result="asis"}
+a_glogal_var = 1
+def check_vars_exists():
+  a_local_var = 2
+  assert "a_glogal_var" in globals()
+  assert "a_local_var" in locals()
+  assert "missing_var" not in locals()
+
+check_vars_exists()
+```
+
+Rでは exists で分かる。
+
+```{r check_vars_r}
+a_glogal_var <- 1
+check_vars_exists <- function() {
+  a_local_var <- 2
+  assertthat::assert_that(exists("a_glogal_var")) &
+  assertthat::assert_that(exists("a_local_var")) &
+  assertthat::assert_that(!exists("missing_var"))
+}
+
+check_vars_exists()
+```
+
+引数が無いことは missing で分かる。NULLを指定することと、引数が無いことは異なる。この例ならデフォルト引数を使っても大差ないが、引数が無いことが分かるとできることがあるかもしれない。
+
+```{r missing_r}
+real_to_complex <- function(real, imaginary) {
+  im_part <- if (missing(imaginary)) {
+     0
+  } else {
+     imaginary
+  }
+  list(r=real, im=im_part)
+}
+
+real_to_complex(real=1)
+real_to_complex(real=1, imaginary=2)
+real_to_complex(real=1, imaginary=NULL)
+```
+
+関数のデフォルト引数の値を調べるために、Pythonでは inspect.signature を使う。Rではformalsを使う。以下は正規表現で文字列を分割する関数のデフォルト引数である。
+
+```{python inspect_python, result="asis"}
+import inspect
+inspect.signature(re.split)
+```
+
+```{r inspect_r}
+formals(stringr::str_split)
+```
+
+### グラフを描く
+
+### CSVを出力する
+
+### コマンドラインのオプションを解析する
+
+Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両者はほとんど同じである。
+
+
+## その他ツール
+
+### Jupyter Notebook と R Markdown
+
+Pythonでコードを試しながら書く場合、Jupyter Notebook を使っている方が多いだろう。Jupyter Notebook とRという組み合わせも可能である。もう一つの選択肢は、 R Markdown である。まさにこの文書の元は R Markdown で、それをHTMLまたはPDFに変換したものを見ているはずである。
+
+### コードの整形と静的解析
+
+Pythonのコードは、 autopep8 で整形して、pylintk, pep8, flake8 でコードの問題点を静的解析して指摘するだろう(他にもツールがあるかもしれない)。
+
+Rは styler でコードを整形して、 lintr でコードの問題点を静的解析して指摘するとよい。Rスクリプトだけでなく、R Markdown も整形できる。
 
