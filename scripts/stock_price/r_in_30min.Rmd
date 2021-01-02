@@ -41,7 +41,7 @@ R と RStudioをインストールする。
 
 基本型として、とりあえず 論理型(logical : Pythonのbool)、数値(numeric)、文字列 (character) を知っておけばよい。characterは文字列で、文字型は無い。文字コードはUnicode、エンコードは UTF-8 一択。Shift_JIS はもう忘れよう。
 
-真理値の、真はTRUE、偽はFALSE という定数である。全部大文字である。整数と真理値を足すとき、TRUEは1に、FALSEは0として扱う。Python の 2 + True と、R の 2 + TRUE はどちらも 3 になる。
+論理型の、真はTRUE、偽はFALSE という定数である。全部大文字である。整数と真理値を足すとき、TRUEは1に、FALSEは0として扱う。Python の 2 + True と、R の 2 + TRUE はどちらも 3 になる。
 
 まずPythonの実行結果を示す。
 
@@ -49,7 +49,7 @@ R と RStudioをインストールする。
 2 + True
 ```
 
-次にRの実行結果を示す。出力の先頭に [1] についているが、これについては後述する。
+次にRの実行結果を示す。出力の先頭に [1] がついているが、これについては後述する。
 
 ```{r add_int_bool_r}
 2 + TRUE
@@ -75,57 +75,59 @@ FALSE | NA
 
 NAは logical, numeric, character と、それぞれの型に用意されている。実は logical -> numeric -> character という変換は、必要なら暗黙に行われるので、あまり気にしなくてよい。さっきの 2 + TRUE がそうだった。
 
-数値が NA (欠測値)、正の無限大 Inf、負の無限大 -Inf、NaN (非数 : Not a number)なことは区別する。is.na, is.infinite, is.nan を使って調べる(細かい仕様は省略)。 == では比較しないことに注意する。RはNAとNaNを区別するので便利である(入力値が欠測なことと、計算結果がNaNであることは別なので)。
+数値が NA (欠測値)、正の無限大 Inf、負の無限大 -Inf、NaN (非数 : Not a Number)なことは区別する。is.na, is.infinite, is.nan を使って調べる(細かい仕様は省略)。 == では比較しないことに注意する。RはNAとNaNを区別するので便利である(入力値が欠測なことと、計算結果がNaNであることは別なので)。
 
 ```{r is_inf_nan}
 is.infinite(0)
 is.infinite(Inf)
+Inf > 0
 is.infinite(-Inf)
+-Inf < 0
 is.nan(0)
 is.nan(NaN)
 ```
 
-Rにスカラー変数はない。C++の std::vector 的な集合、つまり型が等しい複数の要素を、インデックスで参照できる集合が、ベクトルとして用意されている。なのでスカラー変数に見えるものは、要素が1個のベクトルである。変数への代入は \<- で行う。getsと発音する。Pythonと同様に=でも代入できるが、 \<- の方が見やすいだろう。
+Rにスカラー変数はない。C++の std::vector てきな集合、つまり型が等しい複数の要素を、インデックスで参照できる集合が、ベクトルとして用意されている。なのでスカラー変数に見えるものは、要素が1個のベクトルである。変数への代入は \<- で行う。Getsと発音する。Pythonと同様に=でも代入できるが、 \<- の方が見やすいだろう。
 
 ```{r assign_int}
 n <- 2
 n * 3
 ```
 
-複数の即値つまりからベクトルを作るには、 c(15, 26, 37, 48) というようにc()を使う。cはcombineの略である。[]を使う言語が多いのでちょっと変わっているが、慣れればそういうもの。
+複数の即値つまりからベクトルを作るには、 c(15, 26, 37, 48) というようにc()を使う。cはcombineの略である。ベクトルというか配列を作るのに[]を使う言語が多いのでちょっと変わっているが、すぐ慣れるだろう。
 
 ```{r assign_vector}
-int_vec <- c(15, 26, 37, 48)
+score_vec <- c(15, 26, 37, 48)
 name_vec <- c("foo", "bar", "hoge")
-int_vec
+score_vec
 name_vec
 ```
 
-出力の [1] は、この行はベクトルの1番目から順番に表示している、という意味である。さっきから [1] が必ず表示されていたのは、要素が1個のベクトルを表示していたからである。
+出力の [1] は、この行はベクトルの1番目から順番に表示している、という意味である。さっきから [1] が必ず表示されていたのは、要素が1個のベクトルを表示していたからである。要素がたくさんあるベクトルを表示すると行を折り返すので、そのときは1より大きい数字になる。
 
 ベクトルに限らず、配列らしくインデックスがついているデータ(PandasのDataFrameてきなものも含む)の要素は、1始まりで数える。つまりベクトルvの先頭の要素は、 v[1] で読み書きする。PythonやCなど多くの言語は0始まりだが、Rは異なる(FortranやStanも1始まり)。
 
 ```{r vector_element}
-int_vec[1]
+score_vec[1]
 name_vec[2]
 ```
 
 Pythonと同様、複数の値を指定することもできる。
 
 ```{r vector_elements}
-int_vec[c(1, 4)]
+score_vec[c(1, 4)]
 ```
 
 負の値を指定すると、指定したインデックス以外を選ぶ。つまり除外するインデックスを指定することができる。
 
 ```{r vector_exclude_elements}
-int_vec[c(-2, -3)]
+score_vec[c(-2, -3)]
 ```
 
 0を指定すると何も選ばない。PythonやC++の癖で、先頭要素を0にするとこうなる。敢えて0を含めることで条件分岐を省けることがあるかもしれない。
 
 ```{r vector_no_elements}
-int_vec[0]
+score_vec[0]
 ```
 
 ### 演算
@@ -134,15 +136,22 @@ Rにスカラー変数はなく、ベクトルはあるので、演算はベク�
 
 ```{r add_vectors}
 c(10, 20, 30) + c(4, 5, 6)
+10 + 4
 ```
 
-max()は、ベクトルでもっとも大きい値を返す。max(c(10, 20, 30)) は c(30) 、つまり要素が1個のベクトルである。さっきの足し算がmapなら、maxはreduceと考えると解りやすいだろう。
+max()は、ベクトルの要素のうち、もっとも大きい値を返す。max(c(10, 20, 30)) は c(30) 、つまり要素が1個のベクトルである。さっきの足し算がmapなら、maxはreduceと考えると解りやすいだろう。
 
 ```{r max_vector}
 max(c(10, 20, 30))
 ```
 
-NumPyてきなbroadcastingを、Rでも行うことができる。 c(10, 20, 30) + 4 は c(14, 24, 34) になる。左辺のそれぞれに1を足すというふるまいは直観的だろう。実際には右辺ベクトルの要素を、左辺ベクトルの要素数と同じになるまで繰り返している(repeat)。
+2つのベクトルの要素ごとのmaxを取りたい、つまりmapしたいなら、pmaxを使う。
+
+```{r pmax_vectors}
+pmax(c(10, 2, 30), c(4, 50, 6))
+```
+
+NumPyてきなbroadcastingを、Rでも行うことができる。 c(10, 20, 30) + 4 は c(14, 24, 34) になる。左辺のそれぞれに4を足すというふるまいは直観的だろう。実際には右辺ベクトルの要素を、左辺ベクトルの要素数と同じになるまで繰り返している(repeat)。
 
 ```{r add_vector_int}
 c(10, 20, 30) + 4
@@ -158,7 +167,7 @@ NROW(4)
 NROW(c())
 ```
 
-Pythonのrangeてきな連番を作ろう。要素数n個のベクトルvに対して 1, 2, ..., n という連番の整数は、 seq_len(n) で作る。seq_len(NROW(c(10, 20, 30)))は要素が3個なのでc(1, 2, 3)になる。seq_len(NROW(c()))は空ベクトルが返る。Pythonと異なり、Rは閉区間=区間の開始と終了を要素に含む。
+Pythonのrangeてきな連番を作ろう。要素数n個のベクトルvに対して 1, 2, ..., n という連番の整数は、 seq_len(n) で作る。seq_len(NROW(c(10, 20, 30)))は要素が3個なのでc(1, 2, 3)になる。seq_len(NROW(c()))は空ベクトルが返る。Pythonと異なりRは閉区間であり、区間の開始と終了の両方を要素に含む。
 
 ```{r seq_len_vector_int}
 seq_len(NROW(c(10, 20, 30)))
@@ -166,7 +175,7 @@ seq_len(NROW(4))
 seq_len(NROW(c()))
 ```
 
-Pythonのrangeと同様のことをしたければ、 seq() とか 1:n とかがある。ただしPythonのrangeと異なり、開始番号が終了番号より小さいと、1ずつ減る数列が得られる。これだと空文字のベクトルのインデックスがc(1, 0)になりまずいので、seq_len()を使おう。
+Pythonのrangeと同様のことをしたければ、 seq() とか 1:n とかがある。ただしPythonのrangeと異なり、開始番号が終了番号より小さいと、1ずつ減る数列が得られる。ベクトルのインデックスを得る場合に、これだと空のベクトルのインデックスがc(1, 0)になりまずいので、seq_len()を使おう。
 
 ```{r seq_vector}
 seq(4)
@@ -181,6 +190,29 @@ seq(-2)
 
 ```{r concat_vectors}
 c(1:3, 4:6, 7:9)
+```
+
+### Assertion
+
+Pythonでは、()をつけずにassertを書く。
+
+```{python assert_python, result="asis"}
+assert 2 ** 4 == 16
+```
+
+```{python assertion_failed_python, error=TRUE, result="asis"}
+assert 2 ** 4 != 16
+```
+
+Rではassertthatを使う。
+
+```{r assert_r}
+library(assertthat)
+assertthat::assert_that((2 ** 4) == 16)
+```
+
+```{r assertion_failed_r, error=TRUE}
+assertthat::assert_that((2 ** 4) != 16)
 ```
 
 ### リスト
@@ -220,7 +252,7 @@ a_lst[c("name", "score")]
 
 リスト同士はcで結合する。Pythonもそうだが、リストを長くするのか、リストにリストを入れて入れ子にするのかで、コードを使い分ける必要がある。
 
-こちらは
+こちらはリストを長くする。
 
 ```{r concat_lists}
 list_1 <- list("foo")
@@ -231,12 +263,16 @@ list_3_elements
 NROW(list_3_elements)
 ```
 
+こちらはリストを入れ子にする。
+
 ```{r nested_lists}
 nested_list <- list(first=list_1, second=list_2)
 nested_list
 ```
 
-要素の型がすべて同じリストは、ベクトルに変換することができる。逆も然り。Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
+要素の型がすべて同じリストは、 unlist でベクトルに変換することができる。逆も然りで、 as.list を使ってベクトルをリストにする。後で説明するが、Rでは一般的に as.型名 で型変換を行う。
+
+identicalは、二つのオブジェクトが同値ならTRUE、違っていたらFALSEを返す。identicalといいつつ、同一オブジェクト(雑に言うと同じメモリ番地に置かれている)かどうかではなく、値が同じかどうかを調べる。
 
 ```{r vectors_from_to_lists}
 original_vec <- 1:5
@@ -245,12 +281,12 @@ converted_vec <- unlist(list_from_vec)
 assertthat::assert_that(identical(original_vec, converted_vec))
 ```
 
-### DataFrame
+### DataFrame (tibble)
 
 まず必要なパッケージをインストールする。
 
 ```{r install, eval=FALSE, echo=TRUE}
-winstall.packages("tidyverse")
+install.packages("tidyverse")
 ```
 
 パッケージを使う前にimportするのは、Pythonと同様である。
@@ -259,7 +295,7 @@ winstall.packages("tidyverse")
 library(tidyverse)
 ```
 
-PandasのDataFrameと同様に、Rにもdata.frameがある(Rが先だったかもしれないが)。だがtibbleというもっといいものがあるのでそちらを使う。まずダミーデータを作る。
+PandasのDataFrameと同様に、Rにもdata.frameがある(Rが先だったかもしれないが)。だがtibbleというもっといいものがあるのでそちらを使う。まず説明用の架空データを作る。
 
 ```{r create_tibble}
 df <- tibble(name=c("foo", "bar"), score=c(80, 60), year=c(2019, 2020))
@@ -269,7 +305,7 @@ df <- tibble(name=c("foo", "bar"), score=c(80, 60), year=c(2019, 2020))
 df %>% kable() %>% kable_styling()
 ```
 
-print()すると今作った tibble を文字列として表示する。というより実は、変数名だけ入力するとprint()して表示していたのだった。PythonのREPLもそうでしょ。
+print()すると今作った tibble を文字列として表示する。というより実は、変数名だけ入力するとprint()して表示していたのだった。PythonのREPLと同じである。
 
 ```{r print_tibble}
 print(df)
@@ -281,7 +317,7 @@ View()するとExcelっぽいウィンドウに表示する。ここには表示
 View(df)
 ```
 
-DataFrameは、縦方向(行)が標本、横方向(列)が標本の属性である。ざっくりいうと、縦に長いベクトルを横に並べたものがtibbleと思えばよい。なので、先のリストの動作がそのまま当てはまる。
+tibbleは、縦方向(行)が標本、横方向(列)が標本の属性である。ざっくりいうと、縦に長いベクトルを横に並べたものがtibbleと思えばよい。なので、先のリストの動作がそのまま当てはまる。
 
 まず score のベクトルを取得する。PandasのSeriesとは少し異なる。
 
@@ -318,7 +354,7 @@ df[1, ]
 
 Rの関数は、Pythonのラムダ式である。
 
-Pythonでは以下のように、引数の二乗を返す無名関数を定義して、それをmy_squareという変数に格納し、こう呼び出せる。
+Pythonでは以下のように、引数の2乗を返す無名関数を定義して、それをmy_squareという変数に格納し、こう呼び出せる。
 
 ```{python lambda_python, result="asis"}
 my_square = lambda n: n * n
@@ -331,6 +367,8 @@ Rではfunctionと書く。
 my_square <- function(n) { n * n }
 my_square(9)
 ```
+
+Pythonと同様に、引数にキーワードをつけてもよい。引数が多いときは、キーワードをつけるとソースコードが読みやすくなるだろう。
 
 ```{r keyword_parameters}
 my_square(n=9)
@@ -345,19 +383,16 @@ my_pow <- function(base, index) {
 my_pow(index=2, 3)
 ```
 
-do.callを使って、Pythonのunpack, Rubyのsplatのように、名前付きlistを引数に展開することもできる。
+do.callを使って、Pythonのunpack, Rubyのsplatのように、listを引数に展開することもできる。
 
 ```{r splat_parameters}
 args <- list(base=3, index=2)
 do.call(my_pow, args)
 ```
 
-
-
-
 さて、Rの関数はすべて式(expression)である。関数が最後に評価したこと(雑に言うと{}の最後の行)が関数の返り値になる。関数定義の途中で処理を終えるのでなければ、returnと明示する必要ない(この辺はRubyっぽい)。
 
-Rで負の数の対数を取ると警告を出してNaNを返すが、代わりに-Infを返す関数を作ろう。ifも式なのでこう書ける。
+Rで負の数の対数を取ると、警告を出してNaNを返すが、代わりに-Infを返す関数を作ろう。ifも式なのでこう書ける。
 
 ```{r if_expression}
 my_log10 <- function(x) {
@@ -375,7 +410,7 @@ my_log10(0.1)
 my_log10(10)
 ```
 
-最初に述べた通り、Rにスカラーはないので、この引数xはベクトルである。ならば、ベクトルを受け取ってベクトルを返すのがRっぽい(R-like)だろう。上記のコードがどうなるか試してみよう。
+最初に述べた通り、Rにスカラー変数はないので、この引数xはベクトルである。ならば、ベクトルを受け取ってベクトルを返すmap動作がRらしいだろう。PythonのPythonicに対応する言葉が、R-likeである。上記のコードがどうなるか試してみよう。
 
 ```{r naive_my_log}
 my_log10(c(-1, 0, 0.1, 10))
@@ -390,7 +425,7 @@ my_log10_alt1 <- function(xs) {
 my_log10_alt1(c(-1, 0, 0.1, 10))
 ```
 
-二つ目の方法は、Pythonの list comprehension てきに写像(map, inject)することだ。このようにmapを使いこなすとよいだろう。
+二つ目の方法は、Pythonの list comprehension てきにmapすることだ。このようにmapを使いこなすとよいだろう。
 
 ```{r map_else_log}
 my_log10_alt2 <- function(xs) {
@@ -405,7 +440,7 @@ my_log10_alt2 <- function(xs) {
 my_log10_alt2(c(-1, 0, 0.1, 10))
 ```
 
-Rでfor文は使わないので、忘れてよい。Pythonでfor文を使う処理があったら、常にmapとreduceを使うことを検討しよう。上記の通りmapは書いたので、reduceの使い方として、フィボナッチ数列を示そう。0と負の数についてはエラーになるが、それでいいだろう。
+Rでfor文は使わないので、忘れてよい。Pythonでfor文を使う処理があったら、常にmapとreduceを使うことを検討しよう。mapの例の次に、reduceの使い方として、フィボナッチ数列を示そう。0と負の数についてはエラーになるが、それでいいだろう。
 
 ```{r reduce_fib}
 my_fib <- function(xs) {
@@ -456,7 +491,7 @@ outer <- function () {
 outer()
 ```
 
-PythonもRも、lexical scopeの範囲は、ざっくりいうと関数(defやfunction)である。なので関数が入れ子になっている場合は、nonlocalが必要になることがある。C++はif{}や何もキーワードがつかない {} も自動変数の範囲と寿命を決めているが、Rはそうではないので注意すること(ifなどはスコープを変えない)。
+PythonもRも、lexical scopeの範囲は、ざっくりいうと関数(defやfunction)である。なので関数が入れ子になっている場合は、nonlocalが必要になることがある。C++は if (cond) {} や何もキーワードがつかない {} も自動変数の範囲と寿命を決めているが、Rはそうではないので注意する(ifなどはスコープを変えない)。
 
 ## いろいろな処理と込み入った話題
 
@@ -468,10 +503,11 @@ Rでは文字列の整形をするには、昔ながらのsprintfを使う。
 sprintf("地点=%s, 温度=%.1f", "横浜", 11.8)
 ```
 
-文字列を連結するときは、pasteを使う。sepが文字列の区切り文字であるが、デフォルトは半角空白1個である。区切り文字を~文字列にするには明示的にしているか、paste0を使う。Rの文字列は + 演算子で連結できない。
+文字列を連結するときは、pasteを使う。sep引数が文字列の区切り文字で、デフォルトは半角空白1個である。英語で英単語を連結して文を作るときはこれでよいが、日本語では困ることがあるだろう。区切り文字を空文字列にするには明示的に指定するか、paste0を使う。Rの文字列は + 演算子で連結できない。
 
 ```{r paste}
 paste("神奈川県", "横浜市", "中区")
+paste("神奈川県", "横浜市", "中区", sep=" ")
 paste0("神奈川県", "横浜市", "中区")
 paste("神奈川県", "横浜市", "中区", sep=":")
 ```
@@ -483,7 +519,7 @@ words <- c("神奈川県", "横浜市", "中区")
 paste(words)
 ```
 
-collapseを指定すると、文字列を区切り文字で連結して、単一の文字列を返す。
+collapseを指定すると、文字列を区切り文字で連結して、単一の文字列を返す。reduceな動作になる。
 
 ```{r paste_reduce}
 paste(words, sep="", collapse=":")
@@ -515,6 +551,8 @@ as.numeric("-2.7")
 as.integer("-2.7")
 as.character(-2.7)
 ```
+
+Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
 
 ### 参照渡しと copy-on-modify
 
@@ -552,7 +590,7 @@ v
 
 doublerの中では二倍になったようだが(和が20なので)、呼び出し元の変数vは変わらなかった。これがcopy-on-modifyである。
 
-Rでは引数を上書きすることは諦めて、値を返す関数を素直にmapで書こう。"~ .x * 2" は無名関数の略記法である。いずれ役に立つことがあるだろう。
+Rでは引数を上書きすることは諦めて、値を返す関数を素直にmapで書こう。"~ .x * 2" は無名関数の略記法である。今は深入りしないが、いずれ役に立つことがあるだろう。
 
 ```{r double_map_r}
 doubler <- function(x) {
@@ -562,30 +600,9 @@ doubler <- function(x) {
 doubler(rep(1, 10))
 ```
 
-### Assertionとデフォルト値
+### デフォルト値
 
-Pythonでは、()をつけずにassertを書く。
-
-```{python assert_python, result="asis"}
-assert 2 ** 4 == 16
-```
-
-```{python assertion_failed_python, error=TRUE, result="asis"}
-assert 2 ** 4 != 16
-```
-
-Rではassertthatを使う。
-
-```{r assert_r}
-library(assertthat)
-assertthat::assert_that((2 ** 4) == 16)
-```
-
-```{r assertion_failed_r, error=TRUE}
-assertthat::assert_that((2 ** 4) != 16)
-```
-
-Pythonで関数呼び出しに失敗した場合にデフォルト値を得ようとしたら、try-except構文を使うだろう。Rではpurrr::possiblyを使って、デフォルト値を返す関数を作る。なお stop はエラーを発生させる関数である。
+Pythonで関数呼び出しに失敗した場合にデフォルト値を得ようとしたら、try-except構文を使うだろう。Rではpurrr::possiblyを使って、デフォルト値を返す関数を作る。 stop はエラーを発生させる関数である。
 
 ```{r possibly, error=TRUE}
 suspicious_func <- function(x) {
@@ -623,10 +640,31 @@ check_vars_exists <- function() {
 check_vars_exists()
 ```
 
+Pythonと同様にデフォルト引数を書くもできる。だがデフォルト引数がいつ評価されるかは、PythonでもRでも厄介な問題を生むので、個人的にはお勧めしない。
+
+```{python default_python, result="asis"}
+def add(x=[]):
+  x.append(1)
+  return x
+
+add()
+add()
+add()
+```
+
+```{r default_r}
+real_to_complex <- function(real, imaginary = 0.0) {
+  list(r=real, im=imaginary)
+}
+
+real_to_complex(real=1)
+real_to_complex(real=1, imaginary=2)
+```
+
 引数が無いことは missing で分かる。NULLを指定することと、引数が無いことは異なる。この例ならデフォルト引数を使っても大差ないが、引数が無いことが分かるとできることがあるかもしれない。
 
 ```{r missing_r}
-real_to_complex <- function(real, imaginary) {
+real_to_complex_alt <- function(real, imaginary) {
   im_part <- if (missing(imaginary)) {
      0
   } else {
@@ -635,9 +673,9 @@ real_to_complex <- function(real, imaginary) {
   list(r=real, im=im_part)
 }
 
-real_to_complex(real=1)
-real_to_complex(real=1, imaginary=2)
-real_to_complex(real=1, imaginary=NULL)
+real_to_complex_alt(real=1)
+real_to_complex_alt(real=1, imaginary=2)
+real_to_complex_alt(real=1, imaginary=NULL)
 ```
 
 関数のデフォルト引数の値を調べるために、Pythonでは inspect.signature を使う。Rではformalsを使う。以下は正規表現で文字列を分割する関数のデフォルト引数である。
