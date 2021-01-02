@@ -1,0 +1,423 @@
+---
+title: "Pythonプログラマが30分で分かるR"
+author: "プログラマたんbot"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r setup_r_packages, include=FALSE}
+library(assertthat)
+library(kableExtra)
+library(reticulate)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+## WindowsからPythonを起動するには、 .Rprofile にこう書く
+## Sys.setenv(PATH=paste0(c("C:\bin\anaconda", Sys.getenv("PATH")), sep="", collapse=";"))
+```
+
+## 準備
+
+R と RStudioをインストールする。
+
+## 基本型
+
+基本型として、とりあえず 論理型(logical : Pythonのbool)、数値(numeric)、文字列 (character) を知っておけばよい。characterは文字列で、文字型は無い。文字コードはUnicode、エンコードは UTF-8 一択。Shift_JIS はもう忘れよう。
+
+真理値の、真はTRUE、偽はFALSE という定数である。全部大文字である。整数と真理値を足すとき、TRUEは1に、FALSEは0として扱う。Python の 2 + True と、R の 2 + TRUE はどちらも 3 になる。
+
+まずPythonの実行結果を示す。
+
+```{python add_int_bool_python}
+2 + True
+```
+
+次にRの実行結果を示す。出力の先頭に [1] についているが、これについては後述する。
+
+```{r add_int_bool_r}
+2 + TRUE
+```
+
+NA (欠測値 : missing value)と、変数が無い(NULL)ことを区別する。変数がNAかどうかは is.na で、NULLかどうかは in.null で調べる(細かい仕様は省略)。
+
+```{r is_na}
+is.na(0)
+is.na(NA)
+is.null(0)
+is.null(NULL)
+```
+
+一般的にNAとの計算結果はNAになる。この点は、C++の boost::tribool に近い。
+
+```{r na_tribool}
+TRUE & NA
+TRUE | NA
+FALSE & NA
+FALSE | NA
+```
+
+NAは logical, numeric, character と、それぞれの型に用意されている。実は logical -> numeric -> character という変換は、必要なら暗黙に行われるので、あまり気にしなくてよい。さっきの 2 + TRUE がそうだった。
+
+数値が NA (欠測値)、正の無限大 Inf、負の無限大 -Inf、NaN (非数 : Not a number)なことは区別する。is.na, is.infinite, is.nan を使って調べる(細かい仕様は省略)。 == では比較しないことに注意する。RはNAとNaNを区別するので便利である(入力値が欠測なことと、計算結果がNaNであることは別なので)。
+
+```{r is_inf_nan}
+is.infinite(0)
+is.infinite(Inf)
+is.infinite(-Inf)
+is.nan(0)
+is.nan(NaN)
+```
+
+Rにスカラー変数はない。C++の std::vector 的な集合、つまり型が等しい複数の要素を、インデックスで参照できる集合が、ベクトルとして用意されている。なのでスカラー変数に見えるものは、要素が1個のベクトルである。変数への代入は \<- で行う。getsと発音する。Pythonと同様に=でも代入できるが、 \<- の方が見やすいだろう。
+
+```{r assign_int}
+n <- 2
+n * 3
+```
+
+複数の即値つまりからベクトルを作るには、 c(15, 26, 37, 48) というようにc()を使う。cはcombineの略である。[]を使う言語が多いのでちょっと変わっているが、慣れればそういうもの。
+
+```{r assign_vector}
+int_vec <- c(15, 26, 37, 48)
+name_vec <- c("foo", "bar", "hoge")
+int_vec
+name_vec
+```
+
+出力の [1] は、この行はベクトルの1番目から順番に表示している、という意味である。さっきから [1] が必ず表示されていたのは、要素が1個のベクトルを表示していたからである。
+
+ベクトルに限らず、配列らしくインデックスがついているデータ(PandasのDataFrameてきなものも含む)の要素は、1始まりで数える。つまりベクトルvの先頭の要素は、 v[1] で読み書きする。PythonやCなど多くの言語は0始まりだが、Rは異なる(FortranやStanも1始まり)。
+
+```{r vector_element}
+int_vec[1]
+name_vec[2]
+```
+
+Pythonと同様、複数の値を指定することもできる。
+
+```{r vector_elements}
+int_vec[c(1, 4)]
+```
+
+負の値を指定すると、指定したインデックス以外を選ぶ。つまり除外するインデックスを指定することができる。
+
+```{r vector_exclude_elements}
+int_vec[c(-2, -3)]
+```
+
+0を指定すると何も選ばない。
+
+```{r vector_no_elements}
+int_vec[0]
+```
+
+## 演算
+
+Rにスカラー変数はなく、ベクトルはあるので、演算はベクトル同士の演算になる。まず足し算 c(10, 20, 30) + c(4, 5, 6) は、要素ごとの和になる。これは要素が1個のベクトル 10 + 4 = 14 の拡張と考えれば素直だろう。
+
+```{r add_vectors}
+c(10, 20, 30) + c(4, 5, 6)
+```
+
+max()は、ベクトルでもっとも大きい値を返す。max(c(10, 20, 30)) は c(30) 、つまり要素が1個のベクトルである。さっきの足し算がmapなら、maxはreduceと考えると解りやすいだろう。
+
+```{r max_vector}
+max(c(10, 20, 30))
+```
+
+NumPyてきなbroadcastingを、Rでも行うことができる。 c(10, 20, 30) + 4 は c(14, 24, 34) になる。左辺のそれぞれに1を足すというふるまいは直観的だろう。実際には右辺ベクトルの要素を、左辺ベクトルの要素数と同じになるまで繰り返している(repeat)。
+
+```{r add_vector_int}
+c(10, 20, 30) + 4
+```
+
+## ベクトルの要素数とrange
+
+要素数はNROW()で調べる。length()は忘れていい。
+
+```{r length_vector_int}
+NROW(c(10, 20, 30))
+NROW(4)
+NROW(c())
+```
+
+Pythonのrangeてきな連番を作ろう。要素数n個のベクトルvに対して 1, 2, ..., n という連番の整数は、 seq_len(n) で作る。seq_len(NROW(c(10, 20, 30)))は要素が3個なのでc(1, 2, 3)になる。seq_len(NROW(c()))は空ベクトルが返る。Pythonと異なり、Rは閉区間=区間の開始と終了を要素に含む。
+
+```{r seq_len_vector_int}
+seq_len(NROW(c(10, 20, 30)))
+seq_len(NROW(4))
+seq_len(NROW(c()))
+```
+
+Pythonのrangeと同様のことをしたければ、 seq() とか 1:n とかがある。ただしPythonのrangeと異なり、開始番号が終了番号より小さいと、1ずつ減る数列が得られる。これだと空文字のベクトルのインデックスがc(1, 0)になりまずいので、seq_len()を使おう。
+
+```{r seq_vector}
+seq(4)
+1:4
+seq(0)
+1:0
+seq(-2)
+1:-2
+```
+
+## リスト
+
+型が混在する集合はlistに格納する。Pythonのlistと似ている。 "" が無い箇所があることに注意する。
+
+```{r list}
+a_lst <- list(name="foo", score=80, year=2019)
+a_lst
+NROW(a_lst)
+names(a_lst)
+```
+
+要素には$名前、[[属性名]]、インデックスでアクセスできる。Pythonのenumerableな感じだ。
+
+```{r list_elements}
+a_lst$score
+a_lst[["score"]]
+a_lst[[2]]
+```
+
+一重カッコ [属性名] は、要素ではなくリストを返す。
+
+```{r sublist}
+a_lst["score"]
+a_lst[2]
+is.list(a_lst["score"])
+is.list(a_lst[["score"]])
+```
+
+ベクトルと同様に、インデックスを指定して部分リストを得ることができる。属性名を指定してもよい。
+
+```{r sublists}
+a_lst[1:2]
+a_lst[c("name", "score")]
+```
+
+## DataFrame
+
+まず必要なパッケージをインストールする。
+
+```{r install, eval=FALSE, echo=TRUE}
+winstall.packages("tidyverse")
+```
+
+パッケージを使う前にimportするのは、Pythonと同様である。
+
+```{r import_tidyverse}
+library(tidyverse)
+```
+
+PandasのDataFrameと同様に、Rにもdata.frameがある(Rが先だったかもしれないが)。だがtibbleというもっといいものがあるのでそちらを使う。まずダミーデータを作る。
+
+```{r create_tibble}
+df <- tibble(name=c("foo", "bar"), score=c(80, 60), year=c(2019, 2020))
+```
+
+```{r embed_tibble, eval=TRUE, echo=FALSE}
+df %>% kable() %>% kable_styling()
+```
+
+print()すると今作った tibble を文字列として表示する。というより実は、変数名だけ入力するとprint()して表示していたのだった。PythonのREPLもそうでしょ。
+
+```{r print_tibble}
+print(df)
+```
+
+View()するとExcelっぽいウィンドウに表示する。ここには表示できないので、各自試してほしい。
+
+```{r view_tibble, eval=FALSE, echo=TRUE}
+View(df)
+```
+
+DataFrameは、縦方向(行)が標本、横方向(列)が標本の属性である。ざっくりいうと、縦に長いベクトルを横に並べたものがtibbleと思えばよい。なので、先のリストの動作がそのまま当てはまる。
+
+まず score のベクトルを取得する。PandasのSeriesとは少し異なる。
+
+```{r extract_column_as_vector}
+df$score
+df[["score"]]
+df[[2]]
+```
+
+scoreだけを切り出したtibbleを取得する。
+
+```{r extract_column_as_tibble}
+df["score"]
+df[2]
+```
+
+行=標本も指定しよう。この記法はNumPyっぽく、Pandasのようにlocとは書かない。
+
+```{r extract_cell}
+df[[1, "score"]]
+df[1, "score"]
+```
+
+行=標本を指定して全属性を取り出すときは、 , の後を空白にする。 : は書かない。
+
+```{r extract_sample}
+df[1, ]
+```
+
+ここでは一列ずつ、一行ずつ取り出したが、リストと同様に複数の要素を取り出すこともできる。
+
+
+## 関数
+
+Rの関数は、Pythonのラムダ式である。
+
+Pythonでは以下のように、引数の二乗を返す無名関数を定義して、それをmy_squareという変数に格納し、こう呼び出せる。
+
+```{python lambda_python}
+my_square = lambda n: n * n
+my_square(9)
+```
+
+Rではfunctionと書く。
+
+```{r lambda_r}
+my_square <- function(n) { n * n }
+my_square(9)
+```
+
+```{r keyword_parameters}
+my_square(n=9)
+```
+
+Pythonと同様に、引数のキーワードありとなしを混在することもできる。まずキーワードがある引数を当てはめ、残りのパラメータをまだ値が無い先頭のパラメータから順に当てはめる。
+
+```{r named_parameters}
+my_pow <- function(base, index) {
+  base ** index
+}
+my_pow(index=2, 3)
+```
+
+do.callを使って、Pythonのunpack, Rubyのsplatのように、名前付きlistを引数に展開することもできる。
+
+```{r splat_parameters}
+args <- list(base=3, index=2)
+do.call(my_pow, args)
+```
+
+さて、Rの関数はすべて式(expression)である。関数が最後に評価したこと(雑に言うと{}の最後の行)が関数の返り値になる。関数定義の途中で処理を終えるのでなければ、returnと明示する必要ない(この辺はRubyっぽい)。
+
+Rで負の数の対数を取ると警告を出してNaNを返すが、代わりに-Infを返す関数を作ろう。ifも式なのでこう書ける。
+
+```{r if_expression}
+my_log10 <- function(x) {
+  if (x <= 0) {
+    -Inf
+  } else {
+    log10(x)
+  }
+}
+
+log10(-1)
+my_log10(-1)
+my_log10(0)
+my_log10(0.1)
+my_log10(10)
+```
+
+最初に述べた通り、Rにスカラーはないので、この引数xはベクトルである。ならば、ベクトルを受け取ってベクトルを返すのがRっぽい(R-like)だろう。上記のコードがどうなるか試してみよう。
+
+```{r naive_my_log}
+my_log10(c(-1, 0, 0.1, 10))
+```
+
+上手くいってないようだ。改善方法は二つある。一つ目の方法は、ifelseを使って、ベクトルの要素ごとにthenとelseを選ぶことだ。ただしこれは、log10(負の値)が警告を出すので、見た目がよろしくない。警告ではなくエラーになる関数では使えないだろう。
+
+```{r if_else_log}
+my_log10_alt1 <- function(xs) {
+  ifelse(xs <= 0, -Inf, log10(xs))
+}
+my_log10_alt1(c(-1, 0, 0.1, 10))
+```
+
+二つ目の方法は、Pythonの list comprehension てきに写像(map, inject)することだ。このようにmapを使いこなすとよいだろう。
+
+```{r map_else_log}
+my_log10_alt2 <- function(xs) {
+  purrr::map_dbl(xs, function(x) {
+    if (x <= 0) {
+      -Inf
+    } else {
+      log10(x)
+    }
+  })
+}
+my_log10_alt2(c(-1, 0, 0.1, 10))
+```
+
+Rでfor文は使わないので、忘れてよい。Pythonでfor文を使う処理があったら、常にmapとreduceを使うことを検討しよう。上記の通りmapは書いたので、reduceの使い方として、フィボナッチ数列を示そう。0と負の数についてはエラーになるが、それでいいだろう。
+
+```{r reduce_fib}
+my_fib <- function(xs) {
+  purrr::map_dbl(xs, function(x) {
+    tail(purrr::reduce(.x=seq_len(x), .init=integer(), function(acc, i) {
+      if (i == 1) {
+        c(1)
+      } else if (i == 2) {
+        c(1, 1)
+      } else {
+        c(acc[2], sum(acc))
+      }
+    }), 1)
+  })
+}
+
+my_fib(1:10)
+```
+
+## Assertionとデフォルト値
+
+Pythonでは、()をつけずにassertを書く。
+
+```{python assert_python}
+assert 2 ** 4 == 16
+```
+
+```{python assertion_failed_python, error=TRUE, result="asis"}
+assert 2 ** 4 != 16
+```
+
+Rではassertthatを使う。
+
+```{r assert_r}
+library(assertthat)
+assertthat::assert_that((2 ** 4) == 16)
+```
+
+```{r assertion_failed_r, error=TRUE}
+assertthat::assert_that((2 ** 4) != 16)
+```
+
+Pythonで関数呼び出しに失敗した場合にデフォルト値を得ようとしたら、try-except構文を使うだろう。Rではpurrr::possiblyを使って、デフォルト値を返す関数を作る。なお stop はエラーを発生させる関数である。
+
+```{r possibly, error=TRUE}
+suspicious_func <- function(x) {
+  stop("Unsupported")
+}
+
+safe_func <- purrr::possibly(suspicious_func, NA)
+safe_func(1)
+```
+
