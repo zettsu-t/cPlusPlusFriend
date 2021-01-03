@@ -21,7 +21,6 @@ urlcolor: blue
 ---
 
 ```{r setup_r_packages, include=FALSE}
-library(assertthat)
 library(kableExtra)
 library(reticulate)
 ```
@@ -503,7 +502,7 @@ Rでは文字列の整形をするには、昔ながらのsprintfを使う。
 sprintf("地点=%s, 温度=%.1f", "横浜", 11.8)
 ```
 
-文字列を連結するときは、pasteを使う。sep引数が文字列の区切り文字で、デフォルトは半角空白1個である。英語で英単語を連結して文を作るときはこれでよいが、日本語では困ることがあるだろう。区切り文字を空文字列にするには明示的に指定するか、paste0を使う。Rの文字列は + 演算子で連結できない。
+文字列を連結するときは、pasteを使う。sep引数が文字列の区切り文字で、デフォルトは半角空白1個である。英語で英単語を連結して文を作るときはこれでよいが、日本語では困ることがあるだろう。区切り文字を空文字列にするにはsep引数で明示的に指定するか、paste0を使う。Rの文字列は + 演算子で連結できない。
 
 ```{r paste}
 paste("神奈川県", "横浜市", "中区")
@@ -640,7 +639,7 @@ check_vars_exists <- function() {
 check_vars_exists()
 ```
 
-Pythonと同様にデフォルト引数を書くもできる。だがデフォルト引数がいつ評価されるかは、PythonでもRでも厄介な問題を生むので、個人的にはお勧めしない。
+Pythonと同様にデフォルト引数を書くこともできる。だがデフォルト引数がいつ評価されるかは、PythonでもRでも厄介な問題を生むので、個人的にはお勧めしない。
 
 ```{python default_python, result="asis"}
 def add(x=[]):
@@ -689,13 +688,138 @@ inspect.signature(re.split)
 formals(stringr::str_split)
 ```
 
-### グラフを描く
-
-### CSVを出力する
-
 ### コマンドラインのオプションを解析する
 
 Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両者はほとんど同じである。
+
+## CSVファイルを読んで集計する
+
+Rの基本が分かったので、CSVファイルをRで読み込んで描画しよう。Rにはサンプルデータがあってそれを使うのが定番であるが、そういう描画例はウェブで多数見つかるのと、Pythonで同じデータを描画できることを目的に、横浜市のオープンデータを使用する。
+
+※ 本 R Markdown からHTML文書やPDF文書を生成した場合、 [横浜市のオープンデータ](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/) を編集・加工したものが埋め込まれます。これらは [利用条件等](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/opendata.html) に記載の、 CC BY 4.0 に基づいています。
+
+本R Markdown文書にはデータを添付しないので、R MarkdownからHTMLを生成する場合は、各自ダウンロードして、 **incoming_yokohama** サブフォルダに置くこと。ウェブ上のデータは更新されているので、実行時期によって結果が変わるかもしれない。
+
+|内容とリンク先|更新日|ファイル名|
+|:------------------------------|:------------------------------|:------------------------------|
+|[人口と世帯数の推移](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/jinko-setai-suii.html)|最新版(2020年まで)|jinkosetai-sui.csv|
+|[男女別人口及び世帯数－行政区](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/suikei01.html)|令和2年9月(2020年9月)|e1yokohama2009.csv|
+
+### CSVファイルを読む
+
+readr::read_csv を使う。
+
+```{r read_csv}
+library(tidyverse)
+df_timeseries <- readr::read_csv("incoming_yokohama/jinkosetai-sui.csv")
+```
+
+```{r table_timeseries, echo=FALSE}
+df_timeseries %>% head() %>% kable() %>% kable_styling()
+```
+
+さてprintで表示すると、列名に `` がついているのが分かる。
+
+```{r print_timeseries}
+print(df_timeseries)
+```
+
+これは列名に ( を含むので、$の後に列名を書けないということである。
+
+```{r print_timeseries_column_error, error=TRUE}
+df_timeseries$年（和暦）
+```
+
+という風に、 ( が上手く構文解析できないのでエラーになってしまった。名前として使えるものを syntactic name 、そうでないものを non-syntactic name と呼ぶ。詳しい解説は[Advanced R](https://adv-r.hadley.nz/names-values.html)にあるが、ここでは間にあわせの回避策だけ述べよう。
+
+一つ目は、列名を `` (backtick)で囲むことである。
+
+```{r print_timeseries_column_correct}
+df_timeseries$`年（和暦）`
+```
+
+二つ目は、列名を付け替えることである。もちろん入力するデータがどんな形式か分かっていて、それぞれの列に対応する名前をつける。
+
+```{r rename_timeseries_column_correct}
+colnames(df_timeseries) <- c("JPyear", "Year", "Household", "Population")
+```
+
+```{r renamed_table_timeseries, echo=FALSE}
+df_timeseries %>% head() %>% kable() %>% kable_styling()
+```
+
+### グラフを描く
+
+まず単純なグラフを描こう。横軸を年(西暦)、縦軸を人口の折れ線グラフを描く。たった3行で済む。
+
+```{r draw_table_timeseries}
+library(ggplot2)
+g <- ggplot(df_timeseries)
+g <- g + geom_line(aes(x=Year, y=Population))
+plot(g)
+```
+
+いろいろと見た目を変えたり、要素を付け加えることもできる。詳しくは [R for Data Science](https://r4ds.had.co.nz/data-visualisation.html)に例がたくさんある。
+
+- 折れ線の色を青くして太くする
+- タイトルをつける
+- 高さを幅の0.6倍にする
+- フォントを Segoe UI にして、フォントのサイズを指定する
+
+```{r draw_fancy_table_timeseries, message=FALSE}
+library(extrafont)
+font_name <- "Segoe UI"
+g <- ggplot(df_timeseries)
+g <- g + geom_line(aes(x=Year, y=Population), color="navy", size=2)
+g <- g + ggtitle("Yokohama Population")
+g <- g + theme_bw()
+g <- g + theme(aspect.ratio=0.6,
+               text=element_text(family=16),
+               axis.text=element_text(family=font_name, size=14),
+               axis.title=element_text(family=font_name, size=16),
+               plot.title=element_text(family=font_name, size=20))
+plot(g)
+```
+
+tibbleの列名は英語にしても、図の表示は日本語にしたいということがあるだろう。 Migu 1M フォントで表示する。
+
+```{r draw_jp_table_timeseries}
+font_name <- "Segoe UI"
+font_name_jp <- "Migu 1M"
+g <- ggplot(df_timeseries)
+g <- g + geom_line(aes(x=Year, y=Population), color="navy", size=2)
+g <- g + ggtitle("横浜市の人口")
+g <- g + xlab("年(西暦)")
+g <- g + ylab("人口")
+g <- g + theme_bw()
+g <- g + theme(aspect.ratio=0.6,
+               text=element_text(family=font_name),
+               axis.text=element_text(family=font_name_jp, size=14),
+               axis.title=element_text(family=font_name_jp, size=16),
+               plot.title=element_text(family=font_name_jp, size=20))
+plot(g)
+```
+
+図をPNGファイルに保存するには、 ggsaveを使う。
+
+```{r ggsave_png, message=FALSE}
+ggsave("yokohama_population.png", plot = g, dpi = 160)
+```
+
+png() と dev.off() で囲んでもよいが、その場合は高さと幅のピクセル数を固定する必要がある。縦横比を変えたくないときはうれしくないだろう。
+
+```{r save_png, message=FALSE}
+png(filename = "yokohama_population.png", width = 800, height = 600)
+g <- ggplot(df_timeseries)
+g <- g + geom_line(aes(x=Year, y=Population))
+plot(g)
+dev.off()
+```
+
+
+### CSVを加工する
+
+### CSVを出力する
 
 
 ## その他ツール
@@ -709,4 +833,6 @@ Pythonでコードを試しながら書く場合、Jupyter Notebook を使って
 Pythonのコードは、 autopep8 で整形して、pylintk, pep8, flake8 でコードの問題点を静的解析して指摘するだろう(他にもツールがあるかもしれない)。
 
 Rは styler でコードを整形して、 lintr でコードの問題点を静的解析して指摘するとよい。Rスクリプトだけでなく、R Markdown も整形できる。
+
+## 参考文献
 
