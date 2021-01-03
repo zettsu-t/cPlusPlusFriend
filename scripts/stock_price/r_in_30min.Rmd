@@ -694,9 +694,7 @@ Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両
 
 ## CSVファイルを読んで集計する
 
-Rの基本が分かったので、CSVファイルをRで読み込んで描画しよう。Rにはサンプルデータがあってそれを使うのが定番であるが、そういう描画例はウェブで多数見つかるのと、Pythonで同じデータを描画できることを目的に、横浜市のオープンデータを使用する。
-
-※ 本 R Markdown からHTML文書やPDF文書を生成した場合、 [横浜市のオープンデータ](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/) を編集・加工したものが埋め込まれます。これらは [利用条件等](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/opendata.html) に記載の、 CC BY 4.0 に基づいています。
+Rの基本が分かったので、CSVファイルをRで読み込んで描画しよう。Rにはサンプルデータがあってそれを使うのが定番であるが、そういう描画例はウェブで多数見つかるのと、Pythonで同じデータを描画できることを目的に、横浜市のオープンデータを使用する(詳細は[データ出典](#データ出典) )。
 
 本R Markdown文書にはデータを添付しないので、R MarkdownからHTMLを生成する場合は、各自ダウンロードして、 **incoming_yokohama** サブフォルダに置くこと。ウェブ上のデータは更新されているので、実行時期によって結果が変わるかもしれない。
 
@@ -738,7 +736,7 @@ df_timeseries$年（和暦）
 df_timeseries$`年（和暦）`
 ```
 
-二つ目は、列名を付け替えることである。もちろん入力するデータがどんな形式か分かっていて、それぞれの列に対応する名前をつける。
+二つ目は、列名を colnames で付け替えることである。もちろん入力するデータがどんな形式か分かっていて、それぞれの列に対応する名前をつける。
 
 ```{r rename_timeseries_column_correct}
 colnames(df_timeseries) <- c("JPyear", "Year", "Household", "Population")
@@ -816,11 +814,161 @@ plot(g)
 dev.off()
 ```
 
+### CSVファイルを加工する
 
-### CSVを加工する
+Pandasてきに、CSVファイルを加工する方法を説明する。横浜市各区の人口を読み込む。その後、列名を英語にする。
 
-### CSVを出力する
+```{r read_wards}
+df_population_data <- readr::read_csv("incoming_yokohama/e1yokohama2009.csv")
+print(colnames(df_population_data))
+colnames(df_population_data) <- c("date", "code", "ward", "area", "household", "population", "male", "female", "per_household", "density", "diff_household", "diff_population")
+```
 
+```{r print_wards, eval=FALSE, echo=FALSE}
+## 表示すると、列が長すぎて画面からはみ出しているかもしれない。それと先頭行は区ではなく、横浜市の合計である。
+df_population_data %>% kable() %>% kable_styling()
+```
+
+今後使いそうな列だけ残して、後は削除する。列を選ぶには dplyr::select を使う。 %>% は、コマンドラインのパイプと同様、前段で処理したデータを後段に流す。この書き方に慣れるとRが好きになるだろう。実際には前段の返り値を後段の第一引数にしており、Pandasのメソッドチェーンと同じである。
+
+```{r select_wards}
+df_population <- df_population_data %>%
+  dplyr::select(c("ward", "area", "household", "population", "per_household", "density"))
+```
+
+```{r print_selected_wards, echo=FALSE}
+df_population %>% kable() %>% kable_styling()
+```
+
+横浜市の合計を各区を分離しよう。 dplyr::filter を使って、条件に合う行を抜き出す。
+
+```{r separate_wards}
+df_all_city <- df_population %>%
+  dplyr::filter(ward == "横浜市")
+
+df_wards <- df_population %>%
+  dplyr::filter(ward != "横浜市")
+```
+
+```{r print_all_city, echo=FALSE}
+df_all_city %>% kable() %>% kable_styling()
+```
+
+dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これはシンボル(symbol)と言う。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは、 rlang::sym を使う。
+
+```{r separate_wards_again}
+library(rlang)
+ward_column_name <- "ward"
+df_wards_alt <- df_population %>%
+  dplyr::filter(!!rlang::sym(ward_column_name) != "横浜市")
+assertthat::assert_that(identical(df_wards, df_wards_alt))
+```
+
+実は　dplyr::select は、文字列だけでなくシンボルを受け付る。なので "" が無くてもよかった。わざとらしい例だが、複数の文字列を文字列ベクトルにするには、 rlang::syms を使う。それと、!!ではなく!!!を使う。!!と!!!は否定の否定、否定の否定の否定、ではなく演算子というのが珍しい。
+
+```{r select_wards_again}
+column_names <- c("ward", "area", "household", "population", "per_household", "density")
+df_population_alt <- df_population_data %>%
+  dplyr::select(!!!rlang::syms(column_names))
+assertthat::assert_that(identical(df_population, df_population_alt))
+```
+
+### それぞれの行を集計する
+
+df_wards には、 1世帯当たり人員[人] (per_household 列)と 人口密度[人/平方キロメートル] (density 列)がある。これらは、人口(population 列)、世帯数(household 列) 、面積(area 列)から計算できる。 dplyr::mutate で実際に計算して列を作ろう。
+
+```{r mutate_wards}
+df_wards_calc <- df_wards %>%
+  dplyr::mutate(per_household_calc = population / household, density_calc = population / area)
+```
+
+元データの per_household と計算で求めた per_household_calc 、元データの density と計算で求めた density_calc が等しいか確認しよう。浮動小数が丸め誤差を除いて大体同じかどうかは、 dplyr::near で許容誤差 tol を与えて比べる。dplyr::near は二つの要素を先頭から順に比較して、大体同じ=TRUE、違う=FALSEというベクトルを返す。全部TREUかどうかはallで分かる。
+
+```{r near_calc}
+assertthat::assert_that(all(dplyr::near(x = df_wards_calc$per_household,
+  y = df_wards_calc$per_household_calc, tol = 0.01)))
+assertthat::assert_that(all(dplyr::near(x = df_wards_calc$density,
+  y = df_wards_calc$density_calc, tol = 1.0)))
+```
+
+計算した1世帯当たり人員と人口密度があっていたようだ。
+
+### それぞれの列を集計する
+
+全区の世帯数と人口を足して、横浜市全体 df_all_city と同じかどうか確かめる。
+
+```{r sum_wards}
+df_wards_sum <- df_wards_calc %>%
+  dplyr::summarize_at(c("household", "population"), sum)
+```
+
+```{r print_sum_wards, echo=FALSE}
+df_wards_sum %>% kable() %>% kable_styling()
+```
+
+```{r verify_sum}
+assertthat::assert_that(df_all_city$household == df_wards_sum$household)
+assertthat::assert_that(df_all_city$population == df_wards_sum$population)
+```
+
+各区の合計は全市と一致したようだ。
+
+ここでは世帯数と人口を足したが、それは区の名前、1世帯当たり人員、人口密度を足しても意味が無いからである。そして面積は足していなかった。列名を挙げるのがめんどくさければ、列が数字だったら足す、という操作をしたい。そういうときは、dplyr::summarize_all を使う。1世帯当たり人員と人口密度を除いてから、区の名前以外を足す。
+
+```{r sum_wards_all}
+df_wards_sum_all <- df_wards %>%
+  dplyr::select(-c("per_household", "density")) %>%
+  dplyr::summarize(across(where(is.numeric), sum))
+```
+
+```{r verify_sum_all}
+assertthat::assert_that(dplyr::near(x = df_all_city$area, y = df_wards_sum_all$area, tol = 1.0))
+```
+
+### 行をグループ化する
+
+グループ化の例として、横浜市各区を [税務署の管轄地域](https://www.nta.go.jp/about/organization/tokyo/location/kanagawa.htm)でまとめよう。
+
+```{r tax_offices}
+tax_offices <- c("神奈川", "神奈川", "鶴見", "戸塚", "戸塚", "戸塚", "保土ケ谷",
+  "保土ケ谷", "保土ケ谷", "緑", "緑", "緑", "横浜中", "横浜中",
+  "横浜南", "横浜南", "横浜南", "横浜南")
+ward_names <- c("神奈川区", "港北区", "鶴見区", "戸塚区", "栄区", "泉区",
+  "保土ケ谷区", "旭区", "瀬谷区", "緑区", "青葉区", "都筑区", "中区", "西区",
+  "南区", "磯子区", "金沢区", "港南区")
+df_tax_offices <- tibble(tax_office=tax_offices, ward=ward_names)
+```
+
+区の名前で結合する。
+
+```{r join_tax_offices}
+df_ward_tax_offices <- dplyr::inner_join(df_tax_offices, df_wards, by="ward")
+```
+
+税務署ごとに世帯数と人口をまとめよう。dplyr::group_by を使って、行をグループ化できる。それぞれのグループについて、列ごとにすべての行を足す。
+
+```{r group_tax_offices}
+df_group_population <- df_ward_tax_offices %>%
+  dplyr::select(c("household", "population", "tax_office")) %>%
+  dplyr::group_by(tax_office) %>%
+  dplyr::summarize(across(everything(), sum)) %>%
+  dplyr::ungroup()
+```
+
+```{r print_group_tax_offices, echo=FALSE}
+df_group_population %>% kable() %>% kable_styling()
+```
+
+鶴見が少ないのは鶴見区しかないからだが、横浜中も少ない。おそらく人口の割に事業所が多いからだと予想するが、実際そうなっているか確認するのは読者への課題とする。ちなみに衆議院選挙小選挙区は区や市をまたぐので、今回の目的には使えなかった。
+
+### CSVファイルを出力する
+
+readr::write_excel_csv を使って、BOMつきUTF-8でCSVファイルを書く。こうしておくとExcelで読める(BOMがないとExcelで読めない)。Pandasと同様、gzip形式で読み書きできる。
+
+```{r write_group_tax_offices}
+readr::write_excel_csv(df_ward_tax_offices, path="yokohama_tax_office.csv")
+readr::write_excel_csv(df_ward_tax_offices, path="yokohama_tax_office.csv.gz")
+```
 
 ## その他ツール
 
@@ -834,5 +982,35 @@ Pythonのコードは、 autopep8 で整形して、pylintk, pep8, flake8 でコ
 
 Rは styler でコードを整形して、 lintr でコードの問題点を静的解析して指摘するとよい。Rスクリプトだけでなく、R Markdown も整形できる。
 
-## 参考文献
+## 次に進むには
+
+最初に[データサイエンス100本ノック（構造化データ加工編）](https://github.com/The-Japan-DataScientist-Society/100knocks-preprocess)を解いて、PythonのDataFrameと、Rのtibbleの違いを覚えるとよいでしょう。
+
+参考書としては、以下の順番が一案です。
+
+- 最初に読むのは、Rではじめるデータサイエンス (原著 : [R for Data Science](https://r4ds.had.co.nz/) )
+- Rをもっと使いこなすなら、Rクックブック 第2版 ( 原著 : [R Cookbook 2nd Edition](https://rc2e.com/) )
+- R StudioとR Markdownの使い方を学ぶなら、再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)
+- プログラミング言語Rを深く知りたいなら、R言語徹底解説(ただし和訳は版が古い、原著 : [Advanced R](https://adv-r.hadley.nz/) )
+
+|書名|著者|年|リンク|
+|:--------------------------|:---------------------------------------------------------|:--------|:--------------------------|
+|R for Data Science|Garrett Grolemund and Hadley Wickham|2017|https://r4ds.had.co.nz/|
+|R Cookbook 2nd Edition|James (JD) Long and Paul Teetor|2019|https://rc2e.com/|
+|Advanced R|Hadley Wickham|2019|https://adv-r.hadley.nz/|
+|R packages|Hadley Wickham|2015|http://r-pkgs.had.co.nz/|
+
+|書名|著者|年|出版社|
+|:---------------------------------------------------------|:-------------------------------------------------|:---------|:-----------------------------|
+|Rではじめるデータサイエンス|Hadley Wickham, Garrett Grolemund 著/黒川利明 訳/大橋真也 監修|2017|オライリー・ジャパン|
+|Rクックブック 第2版|J.D. Long, Paul Teetor 著/大橋真也 監訳/木下哲也 訳|2020|オライリー・ジャパン|
+|再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)|高橋康介 著/石田基広 監修/市川太祐, 高橋康介, 高柳慎一, 福島真太朗, 松浦健太郎 編|2018|共立出版|
+|R言語徹底解説|Hadley Wickham 著/石田基広, 市川太祐, 高柳慎一, 福島真太朗 訳|2016|共立出版|
+|みんなのR 第2版|Jared P. Lander 著/高柳慎一, 津田真樹, 牧山幸史, 松村杏子, 簑田高志 監修|2018|マイナビ出版|
+|パーフェクトR|Rサポーターズ 著|2017|技術評論社|
+|Rパッケージ開発入門 テスト、文書化、コード共有の手法を学ぶ|Hadley Wickham 著/瀬戸山雅人, 石井弓美子, 古畠敦 訳|2016|オライリー・ジャパン|
+
+## データ出典
+
+本 R Markdown からHTML文書やPDF文書を生成した場合、 [横浜市のオープンデータ](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/) を編集・加工したものが埋め込まれます。これらは [利用条件等](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/opendata.html) に記載の、 CC BY 4.0 に基づいています。
 
