@@ -32,7 +32,17 @@ library(reticulate)
 
 ## 準備
 
-R と RStudioをインストールする。
+[R](https://cran.r-project.org/bin/windows/base/) と [RStudio](https://rstudio.com/products/rstudio/) をインストールする。そのあと必要なパッケージをインストールする。
+
+```{r install, eval=FALSE, echo=TRUE}
+install.packages("assertthat")
+install.packages("extrafont")
+install.packages("rlang")
+install.packages("tidyverse")
+install.packages("RColorBrewer")
+```
+
+以下のコードをRStudioのConsoleに順に入力して実行する。Rスクリプトを実行するときは、拡張 .R のファイルにコードを書いて、シェルからRscriptを起動する。
 
 ## プログラミング言語Rの基本
 
@@ -203,7 +213,7 @@ assert 2 ** 4 == 16
 assert 2 ** 4 != 16
 ```
 
-Rではassertthatを使う。
+Rではassertthatを使う。パッケージを使う前にimportするのは、Pythonと同様である。
 
 ```{r assert_r}
 library(assertthat)
@@ -281,14 +291,6 @@ assertthat::assert_that(identical(original_vec, converted_vec))
 ```
 
 ### DataFrame (tibble)
-
-まず必要なパッケージをインストールする。
-
-```{r install, eval=FALSE, echo=TRUE}
-install.packages("tidyverse")
-```
-
-パッケージを使う前にimportするのは、Pythonと同様である。
 
 ```{r import_tidyverse}
 library(tidyverse)
@@ -840,14 +842,14 @@ df_population <- df_population_data %>%
 df_population %>% kable() %>% kable_styling()
 ```
 
-横浜市の合計を各区を分離しよう。 dplyr::filter を使って、条件に合う行を抜き出す。
+横浜市の合計を各区を分離しよう。 dplyr::filter を使って、～区とそれ以外を抜き出す。
 
 ```{r separate_wards}
-df_all_city <- df_population %>%
-  dplyr::filter(ward == "横浜市")
-
 df_wards <- df_population %>%
-  dplyr::filter(ward != "横浜市")
+  dplyr::filter(stringr::str_ends(ward, "区"))
+
+df_all_city <- df_population %>%
+  dplyr::filter(!stringr::str_ends(ward, "区"))
 ```
 
 ```{r print_all_city, echo=FALSE}
@@ -960,6 +962,85 @@ df_group_population %>% kable() %>% kable_styling()
 ```
 
 鶴見が少ないのは鶴見区しかないからだが、横浜中も少ない。おそらく人口の割に事業所が多いからだと予想するが、実際そうなっているか確認するのは読者への課題とする。ちなみに衆議院選挙小選挙区は区や市をまたぐので、今回の目的には使えなかった。
+
+### カテゴリ変数
+
+グループに用いた税務署名は文字列である。これをカテゴリ値にすることができる。Rではカテゴリをfactorと呼ぶ。 as.factor で文字列をカテゴリに変換する。
+
+```{r factor_tax_offices}
+df_factor <- df_ward_tax_offices %>%
+  dplyr::mutate(tax_office = as.factor(tax_office))
+```
+
+カテゴリを表示すると、見た目は文字列のままだが、実際は文字列に対応する整数を振ったものだと分かる。
+
+```{r print_facotr_tax_offices}
+df_factor$tax_office
+as.integer(df_factor$tax_office)
+```
+
+カテゴリの整数の番号を固定したいことがある。例えばグラフの凡例を描くとき、凡例はカテゴリの整数が小さい順(1, 2, ...)に表示される。forcats::fct_relevel を使うと、整数の順番を固定できる。五十音順にしよう。
+
+```{r relevel_tax_offices}
+df_factor <- df_ward_tax_offices %>%
+  dplyr::mutate(tax_office = as.factor(tax_office)) %>%
+  dplyr::mutate(tax_office = forcats::fct_relevel(tax_office,
+    c("神奈川", "鶴見", "戸塚", "保土ケ谷", "緑", "横浜中", "横浜南")))
+df_factor$tax_office
+as.integer(df_factor$tax_office)
+```
+
+先ほどとは整数の割り当てが異なる。図にしたとき、凡例が五十音順になることを確かめよう。
+
+```{r draw_relevel_tax_offices}
+library(RColorBrewer)
+font_name <- "Segoe UI"
+font_name_jp <- "Migu 1M"
+g <- ggplot(df_factor)
+g <- g + geom_point(aes(x = per_household, y = density, color = tax_office), size = 4, shape = 4)
+g <- g + geom_text(aes(x = per_household, y = density, label = ward),
+  nudge_x = -0.03, size = 2)
+g <- g + scale_color_manual(values=brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
+g <- g + ylim(0, 16000)
+g <- g + xlab("1世帯当たり人員[人]")
+g <- g + ylab("人口密度[人/平方キロメートル]")
+g <- g + guides(color=guide_legend(title="税務署"))
+g <- g + theme_bw()
+g <- g + theme(aspect.ratio=0.8,
+               text=element_text(family=font_name_jp),
+               legend.position="right",
+               legend.text=element_text(family=font_name_jp, size=16),
+               legend.title=element_text(family=font_name_jp, size=16),
+               axis.text=element_text(family=font_name, size=16),
+               axis.title=element_text(family=font_name, size=14),
+               strip.text=element_text(family=font_name, size=20),
+               plot.title=element_text(family=font_name, size=20))
+plot(g)
+```
+
+facet_wrap(~ tax_office, nrow=2) と一行追加するだけで、カテゴリ別の表を作る。ggplot2すごい。
+
+```{r facet_wrap_relevel_tax_offices}
+g <- ggplot(df_factor)
+g <- g + geom_point(aes(x = per_household, y = density, color = tax_office), size = 4, shape = 4)
+g <- g + geom_text(aes(x = per_household, y = density, label = ward),
+  nudge_x = -0.03, size = 2)
+g <- g + scale_color_manual(values=brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
+g <- g + ylim(0, 16000)
+g <- g + xlab("1世帯当たり人員[人]")
+g <- g + ylab("人口密度[人/平方キロメートル]")
+g <- g + guides(color=guide_legend(title="税務署"))
+g <- g + theme_bw()
+g <- g + facet_wrap(~ tax_office, nrow=2)
+g <- g + theme(aspect.ratio=0.8,
+               text=element_text(family=font_name_jp),
+               legend.position="none",
+               axis.text=element_text(family=font_name, size=9),
+               axis.title=element_text(family=font_name, size=10),
+               strip.text=element_text(family=font_name, size=12),
+               plot.title=element_text(family=font_name, size=12))
+plot(g)
+```
 
 ### CSVファイルを出力する
 
