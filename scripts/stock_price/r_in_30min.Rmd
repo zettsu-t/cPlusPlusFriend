@@ -36,6 +36,7 @@ library(reticulate)
 
 ```{r install, eval=FALSE, echo=TRUE}
 install.packages("assertthat")
+install.packages("functional")
 install.packages("extrafont")
 install.packages("rlang")
 install.packages("tidyverse")
@@ -84,7 +85,7 @@ FALSE | NA
 
 NAは logical, numeric, character と、それぞれの型に用意されている。実は logical -> numeric -> character という変換は、必要なら暗黙に行われるので、あまり気にしなくてよい。さっきの 2 + TRUE がそうだった。
 
-数値が NA (欠測値)、正の無限大 Inf、負の無限大 -Inf、NaN (非数 : Not a Number)なことは区別する。is.na, is.infinite, is.nan を使って調べる(細かい仕様は省略)。 == では比較しないことに注意する。RはNAとNaNを区別するので便利である(入力値が欠測なことと、計算結果がNaNであることは別なので)。
+数値が NA (欠測値)、正の無限大 Inf、負の無限大 -Inf、NaN (非数 : Not a Number)なことは区別する。is.na, is.infinite, is.nan を使って調べる。 == では比較しないことに注意する。RはNAとNaNを区別するので便利である(入力値が欠測なことと、計算結果がNaNであることは別なので)。
 
 ```{r is_inf_nan}
 is.infinite(0)
@@ -94,6 +95,12 @@ is.infinite(-Inf)
 -Inf < 0
 is.nan(0)
 is.nan(NaN)
+```
+
+関数の説明は、? + 関数名で得られる。R Consoleから ?is.na と入力すると、 is.na の説明が表示される。ネットで探すよりも速い。
+
+```{r help_is_nan, eval=FALSE, echo=TRUE}
+?is.na
 ```
 
 Rにスカラー変数はない。C++の std::vector てきな集合、つまり型が等しい複数の要素を、インデックスで参照できる集合が、ベクトルとして用意されている。なのでスカラー変数に見えるものは、要素が1個のベクトルである。変数への代入は \<- で行う。Getsと発音する。Pythonと同様に=でも代入できるが、 \<- の方が見やすいだろう。
@@ -217,11 +224,11 @@ Rではassertthatを使う。パッケージを使う前にimportするのは、
 
 ```{r assert_r}
 library(assertthat)
-assertthat::assert_that((2 ** 4) == 16)
+assertthat::assert_that((2**4) == 16)
 ```
 
 ```{r assertion_failed_r, error=TRUE}
-assertthat::assert_that((2 ** 4) != 16)
+assertthat::assert_that((2**4) != 16)
 ```
 
 ### リスト
@@ -229,7 +236,7 @@ assertthat::assert_that((2 ** 4) != 16)
 型が混在する集合はlistに格納する。Pythonのlist、C言語の構造体と似ている。 "" が無い箇所があることに注意する。
 
 ```{r list}
-a_lst <- list(name="foo", score=80, year=2019)
+a_lst <- list(name = "foo", score = 80, year = 2019)
 a_lst
 NROW(a_lst)
 names(a_lst)
@@ -275,7 +282,7 @@ NROW(list_3_elements)
 こちらはリストを入れ子にする。
 
 ```{r nested_lists}
-nested_list <- list(first=list_1, second=list_2)
+nested_list <- list(first = list_1, second = list_2)
 nested_list
 ```
 
@@ -299,7 +306,7 @@ library(tidyverse)
 PandasのDataFrameと同様に、Rにもdata.frameがある(Rが先だったかもしれないが)。だがtibbleというもっといいものがあるのでそちらを使う。まず説明用の架空データを作る。
 
 ```{r create_tibble}
-df <- tibble(name=c("foo", "bar"), score=c(80, 60), year=c(2019, 2020))
+df <- tibble(name = c("foo", "bar"), score = c(80, 60), year = c(2019, 2020))
 ```
 
 ```{r embed_tibble, eval=TRUE, echo=FALSE}
@@ -372,22 +379,22 @@ my_square(9)
 Pythonと同様に、引数にキーワードをつけてもよい。引数が多いときは、キーワードをつけるとソースコードが読みやすくなるだろう。
 
 ```{r keyword_parameters}
-my_square(n=9)
+my_square(n = 9)
 ```
 
 Pythonと同様に、引数のキーワードありとなしを混在することもできる。まずキーワードがある引数を当てはめ、残りのパラメータをまだ値が無い先頭のパラメータから順に当てはめる。
 
 ```{r named_parameters}
 my_pow <- function(base, index) {
-  base ** index
+  base**index
 }
-my_pow(index=2, 3)
+my_pow(index = 2, 3)
 ```
 
 do.callを使って、Pythonのunpack, Rubyのsplatのように、listを引数に展開することもできる。
 
 ```{r splat_parameters}
-args <- list(base=3, index=2)
+args <- list(base = 3, index = 2)
 do.call(my_pow, args)
 ```
 
@@ -446,7 +453,7 @@ Rでfor文は使わないので、忘れてよい。Pythonでfor文を使う処�
 ```{r reduce_fib}
 my_fib <- function(xs) {
   purrr::map_dbl(xs, function(x) {
-    tail(purrr::reduce(.x=seq_len(x), .init=integer(), function(acc, i) {
+    tail(purrr::reduce(.x = seq_len(x), .init = integer(), function(acc, i) {
       if (i == 1) {
         c(1)
       } else if (i == 2) {
@@ -461,7 +468,7 @@ my_fib <- function(xs) {
 my_fib(1:10)
 ```
 
-Pythonで、 lexical scope の外にある変数を変更するには、nonlocalを使う。以下のコードでは、outer()は1を返す。
+Pythonで外の lexical scope にある変数を変更するには、nonlocalを使う。以下のコードでは、outer()は1を返す。
 
 ```{python nonlocal_python, result="asis"}
 def outer():
@@ -479,9 +486,9 @@ outer()
 Rでは \<\<- を使って、 lexical scope の外にある変数に代入する。
 
 ```{r nonlocal_r}
-outer <- function () {
+outer <- function() {
   z <- 0
-  inner <- function () {
+  inner <- function() {
      z <<- z + 1
      -2
   }
@@ -493,6 +500,20 @@ outer()
 ```
 
 PythonもRも、lexical scopeの範囲は、ざっくりいうと関数(defやfunction)である。なので関数が入れ子になっている場合は、nonlocalが必要になることがある。C++は if (cond) {} や何もキーワードがつかない {} も自動変数の範囲と寿命を決めているが、Rはそうではないので注意する(ifなどはスコープを変えない)。
+
+tibbleの説明に書いたように、関数呼び出しの結果はコンソールに表示される。そのままだと大量に出力でコンソールが埋まって困ることがあるだろう。関数の結果を変数で受け止めるのが一つの方法だが、もう一つの方法は関数呼び出しの結果を invisible() で受け止めることである。
+
+いかにもわざとらしい例だが、以下の関数は要素がn個のベクトルを返し、先頭からn個(通常は1000個で打ち切り)を表示しようとするが、 invisible があると何も表示しない。
+
+```{r invisible}
+n_element_vector <- function(n) {
+  1:n
+}
+```
+
+```{r launch_invisible}
+invisible(n_element_vector(n = 2000))
+```
 
 ## いろいろな処理と込み入った話題
 
@@ -508,9 +529,9 @@ sprintf("地点=%s, 温度=%.1f", "横浜", 11.8)
 
 ```{r paste}
 paste("神奈川県", "横浜市", "中区")
-paste("神奈川県", "横浜市", "中区", sep=" ")
+paste("神奈川県", "横浜市", "中区", sep = " ")
 paste0("神奈川県", "横浜市", "中区")
-paste("神奈川県", "横浜市", "中区", sep=":")
+paste("神奈川県", "横浜市", "中区", sep = ":")
 ```
 
 以下のコードは意外にも、要素が3個のベクトルを返す。pasteはベクトルをベクトルにmapする関数である。
@@ -523,10 +544,10 @@ paste(words)
 collapseを指定すると、文字列を区切り文字で連結して、単一の文字列を返す。reduceな動作になる。
 
 ```{r paste_reduce}
-paste(words, sep="", collapse=":")
+paste(words, sep = "", collapse = ":")
 ```
 
-より高度な文字列処理はstringrパッケージを使う。PythonもRもたくさんの関数があるが、代表的なものとして正規表現で文字列を分解する例を示そう。
+より高度な文字列処理はstringrパッケージを使う。PythonもRもたくさんの関数があるが、代表的なものとして正規表現で文字列を分解する例を示そう。Python の re は full matching 、R の stringr は partial matching である。
 
 ```{python str_match_pythoon, eval=TRUE, result="asis"}
 import re
@@ -534,7 +555,7 @@ re.match(r"(\D+)(\d+)", "Year2021").groups()
 ```
 
 ```{r str_match_r}
-stringr::str_match("Year2021", "(\\D+)(\\d+)")
+stringr::str_match("Year2021", "^(\\D+)(\\d+)$")
 ```
 
 ### 強制型変換
@@ -554,6 +575,35 @@ as.character(-2.7)
 ```
 
 Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
+
+### 日時と時刻
+
+日時(date)と時刻(timestamp)を上手く扱うのは難しいので、よくできたパッケージを上手に使いこなす。一年の初めからどれだけの割合(0..1)が経過したか指定すると、その日時を表示する関数を作る。うるう年は考慮するがうるう秒は考慮しない。[1月4日のお昼には、もう2021年の「1%」が経過している](https://twitter.com/kuina_ch/status/1344513191707963392)のは本当だろうか?
+
+```{r elapsed_time_in_year}
+elapsed_time_in_year <- function(year, ratio) {
+  epoch <- paste0(year, "-01-01 00:00:00")
+  x <- lubridate::ymd_hms(epoch, tz = "Asia/Tokyo")
+  x + lubridate::dseconds((365 + lubridate::leap_year(x)) * 24 * 60 * 60 * ratio)
+}
+
+elapsed_time_in_year(year=2021, ratio=0.01)
+elapsed_time_in_year(year=2020, ratio=0.01)
+elapsed_time_in_year(year=2021, ratio=0.162)
+elapsed_time_in_year(year=2020, ratio=0.162)
+```
+
+時間(duration)を説明するついでに関数合成しよう。functional::Composeは二つの関数を合成する。ここでは hh:mm:ss 書式の時間の文字列を受け取って、何秒か返す関数を作る。 function を使っても同じことをできるが、引数とか書かなくて済むのですっきりする。
+
+```{r hms_to_seconds}
+library(functional)
+hms_to_seconds <- functional::Compose(lubridate::hms, lubridate::seconds)
+```
+
+```{r launch_hms_to_seconds}
+hms_to_seconds("00:01:04")
+hms_to_seconds("01:00:04")
+```
 
 ### 参照渡しと copy-on-modify
 
@@ -641,7 +691,7 @@ check_vars_exists <- function() {
 check_vars_exists()
 ```
 
-Pythonと同様にデフォルト引数を書くこともできる。だがデフォルト引数がいつ評価されるかは、PythonでもRでも厄介な問題を生むので、個人的にはお勧めしない。
+Pythonと同様にデフォルト引数を書くこともできる。だがデフォルト引数がいつ評価されるかは、PythonでもRでも厄介な問題を生むので、個人的にはお勧めしない。以下はPythonでありがちなバグである。
 
 ```{python default_python, result="asis"}
 def add(x=[]):
@@ -653,13 +703,15 @@ add()
 add()
 ```
 
+Rのデフォルト引数も、Pythonと同様である。
+
 ```{r default_r}
 real_to_complex <- function(real, imaginary = 0.0) {
-  list(r=real, im=imaginary)
+  list(r = real, im = imaginary)
 }
 
-real_to_complex(real=1)
-real_to_complex(real=1, imaginary=2)
+real_to_complex(real = 1)
+real_to_complex(real = 1, imaginary = 2)
 ```
 
 引数が無いことは missing で分かる。NULLを指定することと、引数が無いことは異なる。この例ならデフォルト引数を使っても大差ないが、引数が無いことが分かるとできることがあるかもしれない。
@@ -671,12 +723,12 @@ real_to_complex_alt <- function(real, imaginary) {
   } else {
      imaginary
   }
-  list(r=real, im=im_part)
+  list(r = real, im = im_part)
 }
 
-real_to_complex_alt(real=1)
-real_to_complex_alt(real=1, imaginary=2)
-real_to_complex_alt(real=1, imaginary=NULL)
+real_to_complex_alt(real = 1)
+real_to_complex_alt(real = 1, imaginary = 2)
+real_to_complex_alt(real = 1, imaginary = NULL)
 ```
 
 関数のデフォルト引数の値を調べるために、Pythonでは inspect.signature を使う。Rではformalsを使う。以下は正規表現で文字列を分割する関数のデフォルト引数である。
@@ -690,9 +742,23 @@ inspect.signature(re.split)
 formals(stringr::str_split)
 ```
 
-### コマンドラインのオプションを解析する
+### コマンドライン引数を解析する
 
-Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両者はほとんど同じである。
+コマンドライン引数は、commandArgs()で文字列ベクトルとして取得する。 trailingOnly=FALSE にするとすべての引数、 trailingOnly=TRUE にすると --args および以降の引数(--argsがなければ空文字列ベクトル)を取得する。R処理系に渡す引数を無視して、Rスクリプトだけに渡す引数を取得するために、 trailingOnly=TRUE を使うとよい。
+
+```{r command_args, eval=FALSE, echo=TRUE}
+commandArgs(trailingOnly=FALSE)
+commandArgs(trailingOnly=TRUE)
+```
+
+```{r launch_command_args, eval=TRUE, echo=FALSE}
+commandArgs(trailingOnly=FALSE) %>% purrr::discard(~ stringr::str_detect(.x, "\\.Rmd"))
+commandArgs(trailingOnly=TRUE)
+```
+
+コマンドライン引数のオプションを解析するのは、Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両者はほとんど同じである。
+
+R MarkdownをHTML化したときの引数が出ていますが、 R Markdown ファイルの場所がフルパスで見えてしまうのは削除した。
 
 ## CSVファイルを読んで集計する
 
@@ -755,7 +821,7 @@ df_timeseries %>% head() %>% kable() %>% kable_styling()
 ```{r draw_table_timeseries}
 library(ggplot2)
 g <- ggplot(df_timeseries)
-g <- g + geom_line(aes(x=Year, y=Population))
+g <- g + geom_line(aes(x = Year, y = Population))
 plot(g)
 ```
 
@@ -763,6 +829,7 @@ plot(g)
 
 - 折れ線の色を青くして太くする
 - タイトルをつける
+- 背景を白にする
 - 高さを幅の0.6倍にする
 - フォントを Segoe UI にして、フォントのサイズを指定する
 
@@ -770,14 +837,14 @@ plot(g)
 library(extrafont)
 font_name <- "Segoe UI"
 g <- ggplot(df_timeseries)
-g <- g + geom_line(aes(x=Year, y=Population), color="navy", size=2)
+g <- g + geom_line(aes(x = Year, y = Population), color = "navy", size = 2)
 g <- g + ggtitle("Yokohama Population")
 g <- g + theme_bw()
-g <- g + theme(aspect.ratio=0.6,
-               text=element_text(family=16),
-               axis.text=element_text(family=font_name, size=14),
-               axis.title=element_text(family=font_name, size=16),
-               plot.title=element_text(family=font_name, size=20))
+g <- g + theme(aspect.ratio = 0.6,
+               text = element_text(family = 16),
+               axis.text = element_text(family = font_name, size = 14),
+               axis.title = element_text(family = font_name, size = 16),
+               plot.title = element_text(family = font_name, size = 20))
 plot(g)
 ```
 
@@ -787,16 +854,16 @@ tibbleの列名は英語にしても、図の表示は日本語にしたいと�
 font_name <- "Segoe UI"
 font_name_jp <- "Migu 1M"
 g <- ggplot(df_timeseries)
-g <- g + geom_line(aes(x=Year, y=Population), color="navy", size=2)
+g <- g + geom_line(aes(x = Year, y = Population), color = "navy", size = 2)
 g <- g + ggtitle("横浜市の人口")
 g <- g + xlab("年(西暦)")
 g <- g + ylab("人口")
 g <- g + theme_bw()
-g <- g + theme(aspect.ratio=0.6,
-               text=element_text(family=font_name),
-               axis.text=element_text(family=font_name_jp, size=14),
-               axis.title=element_text(family=font_name_jp, size=16),
-               plot.title=element_text(family=font_name_jp, size=20))
+g <- g + theme(aspect.ratio = 0.6,
+               text = element_text(family = font_name),
+               axis.text = element_text(family = font_name_jp, size = 14),
+               axis.title = element_text(family = font_name_jp, size = 16),
+               plot.title = element_text(family = font_name_jp, size = 20))
 plot(g)
 ```
 
@@ -811,7 +878,7 @@ png() と dev.off() で囲んでもよいが、その場合は高さと幅のピ
 ```{r save_png, message=FALSE}
 png(filename = "yokohama_population.png", width = 800, height = 600)
 g <- ggplot(df_timeseries)
-g <- g + geom_line(aes(x=Year, y=Population))
+g <- g + geom_line(aes(x = Year, y = Population))
 plot(g)
 dev.off()
 ```
@@ -823,7 +890,10 @@ Pandasてきに、CSVファイルを加工する方法を説明する。横浜�
 ```{r read_wards}
 df_population_data <- readr::read_csv("incoming_yokohama/e1yokohama2009.csv")
 print(colnames(df_population_data))
-colnames(df_population_data) <- c("date", "code", "ward", "area", "household", "population", "male", "female", "per_household", "density", "diff_household", "diff_population")
+colnames(df_population_data) <- c("date", "code", "ward", "area",
+                                  "household", "population", "male", "female",
+                                  "per_household", "density",
+                                  "diff_household", "diff_population")
 ```
 
 ```{r print_wards, eval=FALSE, echo=FALSE}
@@ -831,7 +901,7 @@ colnames(df_population_data) <- c("date", "code", "ward", "area", "household", "
 df_population_data %>% kable() %>% kable_styling()
 ```
 
-今後使いそうな列だけ残して、後は削除する。列を選ぶには dplyr::select を使う。 %>% は、コマンドラインのパイプと同様、前段で処理したデータを後段に流す。この書き方に慣れるとRが好きになるだろう。実際には前段の返り値を後段の第一引数にしており、Pandasのメソッドチェーンと同じである。
+今後使いそうな列だけ残して、後は削除する。列を選ぶには dplyr::select を使う。 %>% は、コマンドラインのパイプと同様、前段で処理したデータを後段に流す。この書き方に慣れるとRが好きになるだろう。実際には前段の返り値を後段の第一引数にしており、Pandasのメソッドチェーン(method chaining)と同じである。
 
 ```{r select_wards}
 df_population <- df_population_data %>%
@@ -842,7 +912,7 @@ df_population <- df_population_data %>%
 df_population %>% kable() %>% kable_styling()
 ```
 
-横浜市の合計を各区を分離しよう。 dplyr::filter を使って、～区とそれ以外を抜き出す。
+横浜市の合計を各区を分離しよう。 dplyr::filter を使って、～区とそれ以外を抜き出す。str_endは文字列がある文字列で終わっているかどうかをTRUEまたはFALSEで返す。Pythonの endswith と同じである。
 
 ```{r separate_wards}
 df_wards <- df_population %>%
@@ -856,7 +926,7 @@ df_all_city <- df_population %>%
 df_all_city %>% kable() %>% kable_styling()
 ```
 
-dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これはシンボル(symbol)と言う。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは、 rlang::sym を使う。
+dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これは先ほど説明したシンボル(symbol)である。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは rlang::sym を使う。
 
 ```{r separate_wards_again}
 library(rlang)
@@ -866,7 +936,7 @@ df_wards_alt <- df_population %>%
 assertthat::assert_that(identical(df_wards, df_wards_alt))
 ```
 
-実は　dplyr::select は、文字列だけでなくシンボルを受け付る。なので "" が無くてもよかった。わざとらしい例だが、複数の文字列を文字列ベクトルにするには、 rlang::syms を使う。それと、!!ではなく!!!を使う。!!と!!!は否定の否定、否定の否定の否定、ではなく演算子というのが珍しい。
+実は　dplyr::select は、文字列だけでなくシンボルを受け付ける。なので "" が無くてもよかった。わざとらしい例だが、複数の文字列をシンボルにするには、 rlang::syms を使う。それと、!!ではなく!!!を使う。!!と!!!は否定の否定、否定の否定の否定、ではなく演算子というのが珍しい。
 
 ```{r select_wards_again}
 column_names <- c("ward", "area", "household", "population", "per_household", "density")
@@ -884,7 +954,7 @@ df_wards_calc <- df_wards %>%
   dplyr::mutate(per_household_calc = population / household, density_calc = population / area)
 ```
 
-元データの per_household と計算で求めた per_household_calc 、元データの density と計算で求めた density_calc が等しいか確認しよう。浮動小数が丸め誤差を除いて大体同じかどうかは、 dplyr::near で許容誤差 tol を与えて比べる。dplyr::near は二つの要素を先頭から順に比較して、大体同じ=TRUE、違う=FALSEというベクトルを返す。全部TREUかどうかはallで分かる。
+元データの per_household と計算で求めた per_household_calc 、元データの density と計算で求めた density_calc が等しいか確認しよう。浮動小数が丸め誤差を除いて大体同じかどうかは、 dplyr::near で許容誤差 tol を与えて比べる。dplyr::near は二つの要素を先頭から順に比較して、大体同じ=TRUE、違う=FALSEというベクトルを返す。全部TRUEかどうかはallで分かる。
 
 ```{r near_calc}
 assertthat::assert_that(all(dplyr::near(x = df_wards_calc$per_household,
@@ -913,9 +983,9 @@ assertthat::assert_that(df_all_city$household == df_wards_sum$household)
 assertthat::assert_that(df_all_city$population == df_wards_sum$population)
 ```
 
-各区の合計は全市と一致したようだ。
+各区の合計は市全体と一致したようだ。
 
-ここでは世帯数と人口を足したが、それは区の名前、1世帯当たり人員、人口密度を足しても意味が無いからである。そして面積は足していなかった。列名を挙げるのがめんどくさければ、列が数字だったら足す、という操作をしたい。そういうときは、dplyr::summarize_all を使う。1世帯当たり人員と人口密度を除いてから、区の名前以外を足す。
+ここでは世帯数と人口を足したが、それは区の名前、1世帯当たり人員、人口密度を足しても意味が無いからである。そして面積は足していなかった。列名を挙げるのがめんどくさければ、列が数字だったら足す、という操作をしたい。そういうときは、 dplyr::summarize と across を使う。1世帯当たり人員と人口密度を除いてから、数値つまり区の名前以外の列を足す。
 
 ```{r sum_wards_all}
 df_wards_sum_all <- df_wards %>%
@@ -923,13 +993,15 @@ df_wards_sum_all <- df_wards %>%
   dplyr::summarize(across(where(is.numeric), sum))
 ```
 
+面積もあっているようだ。
+
 ```{r verify_sum_all}
 assertthat::assert_that(dplyr::near(x = df_all_city$area, y = df_wards_sum_all$area, tol = 1.0))
 ```
 
 ### 行をグループ化する
 
-グループ化の例として、横浜市各区を [税務署の管轄地域](https://www.nta.go.jp/about/organization/tokyo/location/kanagawa.htm)でまとめよう。
+グループ化の例として、横浜市各区を [税務署の管轄地域](https://www.nta.go.jp/about/organization/tokyo/location/kanagawa.htm)でまとめよう。まず税務署と区の対応表を作る。
 
 ```{r tax_offices}
 tax_offices <- c("神奈川", "神奈川", "鶴見", "戸塚", "戸塚", "戸塚", "保土ケ谷",
@@ -938,13 +1010,13 @@ tax_offices <- c("神奈川", "神奈川", "鶴見", "戸塚", "戸塚", "戸塚
 ward_names <- c("神奈川区", "港北区", "鶴見区", "戸塚区", "栄区", "泉区",
   "保土ケ谷区", "旭区", "瀬谷区", "緑区", "青葉区", "都筑区", "中区", "西区",
   "南区", "磯子区", "金沢区", "港南区")
-df_tax_offices <- tibble(tax_office=tax_offices, ward=ward_names)
+df_tax_offices <- tibble(tax_office = tax_offices, ward = ward_names)
 ```
 
 区の名前で結合する。
 
 ```{r join_tax_offices}
-df_ward_tax_offices <- dplyr::inner_join(df_tax_offices, df_wards, by="ward")
+df_ward_tax_offices <- dplyr::inner_join(df_tax_offices, df_wards, by = "ward")
 ```
 
 税務署ごとに世帯数と人口をまとめよう。dplyr::group_by を使って、行をグループ化できる。それぞれのグループについて、列ごとにすべての行を足す。
@@ -979,7 +1051,9 @@ df_factor$tax_office
 as.integer(df_factor$tax_office)
 ```
 
-カテゴリの整数の番号を固定したいことがある。例えばグラフの凡例を描くとき、凡例はカテゴリの整数が小さい順(1, 2, ...)に表示される。forcats::fct_relevel を使うと、整数の順番を固定できる。五十音順にしよう。
+カテゴリの整数の番号を固定したいことがある。例えばグラフの凡例を描くとき、凡例はカテゴリの整数が小さい順(1, 2, ...)に表示される。 forcats::fct_relevel を使うと、整数の順番を固定できる。
+
+カテゴリの順番を五十音順にしよう。つまり、神奈川(かながわ)、鶴見(つるみ)、戸塚(とつか)、保土ケ谷(ほどがや)、緑(みどり)、横浜中(よこやまなか)、横浜南(よこはまみなみ)の順にする。
 
 ```{r relevel_tax_offices}
 df_factor <- df_ward_tax_offices %>%
@@ -1000,21 +1074,21 @@ g <- ggplot(df_factor)
 g <- g + geom_point(aes(x = per_household, y = density, color = tax_office), size = 4, shape = 4)
 g <- g + geom_text(aes(x = per_household, y = density, label = ward),
   nudge_x = -0.03, size = 2)
-g <- g + scale_color_manual(values=brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
+g <- g + scale_color_manual(values = brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
 g <- g + ylim(0, 16000)
 g <- g + xlab("1世帯当たり人員[人]")
 g <- g + ylab("人口密度[人/平方キロメートル]")
-g <- g + guides(color=guide_legend(title="税務署"))
+g <- g + guides(color = guide_legend(title = "税務署"))
 g <- g + theme_bw()
-g <- g + theme(aspect.ratio=0.8,
-               text=element_text(family=font_name_jp),
-               legend.position="right",
-               legend.text=element_text(family=font_name_jp, size=16),
-               legend.title=element_text(family=font_name_jp, size=16),
-               axis.text=element_text(family=font_name, size=16),
-               axis.title=element_text(family=font_name, size=14),
-               strip.text=element_text(family=font_name, size=20),
-               plot.title=element_text(family=font_name, size=20))
+g <- g + theme(aspect.ratio = 0.8,
+               text = element_text(family = font_name_jp),
+               legend.position = "right",
+               legend.text = element_text(family = font_name_jp, size = 16),
+               legend.title = element_text(family = font_name_jp, size = 16),
+               axis.text = element_text(family = font_name, size = 16),
+               axis.title = element_text(family = font_name, size = 14),
+               strip.text = element_text(family = font_name, size = 20),
+               plot.title = element_text(family = font_name, size = 20))
 plot(g)
 ```
 
@@ -1025,20 +1099,20 @@ g <- ggplot(df_factor)
 g <- g + geom_point(aes(x = per_household, y = density, color = tax_office), size = 4, shape = 4)
 g <- g + geom_text(aes(x = per_household, y = density, label = ward),
   nudge_x = -0.03, size = 2)
-g <- g + scale_color_manual(values=brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
+g <- g + scale_color_manual(values = brewer.pal(NROW(unique(df_factor$tax_office)), "Dark2"))
 g <- g + ylim(0, 16000)
 g <- g + xlab("1世帯当たり人員[人]")
 g <- g + ylab("人口密度[人/平方キロメートル]")
-g <- g + guides(color=guide_legend(title="税務署"))
+g <- g + guides(color = guide_legend(title = "税務署"))
 g <- g + theme_bw()
-g <- g + facet_wrap(~ tax_office, nrow=2)
-g <- g + theme(aspect.ratio=0.8,
-               text=element_text(family=font_name_jp),
-               legend.position="none",
-               axis.text=element_text(family=font_name, size=9),
-               axis.title=element_text(family=font_name, size=10),
-               strip.text=element_text(family=font_name, size=12),
-               plot.title=element_text(family=font_name, size=12))
+g <- g + facet_wrap(~tax_office, nrow = 2)
+g <- g + theme(aspect.ratio = 0.8,
+               text = element_text(family = font_name_jp),
+               legend.position = "none",
+               axis.text = element_text(family = font_name, size = 9),
+               axis.title = element_text(family = font_name, size = 10),
+               strip.text = element_text(family = font_name, size = 12),
+               plot.title = element_text(family = font_name, size = 12))
 plot(g)
 ```
 
@@ -1047,8 +1121,8 @@ plot(g)
 readr::write_excel_csv を使って、BOMつきUTF-8でCSVファイルを書く。こうしておくとExcelで読める(BOMがないとExcelで読めない)。Pandasと同様、gzip形式で読み書きできる。
 
 ```{r write_group_tax_offices}
-readr::write_excel_csv(df_ward_tax_offices, path="yokohama_tax_office.csv")
-readr::write_excel_csv(df_ward_tax_offices, path="yokohama_tax_office.csv.gz")
+readr::write_excel_csv(df_ward_tax_offices, path = "yokohama_tax_office.csv")
+readr::write_excel_csv(df_ward_tax_offices, path = "yokohama_tax_office.csv.gz")
 ```
 
 ## その他ツール
@@ -1061,7 +1135,32 @@ Pythonでコードを試しながら書く場合、Jupyter Notebook を使って
 
 Pythonのコードは、 autopep8 で整形して、pylintk, pep8, flake8 でコードの問題点を静的解析して指摘するだろう(他にもツールがあるかもしれない)。
 
-Rは styler でコードを整形して、 lintr でコードの問題点を静的解析して指摘するとよい。Rスクリプトだけでなく、R Markdown も整形できる。
+Rは styler パッケージでコードを整形して、 lintr パッケージでコードの問題点を静的解析して指摘するとよい。 styler はRスクリプト(.Rファイル)だけでなく、R Markdown (.Rmdファイル)も整形できる。
+
+lintr で問題点を挙げるとき、スクリプトが完成してから lintr を通すと大量の問題点を指摘されて降参しかねないので、毎日細かく通すとよい。CI (Continuous Integration)を使っているなら、毎登録(git push)ごとにすればよい。もちろん lintr の前に、 styler で自動的に整形することもできる。
+
+lintr よくある指摘は以下の通りである。
+
+- Cyclomatic complexity が大きすぎる。関数が複雑すぎて、理解もテストもできないだろう。小さな関数に分割して、Cyclomatic complexity を減らす。 pylint だと、関数が長い、分岐が多いといった類似の指摘事項が出る。
+- 1:NROW(aTibble) は、aTibble が空行のときに誤動作する。代わりに seq_len(NROW(aTibble)) を使う。このようによくある間違ったイディオムを指摘する。Pythonでは、 range(len(anObj))の代わりに enumrate(anObj) を使え、と指摘されることがある。
+- ローカル変数が使われていない。似たような変数と取り違えているか、本当に使われなくなった変数が残っているかどちらかなので対処する。変数は要らなくても、そも変数を返す関数呼び出しは必要かもしれない。
+- 書式の良し悪し、例えば = の前後に空白をいれるかどうかは、 styler に任せて手作業で直さない。
+- 変数名に対する指摘は、仕方ない場合もある。指摘に対応しないこともしばしばまにある。
+
+### コードの論理行数
+
+cloc パッケージで、ファイルの論理行、コメント行、空行を数えることができる。Rだけでなくさまざまなプログラミング言語に対応している。Perlが必要なので、Windows の場合は perl (Cygwin可)にPATHを通しておく。ファイル名だけでなくURLを指定することもできる。[R pasteNumbers Addin](https://github.com/zettsu-t/pasteNumbers)にあるファイルの行数を測ろう。
+
+```{r cloc, eval=FALSE, echo=TRUE}
+library(cloc)
+cloc::cloc(source = "pasteNumbers.R")
+```
+
+実行結果は下記の通りである。
+
+|source        |language |file_count |file_count_pct |loc |loc_pct |blank_lines |blank_line_pct |comment_lines |
+|:-------------|:--------|:----------|:--------------|:---|:-------|:-----------|:--------------|:-------------|
+|pasteNumbers.R|R        |1          |0.5            |15  |0.5     |1           |0.5            |28            |
 
 ## 次に進むには
 
@@ -1073,6 +1172,7 @@ Rは styler でコードを整形して、 lintr でコードの問題点を静�
 - Rをもっと使いこなすなら、Rクックブック 第2版 ( 原著 : [R Cookbook 2nd Edition](https://rc2e.com/) )
 - R StudioとR Markdownの使い方を学ぶなら、再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)
 - プログラミング言語Rを深く知りたいなら、R言語徹底解説(ただし和訳は版が古い、原著 : [Advanced R](https://adv-r.hadley.nz/) )
+- Rパッケージの作成を通じて、配布可能な成果物の作り方を学びたいなら、Rパッケージ開発入門 テスト、文書化、コード共有の手法を学ぶ(原著 : [R packages](http://r-pkgs.had.co.nz/) )
 
 |書名|著者|年|リンク|
 |:--------------------------|:---------------------------------------------------------|:--------|:--------------------------|
