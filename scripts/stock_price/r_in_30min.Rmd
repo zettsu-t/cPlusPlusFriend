@@ -43,6 +43,16 @@ install.packages("tidyverse")
 install.packages("RColorBrewer")
 ```
 
+```{r setup, eval=FALSE, echo=FALSE}
+## 各コードチャンクを逐次実行するとき実行する
+library(assertthat)
+library(functional)
+library(extrafont)
+library(rlang)
+library(tidyverse)
+library(RColorBrewer)
+```
+
 以下のコードをRStudioのConsoleに順に入力して実行する。Rスクリプトを実行するときは、拡張 .R のファイルにコードを書いて、シェルからRscriptを起動する。
 
 ## プログラミング言語Rの基本
@@ -171,6 +181,12 @@ NumPyてきなbroadcastingを、Rでも行うことができる。 c(10, 20, 30)
 
 ```{r add_vector_int}
 c(10, 20, 30) + 4
+```
+
+ちなみに同じ値を繰り返したければ、repを使う。
+
+```{r repeat_vector_int}
+rep(4, 3)
 ```
 
 ### ベクトルの要素数とrange
@@ -357,6 +373,33 @@ df[1, ]
 
 ここでは一列ずつ、一行ずつ取り出したが、リストと同様に複数の要素を取り出すこともできる。
 
+
+### Matrix
+
+tibbleに比べれば覚えることが少ないので、最低限のことだけ説明する。
+
+tibbleと異なり、すべての要素を同じ型にする。まずベクトルから行列を作る。
+
+```{r create_matrices}
+matrix(data = 1:6, nrow = 2, byrow = FALSE)
+matrix(data = 1:6, nrow = 2, byrow = TRUE)
+```
+
+要素がすべて型の同じtibbleから行列を作る。
+
+```{r tibble_to_matrix}
+df_num <- tibble(p=1:2, q=3:4, r=5:6)
+mat_num <- as.matrix(df_num)
+mat_num
+```
+
+as_tibbleでtibbleに変換する。
+
+```{r matrix_to_tibble}
+df_mat_num <- as_tibble(mat_num)
+df_mat_num
+assertthat::assert_that(identical(df_num, df_mat_num))
+```
 
 ### 関数
 
@@ -965,6 +1008,24 @@ assertthat::assert_that(all(dplyr::near(x = df_wards_calc$density,
 
 計算した1世帯当たり人員と人口密度があっていたようだ。
 
+ちなみに dplyr::mutate の代入先もシンボルであり、実行時に文字列を与えるときは rlang::syms を使う。このときは = ではなく := を使う。代入元がシンボルの場合も同様である。
+
+```{r mutate_wards_sym}
+dst_column_name <- "per_household_calc"
+df_wards_calc_dst <- df_wards %>%
+  dplyr::mutate(!!rlang::sym(dst_column_name) := population / household)
+assertthat::assert_that(all(dplyr::near(df_wards_calc$per_household_calc,
+                                        df_wards_calc_dst$per_household_calc)))
+
+src1_column_name <- "population"
+src2_column_name <- "household"
+df_wards_calc_src <- df_wards %>%
+  dplyr::mutate(per_household_calc :=
+    !!rlang::sym(src1_column_name) / !!rlang::sym(src2_column_name))
+assertthat::assert_that(all(dplyr::near(df_wards_calc$per_household_calc,
+                                        df_wards_calc_src$per_household_calc)))
+```
+
 ### それぞれの列を集計する
 
 全区の世帯数と人口を足して、横浜市全体 df_all_city と同じかどうか確かめる。
@@ -1171,7 +1232,7 @@ cloc::cloc(source = "pasteNumbers.R")
 - 最初に読むのは、Rではじめるデータサイエンス (原著 : [R for Data Science](https://r4ds.had.co.nz/) )
 - Rをもっと使いこなすなら、Rクックブック 第2版 ( 原著 : [R Cookbook 2nd Edition](https://rc2e.com/) )
 - R StudioとR Markdownの使い方を学ぶなら、再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)
-- プログラミング言語Rを深く知りたいなら、R言語徹底解説(ただし和訳は版が古い、原著 : [Advanced R](https://adv-r.hadley.nz/) )
+- プログラミング言語Rを深く知りたいなら、R言語徹底解説(ただし和訳は版が古い、原著 : [Advanced R](https://adv-r.hadley.nz/) )。 [公式マニュアル](https://cran.r-project.org/manuals.html)より読みやすいと思います。
 - Rパッケージの作成を通じて、配布可能な成果物の作り方を学びたいなら、Rパッケージ開発入門 テスト、文書化、コード共有の手法を学ぶ(原著 : [R packages](http://r-pkgs.had.co.nz/) )
 
 |書名|著者|年|リンク|
