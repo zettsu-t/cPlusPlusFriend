@@ -1194,7 +1194,7 @@ Pythonでコードを試しながら書く場合、Jupyter Notebook を使って
 
 ### コードの整形と静的解析
 
-Pythonのコードは、 autopep8 で整形して、pylintk, pep8, flake8 でコードの問題点を静的解析して指摘するだろう(他にもツールがあるかもしれない)。
+Pythonのコードは、 autopep8 で整形して、pylint, pep8, flake8 でコードの問題点を静的解析して指摘するだろう(他にもツールがあるかもしれない)。
 
 Rは styler パッケージでコードを整形して、 lintr パッケージでコードの問題点を静的解析して指摘するとよい。 styler はRスクリプト(.Rファイル)だけでなく、R Markdown (.Rmdファイル)も整形できる。
 
