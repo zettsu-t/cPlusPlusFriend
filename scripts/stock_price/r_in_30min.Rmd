@@ -191,7 +191,7 @@ rep(4, 3)
 
 ### ベクトルの要素数とrange
 
-要素数はNROW()で調べる。length()は忘れていい。
+要素数はNROW()で調べる。length()もあるが忘れていい。
 
 ```{r length_vector_int}
 NROW(c(10, 20, 30))
@@ -343,7 +343,7 @@ View(df)
 
 tibbleは、縦方向(行)が標本、横方向(列)が標本の属性である。ざっくりいうと、縦に長いベクトルを横に並べたものがtibbleと思えばよい。なので、先のリストの動作がそのまま当てはまる。
 
-まず score のベクトルを取得する。PandasのSeriesとは少し異なる。
+まず score のベクトルを取得する。Pandasがそうであるように、tibbleは連想配列らしく使える。ベクトルが返るのでPandasのSeriesとは少し異なる。
 
 ```{r extract_column_as_vector}
 df$score
@@ -594,11 +594,11 @@ paste(words, sep = "", collapse = ":")
 
 ```{python str_match_pythoon, eval=TRUE, result="asis"}
 import re
-re.match(r"(\D+)(\d+)", "Year2021").groups()
+re.match(r".{2}(\D+)(\d+)", "01Year2021").groups()
 ```
 
 ```{r str_match_r}
-stringr::str_match("Year2021", "^(\\D+)(\\d+)$")
+stringr::str_match("01Year2021", "(\\D+)(\\d+)")
 ```
 
 ### 強制型変換
@@ -839,9 +839,9 @@ print(df_timeseries)
 df_timeseries$年（和暦）
 ```
 
-という風に、 ( が上手く構文解析できないのでエラーになってしまった。名前として使えるものを syntactic name 、そうでないものを non-syntactic name と呼ぶ。詳しい解説は[Advanced R](https://adv-r.hadley.nz/names-values.html)にあるが、ここでは間にあわせの回避策だけ述べよう。
+という風に、 ( が上手く構文解析できないのでエラーになってしまった。このように構文中に埋め込む名前として使えるものを syntactic name 、そうでないものを non-syntactic name と呼ぶ。詳しい解説は[Advanced R](https://adv-r.hadley.nz/names-values.html)にあるが、ここでは間にあわせの回避策だけ述べよう。
 
-一つ目は、列名を `` (backtick)で囲むことである。
+一つ目は、列名を ` (backtick)で囲むことである。
 
 ```{r print_timeseries_column_correct}
 df_timeseries$`年（和暦）`
@@ -955,7 +955,7 @@ df_population <- df_population_data %>%
 df_population %>% kable() %>% kable_styling()
 ```
 
-横浜市の合計を各区を分離しよう。 dplyr::filter を使って、～区とそれ以外を抜き出す。str_endは文字列がある文字列で終わっているかどうかをTRUEまたはFALSEで返す。Pythonの endswith と同じである。
+横浜市の合計と各区を分離しよう。 dplyr::filter を使って、～区とそれ以外を抜き出す。str_endは文字列がある文字列で終わっているかどうかをTRUEまたはFALSEで返す。Pythonの endswith と同じである。
 
 ```{r separate_wards}
 df_wards <- df_population %>%
@@ -971,8 +971,11 @@ df_all_city %>% kable() %>% kable_styling()
 
 dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これは先ほど説明したシンボル(symbol)である。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは rlang::sym を使う。
 
-```{r separate_wards_again}
+```{r import_rlang, message=FALSE, warning=FALSE}
 library(rlang)
+```
+
+```{r separate_wards_again}
 ward_column_name <- "ward"
 df_wards_alt <- df_population %>%
   dplyr::filter(!!rlang::sym(ward_column_name) != "横浜市")
@@ -1008,7 +1011,7 @@ assertthat::assert_that(all(dplyr::near(x = df_wards_calc$density,
 
 計算した1世帯当たり人員と人口密度があっていたようだ。
 
-ちなみに dplyr::mutate の代入先もシンボルであり、実行時に文字列を与えるときは rlang::syms を使う。このときは = ではなく := を使う。代入元がシンボルの場合も同様である。
+ちなみに dplyr::mutate の代入先もシンボルであり、実行時に文字列を与えるときは rlang::sym を使う。このときは = ではなく := を使う。代入元がシンボルの場合も同様である。
 
 ```{r mutate_wards_sym}
 dst_column_name <- "per_household_calc"
@@ -1074,7 +1077,7 @@ ward_names <- c("神奈川区", "港北区", "鶴見区", "戸塚区", "栄区",
 df_tax_offices <- tibble(tax_office = tax_offices, ward = ward_names)
 ```
 
-区の名前で結合する。
+区の名前で結合する。Rには連想配列がないが、tibbleで連想配列てきなテーブルを作ればよい。連想配列の要素を個々に引くより、 inner join や left join する方が手軽である。
 
 ```{r join_tax_offices}
 df_ward_tax_offices <- dplyr::inner_join(df_tax_offices, df_wards, by = "ward")
@@ -1206,7 +1209,7 @@ lintr よくある指摘は以下の通りである。
 - 1:NROW(aTibble) は、aTibble が空行のときに誤動作する。代わりに seq_len(NROW(aTibble)) を使う。このようによくある間違ったイディオムを指摘する。Pythonでは、 range(len(anObj))の代わりに enumrate(anObj) を使え、と指摘されることがある。
 - ローカル変数が使われていない。似たような変数と取り違えているか、本当に使われなくなった変数が残っているかどちらかなので対処する。変数は要らなくても、そも変数を返す関数呼び出しは必要かもしれない。
 - 書式の良し悪し、例えば = の前後に空白をいれるかどうかは、 styler に任せて手作業で直さない。
-- 変数名に対する指摘は、仕方ない場合もある。指摘に対応しないこともしばしばまにある。
+- 変数名に対する指摘は、仕方ない場合もある。指摘に対応しないこともしばしばある。
 
 ### コードの論理行数
 
@@ -1255,4 +1258,8 @@ cloc::cloc(source = "pasteNumbers.R")
 ## データ出典
 
 本 R Markdown からHTML文書やPDF文書を生成した場合、 [横浜市のオープンデータ](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/) を編集・加工したものが埋め込まれます。これらは [利用条件等](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/opendata.html) に記載の、 CC BY 4.0 に基づいています。
+
+## ライセンス
+
+本 R Markdown 文書のライセンスは、この文書がある GitHub レポジトリと同じ、MITライセンスです。いろいろコードを変えて、データや表示がどう変わるかお試しください。
 
