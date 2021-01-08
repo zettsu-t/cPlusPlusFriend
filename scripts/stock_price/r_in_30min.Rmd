@@ -26,8 +26,15 @@ library(reticulate)
 ```
 
 ```{r, echo=FALSE, eval=FALSE}
-## WindowsからPythonを起動するには、 .Rprofile にこう書く
+## Windows から Python を起動するには、 .Rprofile にこう書く
 ## Sys.setenv(PATH=paste0(c("C:\bin\anaconda", Sys.getenv("PATH")), sep="", collapse=";"))
+
+## Windows から cloc 経由で Cygwin Perl を起動するには、 .Rprofile にこう書く
+## Sys.setenv(PATH=paste0(c("C:\\cygwin64\\bin", Sys.getenv("PATH")), sep="", collapse=";"))
+
+## .Rprofile は環境変数 R_USER のディレクトリに置くが、
+## 環境変数 R_USER の値は C:\Users\Username\Documents がデフォルトのようだが、
+## 私の環境では HOME と同じ=C:\Home\Username である。
 ```
 
 ## 準備
@@ -609,15 +616,43 @@ stringr::str_match("01Year2021", "(\\D+)(\\d+)")
 paste("Bool", exp(1), 2, FALSE)
 ```
 
-リストとベクタの変換で既に示したように。型変換は一般に as.型名 でできる。
+リストとベクタの変換で既に示したように。型変換は一般に as.型名 でできる。Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
 
-```{r coerce_types}
+```{r coerce_numeric}
 as.numeric("-2.7")
 as.integer("-2.7")
 as.character(-2.7)
 ```
 
-Rは変数名に . を含めることができ、PythonやC++でインスタンスメソッドの前に . をつけるときのような特別な意味は . にはない。
+無限大と文字列に書くことができる。Pythonのfloat()と同じである。こちらがPythonで
+
+```{python coerce_inf_python}
+float("Inf")
+float("-infinity")
+```
+
+こちらがRである。
+
+```{r coerce_inf_r}
+as.numeric("Inf")
+as.numeric("-infinity")
+```
+
+型変換できないときは、警告を出してNAが返る。Pythonと違って、エラーにはならない。
+
+```{python coerce_not_a_number_python, error=TRUE}
+float("abc")
+```
+
+```{r coerce_not_a_number_r}
+as.numeric("abc")
+```
+
+NAは後でどうにかするので警告を無視したいなら、 suppressWarnings() を使う。
+
+```{r suppress_warnings}
+suppressWarnings(as.numeric("abc"))
+```
 
 ### 日時と時刻
 
@@ -801,7 +836,7 @@ commandArgs(trailingOnly=TRUE)
 
 コマンドライン引数のオプションを解析するのは、Pythonではargparseを使い、Rではoptparseを使うとよいだろう。両者はほとんど同じである。
 
-R MarkdownをHTML化したときの引数が出ていますが、 R Markdown ファイルの場所がフルパスで見えてしまうのは削除した。
+R MarkdownをHTML化したときの引数を出したが、 R Markdown ファイルの場所がフルパスで見えてしまうのは削除した。
 
 ## CSVファイルを読んで集計する
 
