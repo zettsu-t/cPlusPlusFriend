@@ -1269,7 +1269,7 @@ cloc::cloc(source = "pasteNumbers.R")
 
 - 最初に読むのは、Rではじめるデータサイエンス (原著 : [R for Data Science](https://r4ds.had.co.nz/) )
 - Rをもっと使いこなすなら、Rクックブック 第2版 ( 原著 : [R Cookbook 2nd Edition](https://rc2e.com/) )
-- R StudioとR Markdownの使い方を学ぶなら、再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)
+- R StudioとR Markdownの使い方を学ぶなら、再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3) または、 RユーザのためのRStudio［実践］入門 ―tidyverseによるモダンな分析フローの世界―
 - プログラミング言語Rを深く知りたいなら、R言語徹底解説(ただし和訳は版が古い、原著 : [Advanced R](https://adv-r.hadley.nz/) )。 [公式マニュアル](https://cran.r-project.org/manuals.html)より読みやすいと思います。
 - Rパッケージの作成を通じて、配布可能な成果物の作り方を学びたいなら、Rパッケージ開発入門 テスト、文書化、コード共有の手法を学ぶ(原著 : [R packages](http://r-pkgs.had.co.nz/) )
 
@@ -1285,6 +1285,7 @@ cloc::cloc(source = "pasteNumbers.R")
 |Rではじめるデータサイエンス|Hadley Wickham, Garrett Grolemund 著/黒川利明 訳/大橋真也 監修|2017|オライリー・ジャパン|
 |Rクックブック 第2版|J.D. Long, Paul Teetor 著/大橋真也 監訳/木下哲也 訳|2020|オライリー・ジャパン|
 |再現可能性のすゝめ ―RStudioによるデータ解析とレポート作成― (Wonderful R 3)|高橋康介 著/石田基広 監修/市川太祐, 高橋康介, 高柳慎一, 福島真太朗, 松浦健太郎 編|2018|共立出版|
+|RユーザのためのRStudio［実践］入門 ―tidyverseによるモダンな分析フローの世界―|松村優哉, 湯谷啓明, 紀ノ定保礼, 前田和寛 著|2018|技術評論社|
 |R言語徹底解説|Hadley Wickham 著/石田基広, 市川太祐, 高柳慎一, 福島真太朗 訳|2016|共立出版|
 |みんなのR 第2版|Jared P. Lander 著/高柳慎一, 津田真樹, 牧山幸史, 松村杏子, 簑田高志 監修|2018|マイナビ出版|
 |パーフェクトR|Rサポーターズ 著|2017|技術評論社|
