@@ -1,0 +1,9 @@
+{
+    "city" : "横浜市",
+    "kana" : "よこはま",
+    "roman" : "Yokohama",
+    "designated" : true,
+    "n_wards" : 18,
+    "tax_offices" : ["神奈川", "鶴見", "戸塚", "保土ケ谷", "緑", "横浜中", "横浜南"],
+    "date": "2021/01/01"
+}

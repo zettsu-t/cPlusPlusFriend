@@ -45,6 +45,7 @@ library(reticulate)
 install.packages("assertthat")
 install.packages("functional")
 install.packages("extrafont")
+install.packages("plotly")
 install.packages("rlang")
 install.packages("tidyverse")
 install.packages("RColorBrewer")
@@ -163,6 +164,12 @@ score_vec[c(-2, -3)]
 score_vec[0]
 ```
 
+ベクトル同士はcで結合する。
+
+```{r concat_vectors}
+c(c(1, 2, 3), c(4, 5))
+```
+
 ### 演算
 
 Rにスカラー変数はなく、ベクトルはあるので、演算はベクトル同士の演算になる。まず足し算 c(10, 20, 30) + c(4, 5, 6) は、要素ごとの和になる。これは要素が1個のベクトル 10 + 4 = 14 の拡張と考えれば素直だろう。
@@ -214,45 +221,7 @@ seq_len(NROW(4))
 seq_len(NROW(c()))
 ```
 
-Pythonのrangeと同様のことをしたければ、 seq() とか 1:n とかがある。ただしPythonのrangeと異なり、開始番号が終了番号より小さいと、1ずつ減る数列が得られる。ベクトルのインデックスを得る場合に、これだと空のベクトルのインデックスがc(1, 0)になりまずいので、seq_len()を使おう。
-
-```{r seq_vector}
-seq(4)
-1:4
-seq(0)
-1:0
-seq(-2)
-1:-2
-```
-
-ベクトル同士はcで結合する。
-
-```{r concat_vectors}
-c(1:3, 4:6, 7:9)
-```
-
-### Assertion
-
-Pythonでは、()をつけずにassertを書く。
-
-```{python assert_python, result="asis"}
-assert 2 ** 4 == 16
-```
-
-```{python assertion_failed_python, error=TRUE, result="asis"}
-assert 2 ** 4 != 16
-```
-
-Rではassertthatを使う。パッケージを使う前にimportするのは、Pythonと同様である。
-
-```{r assert_r}
-library(assertthat)
-assertthat::assert_that((2**4) == 16)
-```
-
-```{r assertion_failed_r, error=TRUE}
-assertthat::assert_that((2**4) != 16)
-```
+続きは[等差数列](#number_sequence)の項で説明する。
 
 ### リスト
 
@@ -654,6 +623,60 @@ NAは後でどうにかするので警告を無視したいなら、 suppressWar
 suppressWarnings(as.numeric("abc"))
 ```
 
+### 等差数列 {#number_sequence}
+
+Pythonのrangeと同様のことをしたければ、 seq() とか 1:n とかがある。ただしPythonのrangeと異なり、開始番号が終了番号より小さいと、1ずつ減る数列が得られる。ベクトルのインデックスを得る場合に、これだと空のベクトルのインデックスがc(1, 0)になってまずい。seq_len()を積極的に使おう。
+
+```{r seq_vector}
+seq(4)
+1:4
+seq(0)
+1:0
+seq(-2)
+1:-2
+```
+
+さて差が整数ではない等差数列は、丸め誤差が発生するので、予想した長さにならないことがある。以下はPythonのコードである。NumPy.linspaceは数列の長さを指定するので正しい個数になるが、NumPy.arrangeは丸め誤差の影響で個数が合わないことがある。
+
+```{python linspace_python}
+import numpy as np
+for x in range(50, 53):
+  print("{} {}".format(len(np.linspace(0.0, 1.0, x)),
+                       len(np.arange(0.0, 1.0, 1.0/(x - 1)))))
+```
+
+同様のことを、Rではseqの length.out引数と、by引数で区別する。この例ではPythonと違って丸め誤差の影響を受けなかったが、両引数を使い分ける必要がある。
+
+```{r linspace_r}
+purrr::map_chr(50:52, function(x) {
+  sprintf("%d %d", NROW(seq(from = 0.0, to = 1.0, length.out = x)),
+                   NROW(seq(from = 0.0, to = 1.0, by = 1.0 / (x - 1))))
+})
+```
+
+### Assertion
+
+Pythonでは、()をつけずにassertを書く。
+
+```{python assert_python, result="asis"}
+assert 2 ** 4 == 16
+```
+
+```{python assertion_failed_python, error=TRUE, result="asis"}
+assert 2 ** 4 != 16
+```
+
+Rではassertthatを使う。パッケージを使う前にimportするのは、Pythonと同様である。
+
+```{r assert_r}
+library(assertthat)
+assertthat::assert_that((2**4) == 16)
+```
+
+```{r assertion_failed_r, error=TRUE}
+assertthat::assert_that((2**4) != 16)
+```
+
 ### 日時と時刻
 
 日時(date)と時刻(timestamp)を上手く扱うのは難しいので、よくできたパッケージを上手に使いこなす。一年の初めからどれだけの割合(0..1)が経過したか指定すると、その日時を表示する関数を作る。うるう年は考慮するがうるう秒は考慮しない。[1月4日のお昼には、もう2021年の「1%」が経過している](https://twitter.com/kuina_ch/status/1344513191707963392)のは本当だろうか?
@@ -840,7 +863,7 @@ R MarkdownをHTML化したときの引数を出したが、 R Markdown ファイ
 
 ## CSVファイルを読んで集計する
 
-Rの基本が分かったので、CSVファイルをRで読み込んで描画しよう。Rにはサンプルデータがあってそれを使うのが定番であるが、そういう描画例はウェブで多数見つかるのと、Pythonで同じデータを描画できることを目的に、横浜市のオープンデータを使用する(詳細は[データ出典](#データ出典) )。
+Rの基本が分かったので、CSVファイルをRで読み込んで描画しよう。Rにはサンプルデータがあってそれを使うのが定番であるが、そういう描画例はウェブで多数見つかるのと、Pythonで同じデータを描画できることを目的に、横浜市のオープンデータを使用する(詳細は[データ出典](#data_source) )。
 
 本R Markdown文書にはデータを添付しないので、R MarkdownからHTMLを生成する場合は、各自ダウンロードして、 **incoming_yokohama** サブフォルダに置くこと。ウェブ上のデータは更新されているので、実行時期によって結果が変わるかもしれない。
 
@@ -906,21 +929,35 @@ plot(g)
 いろいろと見た目を変えたり、要素を付け加えることもできる。詳しくは [R for Data Science](https://r4ds.had.co.nz/data-visualisation.html)に例がたくさんある。
 
 - 折れ線の色を青くして太くする
+- X軸の刻みを10年間隔にする
 - タイトルをつける
 - 背景を白にする
 - 高さを幅の0.6倍にする
 - フォントを Segoe UI にして、フォントのサイズを指定する
+
+```{r make_breaks}
+year_unit <- 10
+x_min <- ceiling(min(df_timeseries$Year) / year_unit) * year_unit
+x_max <- floor(max(df_timeseries$Year) / year_unit) * year_unit
+x_breaks <- unique(c(min(df_timeseries$Year),
+  seq(from = x_min, to = x_max, by = year_unit), max(df_timeseries$Year)))
+x_head <- head(x_breaks, 2)
+x_tail <- tail(x_breaks, 2)
+x_breaks <- setdiff(x_breaks,
+  c(x_head[2 * (diff(x_head) < year_unit)], x_tail[1 * (diff(x_tail) < year_unit)]))
+```
 
 ```{r draw_fancy_table_timeseries, message=FALSE}
 library(extrafont)
 font_name <- "Segoe UI"
 g <- ggplot(df_timeseries)
 g <- g + geom_line(aes(x = Year, y = Population), color = "navy", size = 2)
+g <- g + scale_x_continuous(breaks = x_breaks)
 g <- g + ggtitle("Yokohama Population")
 g <- g + theme_bw()
 g <- g + theme(aspect.ratio = 0.6,
                text = element_text(family = 16),
-               axis.text = element_text(family = font_name, size = 14),
+               axis.text = element_text(family = font_name, size = 12),
                axis.title = element_text(family = font_name, size = 16),
                plot.title = element_text(family = font_name, size = 20))
 plot(g)
@@ -933,16 +970,24 @@ font_name <- "Segoe UI"
 font_name_jp <- "Migu 1M"
 g <- ggplot(df_timeseries)
 g <- g + geom_line(aes(x = Year, y = Population), color = "navy", size = 2)
+g <- g + scale_x_continuous(breaks = x_breaks)
 g <- g + ggtitle("横浜市の人口")
 g <- g + xlab("年(西暦)")
 g <- g + ylab("人口")
 g <- g + theme_bw()
 g <- g + theme(aspect.ratio = 0.6,
                text = element_text(family = font_name),
-               axis.text = element_text(family = font_name_jp, size = 14),
+               axis.text = element_text(family = font_name_jp, size = 12),
                axis.title = element_text(family = font_name_jp, size = 16),
                plot.title = element_text(family = font_name_jp, size = 20))
 plot(g)
+```
+
+plotly::ggplotlyを使うと、インタラクティブに拡大縮小したり、線にカーソルを置いて各年の人口を表示できたりする。
+
+```{r plotly_jp_table_timeseries, message=FALSE, warning=FALSE}
+library(plotly)
+plotly::ggplotly(g)
 ```
 
 図をPNGファイルに保存するには、 ggsaveを使う。
@@ -1000,11 +1045,17 @@ df_all_city <- df_population %>%
   dplyr::filter(!stringr::str_ends(ward, "区"))
 ```
 
+もしくはこう書ける。
+
+```{r separate_wards_alt, eval=FALSE}
+df_population %>% dplyr::filter(ward != "横浜市")
+```
+
 ```{r print_all_city, echo=FALSE}
 df_all_city %>% kable() %>% kable_styling()
 ```
 
-dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これは先ほど説明したシンボル(symbol)である。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは rlang::sym を使う。
+dplyr::select は列名を文字列で指定したが、dplyr::filter の ward は "" が無いので文字列ではない。これは先ほど説明したシンボル(symbol)である。今回のように各区はwardという列にある、と分かっているときはこのようにハードコーディングしてよいが、実行時に文字列で与えたいことがあるだろう。そのときは !!rlang::sym を使う。
 
 ```{r import_rlang, message=FALSE, warning=FALSE}
 library(rlang)
@@ -1015,6 +1066,13 @@ ward_column_name <- "ward"
 df_wards_alt <- df_population %>%
   dplyr::filter(!!rlang::sym(ward_column_name) != "横浜市")
 assertthat::assert_that(identical(df_wards, df_wards_alt))
+```
+
+rlang::expr を使って、 !!rlang::sym がどう展開されたかを確認すると、先ほどのコードと同じことが分かる。
+
+```{r separate_wards_expanded}
+rlang::expr(df_population %>%
+  dplyr::filter(!!rlang::sym(ward_column_name) != "横浜市"))
 ```
 
 実は　dplyr::select は、文字列だけでなくシンボルを受け付ける。なので "" が無くてもよかった。わざとらしい例だが、複数の文字列をシンボルにするには、 rlang::syms を使う。それと、!!ではなく!!!を使う。!!と!!!は否定の否定、否定の否定の否定、ではなく演算子というのが珍しい。
@@ -1224,6 +1282,76 @@ readr::write_excel_csv(df_ward_tax_offices, path = "yokohama_tax_office.csv")
 readr::write_excel_csv(df_ward_tax_offices, path = "yokohama_tax_office.csv.gz")
 ```
 
+### JSONファイルを読み書きする
+
+CSVファイルには、それがどんなデータかというメタデータを記述しづらい。メタデータをJSONファイルに書くとよいだろう。例えば横浜市と茅ヶ崎市について、このように書く。city:漢字名、kana:かな表記、roman:ローマ字表記、designated:政令指定都市かどうか、n_wards:政令指定都市なら区の数、tax_offices:所管税務署、date:最終更新日、とする。
+
+```{text data_yokohama}
+{
+    "city" : "横浜市",
+    "kana" : "よこはま",
+    "roman" : "Yokohama",
+    "designated" : true,
+    "n_wards" : 18,
+    "tax_offices" : ["神奈川", "鶴見", "戸塚", "保土ケ谷", "緑", "横浜中", "横浜南"],
+    "date": "2021/01/01"
+}
+```
+
+```{text data_chigasaki}
+{
+    "city" : "茅ヶ崎市",
+    "kana" : "ちがさき",
+    "roman" : "Chigasaki",
+    "designated" : false,
+    "tax_offices" : "藤沢",
+    "date": "2021/01/01"
+}
+```
+
+```{r read_jsons}
+data_yokohama <- jsonlite::fromJSON("incoming_metadata/r_in_30min_yokohama.json")
+print(data_yokohama)
+data_chigasaki <- jsonlite::fromJSON("incoming_metadata/r_in_30min_chigasaki.json")
+print(data_chigasaki)
+class(data_chigasaki)
+```
+
+JSONファイルをリストとして読み込んだことが分かる。Rにはスカラー変数が無いので、要素(リスト構造の末端)はすべてベクトルである。論理型、数値、文字列型が上手く推測されたことが分かる。日付は必要なら変換しよう。
+
+```{r json_date}
+data_yokohama$date <- lubridate::ymd(data_yokohama$date)
+data_yokohama$date
+class(data_yokohama$date)
+```
+
+存在しない要素を取得するとNULLが返る。エラーにはならない。茅ヶ崎市は政令指定都市ではないので、区の数はNULLである。
+
+```{r json_elements}
+data_yokohama$n_wards
+data_chigasaki$n_wards
+```
+
+JSONファイルを書き出してみる。
+
+```{r write_jsons}
+jsonlite::write_json(data_yokohama, "output_yokohama.json", pretty=TRUE)
+```
+
+出力結果はこうなる。要素が1個でも配列になるのが、以下にもRらしい。
+
+```{text output_yokohama}
+{
+  "city": ["横浜市"],
+  "kana": ["よこはま"],
+  "roman": ["Yokohama"],
+  "designated": [true],
+  "n_wards": [18],
+  "tax_offices": ["神奈川", "鶴見", "戸塚", "保土ケ谷", "緑", "横浜中", "横浜南"],
+  "date": ["2021-01-01"]
+}
+```
+
 ## その他ツール
 
 ### Jupyter Notebook と R Markdown
@@ -1291,7 +1419,7 @@ cloc::cloc(source = "pasteNumbers.R")
 |パーフェクトR|Rサポーターズ 著|2017|技術評論社|
 |Rパッケージ開発入門 テスト、文書化、コード共有の手法を学ぶ|Hadley Wickham 著/瀬戸山雅人, 石井弓美子, 古畠敦 訳|2016|オライリー・ジャパン|
 
-## データ出典
+## データ出典 {#data_source}
 
 本 R Markdown からHTML文書やPDF文書を生成した場合、 [横浜市のオープンデータ](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/) を編集・加工したものが埋め込まれます。これらは [利用条件等](https://www.city.yokohama.lg.jp/city-info/yokohamashi/tokei-chosa/portal/opendata/opendata.html) に記載の、 CC BY 4.0 に基づいています。
 
