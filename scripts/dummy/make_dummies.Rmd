@@ -3,10 +3,12 @@ title: "ダミー化と補間いろいろ"
 author: "プログラマたんbot"
 date: '`r format(Sys.time(), "%Y/%m/%d")`'
 output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
   pdf_document:
     latex_engine: xelatex
-  html_document:
-    toc: false
   beamer_presentation:
     pandoc_args:
     - --latex-engine
@@ -37,6 +39,16 @@ library(kableExtra)
 
 [参考資料](https://fuminorikawami.hatenablog.com/entry/2018/10/27/170129)を元に、いろいろなパッケージの、いろいろなパラメータでダミー化する。
 
+各パッケージの動作をまとめた、1-to-N または 1-to-N-1ダミー化は、最初に書いたのがパッケージのデフォルト値である。NAをNAのままにするか、NAというカテゴリを作るかも、両方できる場合は最初に書いたのがパッケージのデフォルト値である。
+
+|パッケージ|1-to-N または 1-to-N-1ダミー化|NA(欠測値)|
+|:------------------|:--------------|:--------------------------------|
+|caret::dummyVars|NまたはN-1|NAのまま|
+|dummies::dummy.data.frame|N-1のみ|NAのまま|
+|makedummies::makedummies|N-1またはN|NAのまま|
+|fastDummies::dummy_cols|NまたはN-1|NAというカテゴリを作る/作らない|
+|pandas.get_dummies|NまたはN-1|NAのまま/NAというカテゴリを作る|
+
 ### データフレームをロードする
 
 列の型は、nがnumeric、fがfactorである。列名は以下の通り、順に並ぶ。
@@ -46,7 +58,7 @@ library(kableExtra)
 - valueは数値。NAを含んでいたりいなかったりする。列名はアルファベット順ではない。
 
 ```{r load_dataframe}
-df <- readr::read_csv('with_na.csv', col_types='nfnfnffn')
+df <- readr::read_csv('with_na.csv', col_types = 'nfnfnffn')
 ```
 
 ```{r show_load_dataframe, echo=FALSE}
@@ -58,24 +70,34 @@ df %>% kable() %>% kable_styling()
 NカテゴリをN変数にする(全カテゴリを足すと1sになる)。tibbleのNAはNAのまま残り、「NAというカテゴリ」は作らない。ダミー化前の列はなくなり、元々の列名の順序は維持される。
 
 ```{r caret}
-mat_predict <- predict(caret::dummyVars(~.,df), df)
+mat_predict <- predict(caret::dummyVars(~., df), df)
 ```
 
 ```{r show_caret, echo=FALSE}
 mat_predict %>% kable() %>% kable_styling()
 ```
 
-以下のcode chunkをcache=TRUEにしなおかつ `df_large <- NULL, mat_predict_large <- NULL` でメモリを解放しないと、PCのDRAMが8GBだとlazyLoadDBinsertVariableできないというエラーが発生する。
+fullRank = TRUEにすると、NカテゴリをN-1変数にする。
+
+```{r caret_fullrank}
+mat_predict <- predict(caret::dummyVars(~., df, fullRank = TRUE), df)
+```
+
+```{r show_caret_fullrank, echo=FALSE}
+mat_predict %>% kable() %>% kable_styling()
+```
+
+以下のcode chunkをcache = TRUEにしなおかつ `df_large <- NULL, mat_predict_large <- NULL` でメモリを解放しないと、PCのDRAMが8GBだとlazyLoadDBinsertVariableできないというエラーが発生する。
 
 ```{r caret_large, cache=FALSE}
 n_cols <- 10000
 n_samples <- 10000
 df_large <- purrr::map(1:n_cols, function(x) {
-    v <- list(a=sample(c("p", "q", "r"), n_samples, replace=TRUE))
+    v <- list(a = sample(c("p", "q", "r"), n_samples, replace = TRUE))
     names(v) <- paste0('V', x)
     v
 }) %>% dplyr::bind_cols()
-mat_predict_large <- predict(caret::dummyVars(~.,df_large), df_large)
+mat_predict_large <- predict(caret::dummyVars(~., df_large), df_large)
 print(pryr::object_size(df_large))
 print(pryr::object_size(mat_predict_large))
 ```
@@ -104,17 +126,17 @@ mat_dummies %>% kable() %>% kable_styling()
 basal_level 引数で、NカテゴリをN変数にするかN-1変数にするか指定できる。まずN変数にする。tibbleのNAはNAのまま残り、NAというカテゴリは作らない。ダミー化前の列はなくなり、元々の列名の順序は維持される。つまりcaretと同様の動作をする。
 
 ```{r makedummies_n}
-mat_makedummies_n <- makedummies::makedummies(df, basal_level=TRUE)
+mat_makedummies_n <- makedummies::makedummies(df, basal_level = TRUE)
 ```
 
 ```{r show_makedummies_n, echo=FALSE}
 mat_makedummies_n %>% kable() %>% kable_styling()
 ```
 
-basal_level=FALSEにすると、NカテゴリをN-1変数にする。
+basal_level = FALSEにすると、NカテゴリをN-1変数にする。デフォルトはN-1変数である。
 
 ```{r makedummies_n_1}
-mat_makedummies_n_1 <- makedummies::makedummies(df, basal_level=FALSE)
+mat_makedummies_n_1 <- makedummies::makedummies(df, basal_level = FALSE)
 ```
 
 ```{r show_makedummies_n_1, echo=FALSE}
@@ -126,27 +148,27 @@ mat_makedummies_n_1 %>% kable() %>% kable_styling()
 remove_first_dummy 引数で、NカテゴリをN変数にするかN-1変数にするか指定できる。まずN変数にする。NAを含むfactorには、NAというカテゴリができる。
 
 ```{r fastDummies_n}
-mat_fastDummies_n <- fastDummies::dummy_cols(df, remove_first_dummy=FALSE)
+mat_fastDummies_n <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE)
 ```
 
 ```{r show_fastDummies_n, echo=FALSE}
 mat_fastDummies_n %>% kable() %>% kable_styling()
 ```
 
-ignore_na=TRUE にすると、NAというカテゴリは作らない。
+ignore_na = TRUE にすると、NAというカテゴリは作らない。
 
 ```{r fastDummies_n_na}
-mat_fastDummies_n_na <- fastDummies::dummy_cols(df, remove_first_dummy=FALSE, ignore_na=TRUE)
+mat_fastDummies_n_na <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE, ignore_na = TRUE)
 ```
 
 ```{r show_fastDummies_n_na, echo=FALSE}
 mat_fastDummies_n_na %>% kable() %>% kable_styling()
 ```
 
-remove_first_dummy=TRUE にして、NカテゴリをN-1変数にする。ignore_na=FALSE にするとNAというカテゴリができ、ignore_na=TRUE にすると、NAというカテゴリは作らない。
+remove_first_dummy = TRUE にして、NカテゴリをN-1変数にする。ignore_na = FALSE にするとNAというカテゴリができ、ignore_na = TRUE にすると、NAというカテゴリは作らない。
 
 ```{r fastDummies_default_n_1}
-mat_fastDummies_n_1 <- fastDummies::dummy_cols(df, remove_first_dummy=TRUE, ignore_na=FALSE)
+mat_fastDummies_n_1 <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, ignore_na = FALSE)
 ```
 
 ```{r show_fastDummies_default_n_1, echo=FALSE}
@@ -154,17 +176,17 @@ mat_fastDummies_n_1 %>% kable() %>% kable_styling()
 ```
 
 ```{r fastDummies_default_n_1_na}
-mat_fastDummies_n_1_na <- fastDummies::dummy_cols(df, remove_first_dummy=TRUE, ignore_na=TRUE)
+mat_fastDummies_n_1_na <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, ignore_na = TRUE)
 ```
 
 ```{r show_fastDummies_default_n_1_na, echo=FALSE}
 mat_fastDummies_n_1_na %>% kable() %>% kable_styling()
 ```
 
-列名は元々の列に、ダミー化した列を追加する。ダミー化前の列はデフォルトで残るが、 remove_selected_columns=TRUE にするとダミー化前の列を削除し、結果としてダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。つまり列の順序は __保存されない__ 。
+列名は元々の列に、ダミー化した列を追加する。ダミー化前の列はデフォルトで残るが、 remove_selected_columns = TRUE にするとダミー化前の列を削除し、結果としてダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。つまり列の順序は __保存されない__ 。
 
 ```{r fastDummies_remove_n}
-mat_fastDummies_n_filtered <- fastDummies::dummy_cols(df, remove_first_dummy=FALSE, remove_selected_columns=TRUE, ignore_na=TRUE)
+mat_fastDummies_n_filtered <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE, remove_selected_columns = TRUE, ignore_na = TRUE)
 ```
 
 ```{r show_fastDummies_remove_n, echo=FALSE}
@@ -172,7 +194,7 @@ mat_fastDummies_n_filtered %>% kable() %>% kable_styling()
 ```
 
 ```{r fastDummies_remove_n_1}
-mat_fastDummies_n_1_filtered <- fastDummies::dummy_cols(df, remove_first_dummy=TRUE, remove_selected_columns=TRUE, ignore_na=TRUE)
+mat_fastDummies_n_1_filtered <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, remove_selected_columns = TRUE, ignore_na = TRUE)
 ```
 
 ```{r show_fastDummies_remove_n_1, echo=FALSE}
@@ -186,8 +208,8 @@ mat_fastDummies_n_1_filtered %>% kable() %>% kable_styling()
 NカテゴリをN変数にするダミー化はこうであった。
 
 ```{r load_before_interpolate}
-df <- readr::read_csv('with_na.csv', col_types='nfnfnffn')
-mat <- makedummies::makedummies(df, basal_level=TRUE)
+df <- readr::read_csv('with_na.csv', col_types = 'nfnfnffn')
+mat <- makedummies::makedummies(df, basal_level = TRUE)
 ```
 
 ```{r show_load_before_interpolate, echo=FALSE}
@@ -197,10 +219,10 @@ mat %>% kable() %>% kable_styling()
 tidyr::fillを使って、各列を補間する。purrr::reduceを使うと、それぞれの列について補間できる。
 
 ```{r matrix_interpolate1}
-mat_interpolated_1 <- purrr::reduce(.x=colnames(mat), .init=mat, .f=function(df, col_name) {
+mat_interpolated_1 <- purrr::reduce(.x = colnames(mat), .init = mat, .f = function(df, col_name) {
   df %>%
-    tidyr::fill(col_name, .direction='down') %>%
-    tidyr::fill(col_name, .direction='up')
+    tidyr::fill(col_name, .direction = 'down') %>%
+    tidyr::fill(col_name, .direction = 'up')
 })
 ```
 
@@ -211,12 +233,12 @@ mat_interpolated_1 %>% kable() %>% kable_styling()
 以下のようにするとメッセージが出なくなる。
 
 ```{r matrix_interpolate2}
-mat_interpolated_2 <- purrr::reduce(.x=colnames(mat), .init=mat, .f=function(df, col_name) {
+mat_interpolated_2 <- purrr::reduce(.x = colnames(mat), .init = mat, .f = function(df, col_name) {
   df %>%
-    dplyr::mutate(.prev_val=col_name, .next_val=col_name) %>%
-    tidyr::fill(col_name, .direction='down') %>%
-    tidyr::fill(col_name, .direction='up') %>%
-    dplyr::mutate(col_name=ifelse(.prev_val == .next_val, .prev_val, col_name)) %>%
+    dplyr::mutate(.prev_val = col_name, .next_val = col_name) %>%
+    tidyr::fill(col_name, .direction = 'down') %>%
+    tidyr::fill(col_name, .direction = 'up') %>%
+    dplyr::mutate(col_name = ifelse(.prev_val == .next_val, .prev_val, col_name)) %>%
     dplyr::select(-c(.prev_val, .next_val))
 })
 ```
@@ -254,7 +276,7 @@ print(df)
 
 NカテゴリをN変数およびはN-1変数にする。Data frameのNAはNAのまま残り、デフォルトでは「NAというカテゴリ」は作らない。ダミー化前の列はなくなる。
 
-列の順序は __保存されない__ 。ダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。fastDummies::dummy_cols(remove_selected_columns=TRUE) と同様の出力になる。
+列の順序は __保存されない__ 。ダミー化しなかった列が前、ダミー化した列が後にくる(それぞれの中の列の順序は元の順序が維持される)。fastDummies::dummy_cols(remove_selected_columns = TRUE) と同様の出力になる。
 
 ```{python python_dummy, echo=TRUE}
 df_dummy_n = pd.get_dummies(data=df, drop_first=False)
@@ -263,7 +285,7 @@ df_dummy_n_1 = pd.get_dummies(data=df, drop_first=True)
 print(df_dummy_n_1)
 ```
 
-dummy_na=True にすると、NAをいうカテゴリを作る。
+dummy_na = True にすると、NAをいうカテゴリを作る。
 
 ```{python python_dummy_na, echo=TRUE}
 df_dummy_n_na = pd.get_dummies(data=df, dummy_na=True)
