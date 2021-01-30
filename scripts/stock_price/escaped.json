@@ -1,1 +1,6 @@
-{"regex_pattern": "\u5e74\u6708\u65e5: \\d{8}", "date": "20210129"}
+{
+ "regex_pattern_date": "\u5e74\u6708\u65e5: \\d{8}",
+ "date": "20210129",
+ "regex_pattern_time": "\u6642\u5206\u79d2: \\d{6}",
+ "time": "234506"
+}
