@@ -31,7 +31,7 @@ void AlignedStorage(void) {
         "movaps xmm5, [rsi] \n\t"
         "vdpps xmm4, xmm5, ds:[rsi + rbx * 4 + 8], 0xd2 \n\t"
         "movaps [rdi], xmm4 \n\t"
-        ::"S"(pXmmSrc),"D"(pXmmDst):"rbx","memory");
+        ::"S"(pXmmSrc),"D"(pXmmDst):"rbx", "xmm4", "xmm5", "memory");
 
     std::cout << pXmmSrc[0] << " : " << pXmmSrc[1] << " : " << pXmmSrc[2] << " : " << pXmmSrc[3] << "\n";
     std::cout << pXmmSrc[4] << " : " << pXmmSrc[5] << " : " << pXmmSrc[6] << " : " << pXmmSrc[7] << "\n";
@@ -57,7 +57,7 @@ void AlignAsBytes(void) {
         "movaps xmm5, [rsi] \n\t"
         "vdpps xmm4, xmm5, ds:[rsi + rbx * 4 + 8], 0xd2 \n\t"
         "movaps [rdi], xmm4 \n\t"
-        ::"S"(pXmmSrc),"D"(pXmmDst):"rbx","memory");
+        ::"S"(pXmmSrc),"D"(pXmmDst):"rbx", "xmm4", "xmm5", "memory");
 
     std::cout << pXmmSrc[0] << " : " << pXmmSrc[1] << " : " << pXmmSrc[2] << " : " << pXmmSrc[3] << "\n";
     std::cout << pXmmSrc[4] << " : " << pXmmSrc[5] << " : " << pXmmSrc[6] << " : " << pXmmSrc[7] << "\n";
@@ -87,7 +87,7 @@ void FourOperands(void) {
         "movaps xmm6, [rdi + 32] \n\t"
         "vpclmulqdq xmm4, xmm5, xmm6, 0x1 \n\t"
         "movaps [rdi], xmm4 \n\t"
-        ::"D"(pXmm):"memory");
+        ::"D"(pXmm):"xmm4", "xmm5", "xmm6", "memory");
     std::cout << pXmm[0] << " : " << pXmm[1] << "\n" << std::boolalpha <<
         (pXmm[0] == 15) << ":" << (pXmm[1] == 0) << "\n";
 
@@ -101,7 +101,7 @@ void FourOperands(void) {
         "movaps xmm5, [rdi + 16] \n\t"
         "vpclmulqdq xmm4, xmm5, ds:[rdi + rbx * 8 + 16], 0x11 \n\t"
         "movaps [rdi], xmm4 \n\t"
-        ::"D"(pXmm):"rbx", "memory");
+        ::"D"(pXmm):"rbx", "xmm4", "xmm5", "memory");
     std::cout << pXmm[0] << " : " << pXmm[1] << "\n" << std::boolalpha <<
         (pXmm[0] == 9) << ":" << (pXmm[1] == 0) << "\n\n";
     return;

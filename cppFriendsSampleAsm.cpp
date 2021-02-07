@@ -1,5 +1,6 @@
 // やめるのだフェネックで学ぶC++の実証コード(インラインアセンブリ)
 #include <climits>
+#include <cstring>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -37,7 +38,7 @@ TEST_F(TestSaturationArithmetic, Add) {
         "movdqa  16(%0), %%xmm5 \n\t"
         "paddusb %%xmm5, %%xmm4 \n\t"
         "movdqa  %%xmm4, (%0)    \n\t"
-        ::"r"(xmmRegisters):"memory");
+        ::"r"(xmmRegisters):"xmm4", "xmm5", "memory");
 
     static_assert(sizeof(expected) <= sizeof(xmmRegisters), "Too large");
     EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
@@ -63,7 +64,7 @@ TEST_F(TestSaturationArithmetic, Sub) {
         "movdqa  16(%0), %%xmm5 \n\t"
         "psubusb %%xmm5, %%xmm4 \n\t"
         "movdqa  %%xmm4, (%0)    \n\t"
-        ::"r"(xmmRegisters):"memory");
+        ::"r"(xmmRegisters):"xmm4", "xmm5", "memory");
 
     static_assert(sizeof(expected) <= sizeof(xmmRegisters), "Too large");
     EXPECT_EQ(0, ::memcmp(expected, xmmRegisters, sizeof(expected)));
@@ -937,6 +938,36 @@ TEST_F(TestAsmInstructions, BitScanReverse) {
         "lzcnt %%rax, %%rdx \n\t"
         :"=d"(actual64):"a"(argZero64):);
     EXPECT_EQ(64, actual64);
+}
+
+namespace {
+    struct XmmRegValue {
+        alignas(16) unsigned char values[16] {0};
+    };
+
+    void ReLU(XmmRegValue& xmmRegValue) {
+        asm volatile (
+            "xorps  %%xmm4, %%xmm4 \n\t"
+            "movaps (%0),   %%xmm5 \n\t"
+            "maxps  %%xmm5, %%xmm4 \n\t"
+            "movaps %%xmm4, (%0)   \n\t"
+            ::"a"(xmmRegValue.values):"xmm4", "xmm5", "memory");
+        return;
+    }
+}
+
+TEST_F(TestAsmInstructions, MaxDoubles) {
+    using FloatingType = float;
+    XmmRegValue actual;
+    constexpr size_t n_float = sizeof(actual.values) / sizeof(FloatingType);
+    FloatingType values[n_float] {2.5, 10, -7.5, 1.0};
+    const FloatingType expected[n_float] {2.5, 10, 0, 1.0};
+    static_assert(sizeof(actual.values) == sizeof(values), "Must have a same size");
+    static_assert(sizeof(actual.values) == sizeof(expected), "Must have a same size");
+
+    ::memmove(actual.values, values, sizeof(values));
+    ReLU(actual);
+    EXPECT_EQ(0, ::memcmp(expected, &actual.values, sizeof(expected)));
 }
 
 /*

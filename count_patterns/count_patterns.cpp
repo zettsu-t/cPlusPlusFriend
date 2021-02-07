@@ -1,4 +1,4 @@
-// Count Yu.*Ka.*Ta.*Yu in YuKaTaYuTaYuTaYu
+// Count Yu*Ka*Ta*Yu substrings in YuKaTaYuTaYuTaYu
 // This quiz is cited from
 // https://twitter.com/yukata_yu/status/1286061070004531201
 // Run this online in
@@ -90,7 +90,7 @@ template<typename... Ts>
 using YuCounter = YuFirst<Ts..., Nil>;
 
 int main(void) {
-    // Count matches of /Yu.*Ka.*Ta.*Yu/  in YuKaTaYuTaYuTaYu
+    // Count matches of /Yu.*Ka.*Ta.*Yu/ in YuKaTaYuTaYuTaYu
     YuCounter<Yu, Ka, Ta, Yu, Ta, Yu, Ta, Yu> pattern;
     std::cout << "Found " << pattern.count << " pattern(s).\n";
     std::cout << sizeof(pattern) << " bytes.\n";

@@ -593,7 +593,7 @@ TEST_F(TestBadCast, Alignment) {
         "mov     %1, %%rdx       \n\t"
         "movaps  (%%rdx), %%xmm4 \n\t"
         "pextrq  $1, %%xmm4, %0  \n\t"
-        :"=a"(actual):"r"(&xmmReg):"rdx", "memory");
+        :"=a"(actual):"r"(&xmmReg):"rdx", "xmm4", "memory");
     EXPECT_EQ(expected, actual);
 
 #if 0
@@ -603,7 +603,7 @@ TEST_F(TestBadCast, Alignment) {
         "add     $1, %%rdx       \n\t"
         "movaps  (%%rdx), %%xmm4 \n\t"
         "pextrq  $1, %%xmm4, %0  \n\t"
-        :"=a"(actual):"r"(&xmmReg):"rdx", "memory");
+        :"=a"(actual):"r"(&xmmReg):"rdx", "xmm4", "memory");
     EXPECT_EQ(expected, actual);
 #endif
 }

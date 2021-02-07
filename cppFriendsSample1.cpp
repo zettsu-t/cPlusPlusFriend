@@ -1,6 +1,7 @@
 // やめるのだフェネックで学ぶC++の実証コード
 #define  __STDC_LIMIT_MACROS
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <climits>
 #include <atomic>
@@ -67,6 +68,17 @@ TEST_F(TestTypeCast, AnyCastBoost) {
     EXPECT_EQ(17, result2);
 }
 
+// https://www.ipa.go.jp/files/000055043.pdf
+// R1.3.2
+TEST_F(TestTypeCast, PtrDiff) {
+    int off, var1[10];
+    int *p1, *p2;
+    p1 = &var1[5];
+    p2 = &var1[2];
+//   off = p1 - p2; // intではなくptrdiff_t
+    ptrdiff_t offp = p1 - p2; // intではなくptrdiff_t
+}
+
 TEST_F(TestTypeCast, EnumCast) {
     auto intEnum = static_cast<std::underlying_type_t<decltype(IntEnum::INT_ENUM_MEMBER)>>
         (IntEnum::INT_ENUM_MEMBER);
@@ -118,6 +130,14 @@ TEST_F(TestTypeCast, PopCount) {
     // 1111 0111 0011 0000 0100 0010 0010 0101b
     //    4    7    9        10   11   12   14個
     EXPECT_EQ(14, MySlowPopCount(0xf7304225u));
+}
+
+TEST_F(TestTypeCast, VoidCast) {
+//  int* pInt = std::malloc(16);
+//  int* pInt = (int*)(std::malloc(16));
+    int* pInt = static_cast<decltype(pInt)>(std::malloc(16));
+    std::free(pInt);
+    pInt = nullptr;
 }
 
 namespace {
