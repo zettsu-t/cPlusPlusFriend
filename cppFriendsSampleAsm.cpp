@@ -1,6 +1,7 @@
 // やめるのだフェネックで学ぶC++の実証コード(インラインアセンブリ)
 #include <climits>
 #include <cstring>
+#include <algorithm>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -951,9 +952,49 @@ namespace {
             "movaps (%0),   %%xmm5 \n\t"
             "maxps  %%xmm5, %%xmm4 \n\t"
             "movaps %%xmm4, (%0)   \n\t"
-            ::"a"(xmmRegValue.values):"xmm4", "xmm5", "memory");
+            ::"r"(xmmRegValue.values):"xmm4", "xmm5", "memory");
         return;
     }
+
+    int16_t SaturatedAddInt16(int16_t x, int16_t y) {
+        XmmRegValue reg;
+        ::memmove(reg.values, &x, sizeof(x));
+        ::memmove(reg.values + 2, &y, sizeof(y));
+
+        asm volatile (
+            "movdqa  (%0), %%xmm4 \n\t"
+            "phaddsw %%xmm4, %%xmm4 \n\t"
+            "movdqa  %%xmm4, (%0) \n\t"
+            ::"r"(reg.values):"xmm4", "memory");
+
+        return *(std::launder(reinterpret_cast<int16_t*>(reg.values)));
+    }
+
+    uint16_t SaturatedAddUint16(uint16_t x, uint16_t y) {
+        uint16_t sum = 0;
+        asm volatile (
+            "mov  %%bx, %%ax \n\t"
+            "add  %%cx, %%ax \n\t"
+            "sbb  %%r10w, %%r10w \n\t"
+            "or   %%r10w, %%ax \n\t"
+            :"=a"(sum):"b"(x),"c"(y):"r10");
+
+        return sum;
+    }
+
+    uint16_t SaturatedAddUint16cmov(uint16_t x, uint16_t y) {
+        uint16_t sum = 0;
+        asm volatile (
+            "xor   %%r10w, %%r10w \n\t"
+            "not   %%r10w \n\t"
+            "mov   %%bx, %%ax \n\t"
+            "add   %%cx, %%ax \n\t"
+            "cmovc %%r10w, %%ax \n\t"
+            :"=a"(sum):"b"(x),"c"(y):"r10");
+
+        return sum;
+    }
+
 }
 
 TEST_F(TestAsmInstructions, MaxDoubles) {
@@ -969,6 +1010,95 @@ TEST_F(TestAsmInstructions, MaxDoubles) {
     ReLU(actual);
     EXPECT_EQ(0, ::memcmp(expected, &actual.values, sizeof(expected)));
 }
+
+TEST_F(TestAsmInstructions, SaturatedAddInt16) {
+    using IntType = int16_t;
+    using BigIntType = int64_t;
+    constexpr auto minValue = std::numeric_limits<IntType>::min();
+    constexpr auto maxValue = std::numeric_limits<IntType>::max();
+
+    const std::vector<int16_t> valueSet {
+        minValue, minValue + 1,
+        minValue/2 - 1, minValue/2, minValue/2 + 1,
+        -1, 0, 1,
+        maxValue/2 - 1, maxValue/2, maxValue/2 + 1,
+        maxValue - 1, maxValue
+    };
+
+    constexpr BigIntType lowerLimit = minValue;
+    constexpr BigIntType upperLimit = maxValue;
+    for (const auto& x : valueSet) {
+        for (const auto& y : valueSet) {
+            BigIntType intX = x;
+            BigIntType intY = y;
+            BigIntType expected = std::clamp(intX + intY, lowerLimit, upperLimit);
+            BigIntType actual = SaturatedAddInt16(x, y);
+            EXPECT_EQ(expected, actual);
+        }
+    }
+}
+
+TEST_F(TestAsmInstructions, SaturatedAddUint16) {
+    using UintType = uint16_t;
+    using BigUintType = uint64_t;
+    constexpr auto maxValue = std::numeric_limits<UintType>::max();
+    const std::vector<uint16_t> valueSet {
+        0, 1, maxValue/2 - 1, maxValue/2, maxValue/2 + 1,
+        maxValue - 1, maxValue
+    };
+
+    constexpr BigUintType upperLimit = maxValue;
+    for (const auto& x : valueSet) {
+        for (const auto& y : valueSet) {
+            BigUintType uintX = x;
+            BigUintType uintY = y;
+            BigUintType expected = std::min(uintX + uintY, upperLimit);
+            BigUintType actual = SaturatedAddUint16(x, y);
+            EXPECT_EQ(expected, actual);
+            actual = SaturatedAddUint16cmov(x, y);
+            EXPECT_EQ(expected, actual);
+        }
+    }
+}
+
+#if 1
+TEST_F(TestAsmInstructions, SaturatedAddInt16Full) {
+    using IntType = int16_t;
+    using BigIntType = int64_t;
+    constexpr auto minValue = std::numeric_limits<IntType>::min();
+    constexpr auto maxValue = std::numeric_limits<IntType>::max();
+    constexpr BigIntType lowerLimit = minValue;
+    constexpr BigIntType upperLimit = maxValue;
+    for (IntType x = minValue; x < maxValue; ++x) {
+        for (IntType y = minValue; y < maxValue; ++y) {
+            BigIntType intX = x;
+            BigIntType intY = y;
+            BigIntType expected = std::clamp(intX + intY, lowerLimit, upperLimit);
+            BigIntType actual = SaturatedAddInt16(x, y);
+            EXPECT_EQ(expected, actual);
+        }
+    }
+}
+
+TEST_F(TestAsmInstructions, SaturatedAddUint16Full) {
+    using UintType = uint16_t;
+    using BigUintType = uint64_t;
+    constexpr auto maxValue = std::numeric_limits<UintType>::max();
+
+    constexpr BigUintType upperLimit = maxValue;
+    for (UintType x = 0; x < maxValue; ++x) {
+        for (UintType y = 0; y < maxValue; ++y) {
+            BigUintType uintX = x;
+            BigUintType uintY = y;
+            BigUintType expected = std::min(uintX + uintY, upperLimit);
+            BigUintType actual = SaturatedAddUint16(x, y);
+            EXPECT_EQ(expected, actual);
+            actual = SaturatedAddUint16cmov(x, y);
+            EXPECT_EQ(expected, actual);
+        }
+    }
+}
+#endif
 
 /*
   Local Variables:
