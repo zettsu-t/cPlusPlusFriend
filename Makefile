@@ -1,7 +1,7 @@
 # ビルド環境を識別する
 GCC_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3)
-GCC_VERSION_NUMBER:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
-LLVM_VERSION:=$(shell clang++ -v 2>&1 | head -1 | sed -e "s/[^0-9.]//g" -e "s/.* \\([0-9]\\)\\.\\([0-9]\\)\\b.*/\\1\\2/" | cut -f 1-2 -d .)
+GCC_VERSION_NUMBER:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/[^0-9.]//g" -e "s/.* \\([0-9]\\)\\.\\([0-9]\\)\\b.*/\\1\\2/" | cut -f 1-2 -d .)
+LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/[^0-9.]//g" -e "s/.* \\([0-9]\\)\\.\\([0-9]\\)\\b.*/\\1\\2/" | cut -f 1-2 -d .)
 
 # Structured bindingを使う
 GCC_CPP17_VERSION=7.0

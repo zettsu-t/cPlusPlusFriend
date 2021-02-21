@@ -5,7 +5,7 @@
 #if __cplusplus >= 202002L
 
 template <class T>
-concept Printable = requires (T& x) {
+concept Printable = requires (const T& x) {
     x.to_string();
 };
 
