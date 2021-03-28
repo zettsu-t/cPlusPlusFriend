@@ -1,0 +1,9 @@
+I wonder why the plural form of day-off is days-off and the plural form of plug-in is plug-ins.
+Programmers compare lossless compression to freeze-drying coffee, from-concentrate juice, and futon compression bags.
+I get plenty of exercises - move, jump, spin, load, carry, and push in my assembly code.
+Walt Disney said, "If you can dream it, you can do it.". Contestants of competitive programming may say "If you can come up with it, you can implement it."
+In C and C++, you can replace if(p) { free(p); } with free(p); . free(NULL) does nothing and does not crash. This is a kind of the null object design pattern.
+If you wonder some C++ empty structs are defined, leave them untouched and do not bundle them into one struct. They are tags for Boost.MultiIndex.
+You may find a comment in C++ code that says "This variable must be unsigned". It is a good practice to write an assertion "static_assert(std::is_unsigned)".
+It is a pesky bug that an interrupt handler constructs a C++ object which calls malloc unintentionally. Malloc is not reentrant so the handler rarely corrupts heap. This is hard to reproduce.
+T is a function to transpose a matrix in NumPy and t is a function to transpose a matrix in R. Stan has the T operator which is used for truncated data models.
