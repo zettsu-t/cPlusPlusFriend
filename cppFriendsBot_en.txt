@@ -7,3 +7,10 @@ If you wonder some C++ empty structs are defined, leave them untouched and do no
 You may find a comment in C++ code that says "This variable must be unsigned". It is a good practice to write an assertion "static_assert(std::is_unsigned)".
 It is a pesky bug that an interrupt handler constructs a C++ object which calls malloc unintentionally. Malloc is not reentrant so the handler rarely corrupts heap. This is hard to reproduce.
 T is a function to transpose a matrix in NumPy and t is a function to transpose a matrix in R. Stan has the T operator which is used for truncated data models.
+Before writing assert_equals, check their arguments. Google Test and CppUnit take (expected, actual). CUnit and R testthat::expect_equal take (actual, expected). It is troublesome to swap expected and actual values after writing unit tests.
+The logo of Boost C++ Libraries uses hexagons like benzene rings. It recalls us that the libraries work well together with the C++ standard library. Tidyverse is a collection of R packages and it also uses hexagons in its logo.
+x64 uses SSE registers and x86 uses 80-bit x87 FPU registers in floating-point arithmetic. This occasionally leads to different results of the same calculations.
+sizeof(4) is accidentally treated as 4 in many platforms. Do you mean "size_t var = 4;"?
+C++ compilers are novelists. They have you read their gargantuan error novels when there's something wrong in C++ code using templates.
+An interrupt is like pizza delivery. A driver rings the doorbell, you suspend your programming, and you pick up a pizza box on the floor. Bon appétit!
+Random seeds are required to reproduce results in some algorithms. You should save seeds or you will have a hard time reproducing the results.
