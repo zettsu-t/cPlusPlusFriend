@@ -1,0 +1,45 @@
+---
+title: "Expand text files in a R Markdown document"
+author: "Zettsu Tatsuya"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r setup_r_packages, include=FALSE}
+library(xfun)
+```
+
+```{r readLines_us_ascii, comment="", echo=FALSE}
+cat(readLines("us-ascii.txt"), sep = "\n")
+```
+
+```{r readLines_utf_8, comment="", echo=FALSE, error=TRUE}
+cat(readLines("utf-8.txt"), sep = "\n")
+```
+
+```{r readLines_utf_8_with_encoding, comment="", echo=FALSE}
+cat(readLines("utf-8.txt", encoding = "UTF-8"), sep = "\n")
+```
+
+```{r read_utf8_us_ascii, echo=FALSE, comment=""}
+cat(xfun::read_utf8("us-ascii.txt"), sep = "\n")
+```
+
+```{r read_utf8, echo=FALSE, comment=""}
+cat(xfun::read_utf8("utf-8.txt"), sep = "\n")
+```
