@@ -14,3 +14,9 @@ sizeof(4) is accidentally treated as 4 in many platforms. Do you mean "size_t va
 C++ compilers are novelists. They have you read their gargantuan error novels when there's something wrong in C++ code using templates.
 An interrupt is like pizza delivery. A driver rings the doorbell, you suspend your programming, and you pick up a pizza box on the floor. Bon appétit!
 Random seeds are required to reproduce results in some algorithms. You should save seeds or you will have a hard time reproducing the results.
+In C++, the 'this' pointer is rarely necessary. It is an example to write explicit 'this'. std::bind(&T::MemberFunction, this, std::placeholders::_1)
+It is a bad practice that an int holds a distance of two pointers in C/C++. Use ptrdiff_t and describe "%td" in printf().
+When you write a unit test, make it fail first. Otherwise, you wonder if the test passes or is empty or does not run.
+It is not easy to parse -1-1e-3 to -1.001.
+An advantage of just-in-time compilation over ahead-of-time compilation is generating platform-specific code. I have not written code for AVX-512.
+std::ofstreams in C++ automatically close file streams that they opened. This is a typical RAII behavior. Note that if closing a file fails in a destructor of std::ofstream, the destructor tells nothing.
