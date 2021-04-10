@@ -24,22 +24,36 @@ urlcolor: blue
 library(xfun)
 ```
 
-```{r readLines_us_ascii, comment="", echo=FALSE}
+
+```{r readLines_us_ascii, comment=""}
 cat(readLines("us-ascii.txt"), sep = "\n")
 ```
 
-```{r readLines_utf_8, comment="", echo=FALSE, error=TRUE}
+```{r readLines_utf_8, comment="", error=TRUE}
 cat(readLines("utf-8.txt"), sep = "\n")
 ```
 
-```{r readLines_utf_8_with_encoding, comment="", echo=FALSE}
+```{r readLines_utf_8_bom, comment="", error=TRUE}
+cat(readLines("utf-8-bom.txt"), sep = "\n")
+```
+
+```{r readLines_utf_8_with_encoding, comment=""}
 cat(readLines("utf-8.txt", encoding = "UTF-8"), sep = "\n")
 ```
 
-```{r read_utf8_us_ascii, echo=FALSE, comment=""}
+```{r readLines_utf_8_bom_with_encoding, comment=""}
+cat(readLines("utf-8-bom.txt", encoding = "UTF-8"), sep = "\n")
+```
+
+
+```{r xfun_us_ascii, comment=""}
 cat(xfun::read_utf8("us-ascii.txt"), sep = "\n")
 ```
 
-```{r read_utf8, echo=FALSE, comment=""}
+```{r xfun_utf8, comment=""}
 cat(xfun::read_utf8("utf-8.txt"), sep = "\n")
+```
+
+```{r xfun_utf8_bom, comment=""}
+cat(xfun::read_utf8("utf-8-bom.txt"), sep = "\n")
 ```
