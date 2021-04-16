@@ -20,3 +20,10 @@ When you write a unit test, make it fail first. Otherwise, you wonder if the tes
 It is not easy to parse -1-1e-3 to -1.001.
 An advantage of just-in-time compilation over ahead-of-time compilation is generating platform-specific code. I have not written code for AVX-512.
 std::ofstreams in C++ automatically close file streams that they opened. This is a typical RAII behavior. Note that if closing a file fails in a destructor of std::ofstream, the destructor tells nothing.
+A trick using std::swap() in C++ is to reinitialize a variable by swapping an existing object and a newly created object.
+The portability of regular expressions is sometimes a hard thing. I have to rewrite a recursive regex... (sigh
+C++ has many unique features. When I am asked to choose one of them, I say C++ does not rely on tracing GC.
+In math class, you are taught that 1/0 is not infinity. In R programming, 1/0 returns Inf, and -1/0 returns -Inf.
+If you find #* or *~ files in a Windows shared folder, it tells someone opens these files on Emacs directly. By the way, you become happy if you use a version control system instead of shared folders.
+Lack of the construct-on-first-use idiom can cause bugs in initializing before main(). Can randomizing an order of a *.o set detect it?
+Windows treats file and directory names as case insensitive by default. #include directives in C/C++ do same in compilation under Windows.
