@@ -27,3 +27,9 @@ In math class, you are taught that 1/0 is not infinity. In R programming, 1/0 re
 If you find #* or *~ files in a Windows shared folder, it tells someone opens these files on Emacs directly. By the way, you become happy if you use a version control system instead of shared folders.
 Lack of the construct-on-first-use idiom can cause bugs in initializing before main(). Can randomizing an order of a *.o set detect it?
 Windows treats file and directory names as case insensitive by default. #include directives in C/C++ do same in compilation under Windows.
+R and American building stories have 1-based indexing. C and British building storeys have 0-based indexing.
+A famous usage of 'do{}while();' is wrapping multi-statement macros in C/C++. Another is enumerating all permutations of a list. std::sort(vec.begin(), vec.end()); do {...} while(std::next_permutation(vec.begin(), vec.end()));
+NOP instructions do not make modern processors idle. They are useful to align instructions.
+Bit fields are not always ordered from LSB to MSB. It is platform-dependent and an IPv4 header struct is a good example.
+The document of R dplyr::distinct() says it is considerably faster. I would like to use this phrase.
+A simple use case does not mean that it is easy to design. "Deposit coins, press a button, and you can get a soda bottle" is correct but it doesn't help you make a vending machine.
