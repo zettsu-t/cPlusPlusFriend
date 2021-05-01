@@ -33,3 +33,11 @@ NOP instructions do not make modern processors idle. They are useful to align in
 Bit fields are not always ordered from LSB to MSB. It is platform-dependent and an IPv4 header struct is a good example.
 The document of R dplyr::distinct() says it is considerably faster. I would like to use this phrase.
 A simple use case does not mean that it is easy to design. "Deposit coins, press a button, and you can get a soda bottle" is correct but it doesn't help you make a vending machine.
+A result of positive integer division depends on platforms and computer languages. A dynamic typing language returns a floating-point number if two integers are not divisible.
+Programmers are lazy so they count lines of a CSV file with the wc command. Programmers are impatient so they do not launch R or Python and use the shell function below to count columns in a CSV file. 'head foo.csv | sed -e "s/[^\\,]//g" | awk '{ print length + 1 }'
+An advantage of C++ constants over macros is finding an undefined symbol. "if constexpr (color)" causes a compilation error if you expect "colour" but "#ifdef COLOR ... #endif" possibly leads to unexpected behaviors without compilation errors.
+Automatic memory management relieves programmers' burden but programmers are not free from memory management. Before reading a huge file, you may have to release huge objects or it causes an out-of-memory error.
+Someone said, "Any code doesn't run as you thought, run as you wrote". Sure. I say "Tracing GC doesn't collect objects which you thought obsolete, collect unreachable objects".
+It is fun for students in CS courses to read "Intel 64 and IA-32 Architectures Software Developer Manuals" and beat C/C++/Rust optimizers.
+int* is automatically convertible to const int* in most cases but it is not always true. A std::bad_any_cast exception is thrown if you put an int* into a std::any object and apply std::any_cast<const int*> to it.
+There are cases where different technical terms in different fields have the same notion. Markov property is well known as a sunk cost in economics. Hazard rate and force of mortality have a common definition.
