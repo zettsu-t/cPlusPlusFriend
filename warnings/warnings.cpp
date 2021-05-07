@@ -17,12 +17,27 @@ std::unique_ptr<Box> Create(int x) {
     return std::make_unique<Box>(x);
 }
 
-int main(void) {
+void moveUnique(void) {
     std::unique_ptr<Box> p = std::move(Create(1));
     p->Print();
-    std::unique_ptr<Box> q(Create(1));
-    q->Print();
+}
 
+void constructUnique(void) {
+    std::unique_ptr<Box> p(Create(2));
+    p->Print();
+}
+
+void moveToShared(void) {
+    std::shared_ptr<Box> p = std::move(Create(3));
+    p->Print();
+}
+
+void constructShared(void) {
+    std::shared_ptr<Box> p(Create(4));
+    p->Print();
+}
+
+void decltypeCast(void) {
     using Num = int;
     constexpr bool y = true;
     constexpr Num x = static_cast<decltype(x)>(y);
@@ -31,6 +46,14 @@ int main(void) {
     bool b = false;
     Num a = static_cast<decltype(a)>(b);
     std::cout << a << " " << b << "\n";
+}
+
+int main(void) {
+    moveUnique();
+    constructUnique();
+    moveToShared();
+    constructShared();
+    decltypeCast();
     return 0;
 }
 
