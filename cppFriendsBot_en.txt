@@ -41,3 +41,11 @@ Someone said, "Any code doesn't run as you thought, run as you wrote". Sure. I s
 It is fun for students in CS courses to read "Intel 64 and IA-32 Architectures Software Developer Manuals" and beat C/C++/Rust optimizers.
 int* is automatically convertible to const int* in most cases but it is not always true. A std::bad_any_cast exception is thrown if you put an int* into a std::any object and apply std::any_cast<const int*> to it.
 There are cases where different technical terms in different fields have the same notion. Markov property is well known as a sunk cost in economics. Hazard rate and force of mortality have a common definition.
+The critical path of a project is not obvious. In the construction of the Tokaido shinkansen, I suppose its critical path was digging a 7959m tunnel between Atami and Mishima, not developing trains running at 200 Km/h (125 mph).
+I know a capitalization-weighted stock index approximates the stock's value of a sector, region, or country. I wonder what price-weighted stock indices such as DJIA and N225 represent?
+Multi-level indexing was known before computers. Keeping Kimarijis in mind is crucial for winning competitive karuta games. Even novices know mu-su-me-fu-sa-ho-se. You can experience Kimarijis on Bash with bash-completion or on a car GPS unit to set a destination.
+Haven't you read a patent? Watch Michael Jackson's 'Smooth Criminal' video and read USP 5255452 'Method and means for creating anti-gravity illusion', which he is an inventor of.
+I heard the greatest inventor in the world is Patent Pending. The most-cited paper of all time must be "Error! Reference source not found."
+Suspension bridges are built from a long time ago but cable-stayed bridges are modern because they require structural analysis. There are many ideas which computers realize and cable-stayed bridges are one of them. Markov chain Monte Carlo (MCMC) methods are also the same.
+I heard that I can buy high throughput using parallelism, cannot buy low latency because it is bound by physical constants. Is this a famous maxim?
+If trainees are novices in UML, let them draw steps of household chores. We can wash clothes and clean up rooms in parallel.
