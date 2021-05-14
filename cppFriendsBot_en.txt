@@ -49,3 +49,9 @@ I heard the greatest inventor in the world is Patent Pending. The most-cited pap
 Suspension bridges are built from a long time ago but cable-stayed bridges are modern because they require structural analysis. There are many ideas which computers realize and cable-stayed bridges are one of them. Markov chain Monte Carlo (MCMC) methods are also the same.
 I heard that I can buy high throughput using parallelism, cannot buy low latency because it is bound by physical constants. Is this a famous maxim?
 If trainees are novices in UML, let them draw steps of household chores. We can wash clothes and clean up rooms in parallel.
+There is a chain reaction where we find unfamiliar technical terms in a paper and looking up the terms leads to other unfamiliar technical terms. Eventually, we understand the paper and these terms. Is this learning curve a sigmoid function?
+"What programming and stock trading have in common?" "There is one field where professionals and amateurs and any others play under the same rules. This never happens in baseball and chess leagues."
+The UD2 instruction is an oxymoron. Look, an undefined instruction is defined!
+"There is more than one way to do it." is a Perl programming motto and Ruby takes it over. By the way, there is more than one way to express "version 3.2 or later".
+Vanilla pthread_cond_wait has you deal with spurious wakeups. Use std::condition_variable::wait and you will be happy.
+Someone said, "We are living in a digital era". That's true in 2021. I suppose that letters and characters and music notes have been discrete but rarely called digital.
