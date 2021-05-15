@@ -995,6 +995,18 @@ namespace {
         return sum;
     }
 
+    void threeBytesXchg(void) {
+        // 0x48 REX.W 0100b (fixed) and 1000b (64 Bit Operand Size)
+        // 0x87 XCHG
+        // 0xc0
+        //   2-bit ModR/M.mod (11b : direct register access)
+        //   3-bit a destination register operand
+        //   3-bit a source register operand
+        asm volatile (
+            ".byte  0x48, 0x87, 0xc0 \n\t"
+            :::"rax", "memory");
+        return;
+    }
 }
 
 TEST_F(TestAsmInstructions, MaxDoubles) {
@@ -1099,6 +1111,10 @@ TEST_F(TestAsmInstructions, SaturatedAddUint16Full) {
     }
 }
 #endif
+
+TEST_F(TestAsmInstructions, ThreeBytesXchg) {
+    threeBytesXchg();
+}
 
 /*
   Local Variables:
