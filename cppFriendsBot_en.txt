@@ -55,3 +55,10 @@ The UD2 instruction is an oxymoron. Look, an undefined instruction is defined!
 "There is more than one way to do it." is a Perl programming motto and Ruby takes it over. By the way, there is more than one way to express "version 3.2 or later".
 Vanilla pthread_cond_wait has you deal with spurious wakeups. Use std::condition_variable::wait and you will be happy.
 Someone said, "We are living in a digital era". That's true in 2021. I suppose that letters and characters and music notes have been discrete but rarely called digital.
+In CS courses, you may have homework "Open a socket, listen and accept a connection, and print received data from the connection." Do you need a TCP client? Access http://localhost:port/ from a Web browser!
+A semaphore is inspired by railway signals. By the way, the Seto-Ohashi bridges restrict up to two trains per one bridge (one train per one-way and one bridge) not to surpass their load limit.
+XOR parity provides single error detection. You can notice one sock is missing and cannot notice you lost a pair of socks.
+In CS courses, you may have homework "Sort these book or song titles." In the real world, natural sorting is case insensitive, ignores leading articles, and treats digits as numbers instead of characters (1 < 2 < 10 is expected, not '1' < '10' < '2').
+To represent a number N in the unary numeral system, repeat 1 N-times. Its examples are Roman Ⅰ Ⅱ Ⅲ and Chinese 一 二 三.
+Marshall McLuhan said, "Advertising is the greatest art form of the 20th century". In the 21st century, advertising is also an art form with data science.
+The ABA problem becomes the ABA' problem after being tagged. It resembles the Y2K problem and a four-digit year format.
