@@ -77,8 +77,10 @@ draw_by_survey_years <- function(df, action, days_in_week, key, color_func, weba
       title_source2 <- ""
     }
   }
-  title <- paste0(title_prefix, title_filter, title_source1, title_lf1,
-                  title_source2, " を図の作者が編集・加工して作成")
+  title <- paste0(
+    title_prefix, title_filter, title_source1, title_lf1,
+    title_source2, " を図の作者が編集・加工して作成"
+  )
 
   legend_title <- if (key == "cohort") {
     "性別と生年(調査年から年齢を引いたもの)\n年齢は10..60代と70歳以上"
@@ -114,7 +116,7 @@ draw_by_survey_years <- function(df, action, days_in_week, key, color_func, weba
   g <- g + scale_linetype_manual(values = linetype_set)
   g <- g + scale_shape_manual(values = shape_set)
   if (!webapp) {
-      g <- g + scale_y_continuous(limits = c(0, 100))
+    g <- g + scale_y_continuous(limits = c(0, 100))
   }
   g <- g + ggtitle(title)
   g <- g + xlab("調査年")
@@ -182,8 +184,10 @@ execute_all <- function(in_dirname, out_dirname, actions) {
       df_sub <- filter_by_action(df = df_survey, action = action, days_in_week = days_in_week)
       out_filename <- paste0(action, "_", days_in_week) %>%
         stringr::str_replace("[・（）()]", "_")
-      draw_by_cohort_ages(df = df_sub, action = action, days_in_week = days_in_week,
-                          out_dirname = out_dirname, out_filename = out_filename)
+      draw_by_cohort_ages(
+        df = df_sub, action = action, days_in_week = days_in_week,
+        out_dirname = out_dirname, out_filename = out_filename
+      )
     })
     0
   })
