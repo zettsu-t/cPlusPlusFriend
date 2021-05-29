@@ -62,3 +62,10 @@ In CS courses, you may have homework "Sort these book or song titles." In the re
 To represent a number N in the unary numeral system, repeat 1 N-times. Its examples are Roman Ⅰ Ⅱ Ⅲ and Chinese 一 二 三.
 Marshall McLuhan said, "Advertising is the greatest art form of the 20th century". In the 21st century, advertising is also an art form with data science.
 The ABA problem becomes the ABA' problem after being tagged. It resembles the Y2K problem and a four-digit year format.
+The photo book "Mademoiselle: Coco Chanel Summer 62" by Douglas Kirkland and Karl Lagerfeld recalls programmers working in the state of flow.
+When you create presentation slides, press Ctrl-Win-c to enable grayscale mode and check whether the slides are photocopy friendly. Use hatching patterns and line types properly and your slides become easy to understand for people.
+GNU make turns "$(RM) $(OUTPUT)/*" in a Makefile into "rm -f /*" if OUTPUT is undefined. It is dangerous and we need to avoid it. Is "$(RM) ./$(OUTPUT)/*" a safer way?
+The Peopleware book explains how office environments affect programmers' productivity. We would like to know its telecommuting version.
+Alloy, which is an analyzer for software modeling, can solve "I'm my own grandpa" according to Daniel Jackson's Software Abstractions book. Before searching the Internet for its answer, solve it by hand or let Alloy solve it.
+It is clever that C++ puts is_union, launder, ​byte and, bit_cast into the std namespace and avoids appending C++ keywords due to backward compatibility. What comes next?
+Someone claimed, "'(expr) ? t : f' is difficult to read so should be replaced with if-else.". Umm..., the ternary operator exists for historical reasons. It is a hint to use conditional move instructions and avoid branch-prediction miss penalties.
