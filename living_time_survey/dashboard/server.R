@@ -2,7 +2,7 @@ library(shiny)
 library(plotly)
 
 reactive_list <- reactiveValues()
-reactive_list$df_survey <- read_data_all(in_dirname = "incoming")
+reactive_list$df_survey <- read_data_all(in_dirname = "../incoming")
 
 render_local <- function(input, use_plotly) {
   df <- filter_by_action(
