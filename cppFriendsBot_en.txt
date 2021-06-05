@@ -69,3 +69,9 @@ The Peopleware book explains how office environments affect programmers' product
 Alloy, which is an analyzer for software modeling, can solve "I'm my own grandpa" according to Daniel Jackson's Software Abstractions book. Before searching the Internet for its answer, solve it by hand or let Alloy solve it.
 It is clever that C++ puts is_union, launder, ​byte and, bit_cast into the std namespace and avoids appending C++ keywords due to backward compatibility. What comes next?
 Someone claimed, "'(expr) ? t : f' is difficult to read so should be replaced with if-else.". Umm..., the ternary operator exists for historical reasons. It is a hint to use conditional move instructions and avoid branch-prediction miss penalties.
+Don't be afraid of error messages in C! The messages tell you that you have to rewrite your code and they do not blame you. Real horror creeps up on you with buffer overflow, dangling pointers, and incoherent data among CPU cores without error messages.
+Rear Admiral Grace Murray Hopper said, "It's easier to ask forgiveness than it is to get permission." Programmers try new tools in their private works and show them in their workplace.
+Python 3.8 introduced the walrus operator (:=) . In R, the walrus operator is used to pass column names via variables to dplyr.\nlibrary(dplyr)\nlibrary(rlang)\ndf <- data.frame(x=c('A','B'))\ns <- 'z'\ndf %>% dplyr::rename(!!rlang::sym(s):=x)\nz\n1 A\n2 B
+C++14 adopts single quotations as a separator of digits. Did it come from U+2396 (Decimal Separator Key Symbol)?
+We cannot exhaust 2^160 Git commit IDs which are far larger than Avogadro's number.
+Dictionary unpacking in Python is useful to hold parameters in a list and write the list into a JSON file. The splat operator in Ruby and do.call in R are also available for the same purpose.
