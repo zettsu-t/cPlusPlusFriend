@@ -75,3 +75,10 @@ Python 3.8 introduced the walrus operator (:=) . In R, the walrus operator is us
 C++14 adopts single quotations as a separator of digits. Did it come from U+2396 (Decimal Separator Key Symbol)?
 We cannot exhaust 2^160 Git commit IDs which are far larger than Avogadro's number.
 Dictionary unpacking in Python is useful to hold parameters in a list and write the list into a JSON file. The splat operator in Ruby and do.call in R are also available for the same purpose.
+Reference counting is a memory management strategy in C++. Besides programming languages, i-nodes in file systems are also based on reference counting. Try ls -i '.' , '..' , and '../current-working-dir' to show their i-nodes.
+Makefile is hard to debug but we do not give it up. 'make --dry-run' and '$(foreach v, $(.VARIABLES), $(info $(v) = $($(v))))' give us a clue to know what is wrong.
+In C/C++, sizeof(a_type_name) is a classic mistake. If you change the size of a_type_name, it possibly causes a buffer overflow. I recommend sizeof(*a_pointer_to_object) if it is available.
+Read a line using std::getline(std::ifstream), convert it into an int using boost::lexical_cast<int>(line), and catch an exception due to a trailing CR in the line. Ouch!
+Interleaving is like you guess missing characters in a book. If the edge of the book gets torn, you possibly compensate what would be written. If a couple of pages are lost, you cannot imagine them.
+If you want to change a member in an instance of a class from its const member function, the mutable keyword and const_cast<T*>(this) come to mind. Hold on! Callers of the function expect it is thread-safe!
+Do not delete\n/*\nLocal Variables:\nc-file-style: "..."\n*/\nin a source file! The magic is to edit the file on Emacs.
