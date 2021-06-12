@@ -1,0 +1,17 @@
+Package: nbinomPlot
+Title: Plot negative binomial distributions interactively
+Version: 0.1.0
+Authors@R: person(family="Zettsu", given="Tatsuya", email="zettsu.tatsuya@gmail.com", role=c("aut", "cre"))
+Description: A Shiny app to plot negative binomial distributions interactively
+Depends:
+    R (>= 3.0.0)
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    shiny,
+    pkgload,
+    tibble,
+    ggplot2
+Suggests: 
+    testthat
