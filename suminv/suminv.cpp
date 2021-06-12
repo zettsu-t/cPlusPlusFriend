@@ -2,11 +2,19 @@
 // This is based on the tweet below
 // https://twitter.com/con_integral17/status/1398468512402665474
 //
-// Running
+// Run
 //   suminv 10
-// finds the N for M = 10 and running without arguments
+// and it finds the N for M = 10.
+//
+// Run without arguments
 //   suminv
-// executes built-in unit tests.
+// and it executes built-in unit tests.
+//
+// suminv 10 4
+// uses a 4-stage pipelining. 1 to 'MaxSizeOfDivisors' pipelining is available.
+//
+// suminv 10 0
+// does not use SIMD parallel divisions.
 
 #include <cmath>
 #include <cstdint>
@@ -21,27 +29,38 @@
 #include <vector>
 
 using Number = double;
+using NumberSet = std::vector<Number>;
 using Border = uint32_t;
-using LessFlag = uint64_t;
-using LoopIndex = size_t;
+using SizeOfUnits = size_t;
+constexpr SizeOfUnits MaxSizeOfDivisors = 8;
+constexpr SizeOfUnits SizeOfUnitsTested = MaxSizeOfDivisors + 1;
 
-// *pInput has input parametes and stores values in all YMM registers.
-LoopIndex callSumUpto(void* pInput, void* pOutput) {
-    LoopIndex loopIndex = 0;
+// *pInput has input parameters and stores values in all YMM registers.
+void callSumUpto(void* pInput, void* pOutput, SizeOfUnits sizeOfDivisors, bool noParallel) {
+    uint64_t arg = sizeOfDivisors;
+    if (noParallel) {
+        arg = 0;
+    }
+
     asm volatile (
         "call sumUpto\n\t"
-        :"=b"(loopIndex):"S"(pInput),"D"(pOutput):"memory");
+        ::"S"(pInput),"D"(pOutput),"a"(arg):"memory");
 
-    return loopIndex;
+    return;
 }
 
-Number findMinIndex(LoopIndex divisorIndex, const LessFlag* lessFlagSet,
-                    size_t elementsInRegister, const Number* divisorSet) {
+Number findMinDivisor(Border border, const NumberSet& divisorSet, const NumberSet& sumSet) {
+    Number lowerBound = border;
     Number minDivisor = 0;
 
-    for(auto i = decltype(elementsInRegister){0}; i < elementsInRegister; ++i) {
-        if (lessFlagSet[i]) {
-            const auto divisor = divisorSet[i + divisorIndex * elementsInRegister];
+    const auto n = divisorSet.size();
+    if (n != sumSet.size()) {
+        return 0;
+    }
+
+    for(auto i = decltype(n){0}; i < n; ++i) {
+        if (sumSet.at(i) >= lowerBound) {
+            const auto divisor = divisorSet.at(i);
             if (minDivisor <= 0) {
                 minDivisor = divisor;
             } else {
@@ -53,22 +72,16 @@ Number findMinIndex(LoopIndex divisorIndex, const LessFlag* lessFlagSet,
     return minDivisor;
 }
 
-template<typename T, size_t N>
-void printElements(std::ostream& os, const T (&es)[N]) {
+template<typename T>
+void printElements(std::ostream& os, const T& es) {
     for(const auto& e : es) {
         os << e << " : ";
     }
 }
 
-template<typename T1, typename T2, typename T3, size_t N1, size_t N2, size_t N3>
-void printResult(std::ostream& os, Number minDivisor, LoopIndex divisorIndex,
-                 const T1 (&lessFlagSet)[N1], const T2 (&divisorSet)[N2], const T3 (&sumSet)[N3]) {
+void printResult(std::ostream& os, Number minDivisor,
+                 const NumberSet& divisorSet, const NumberSet& sumSet) {
     os << "Answer: " << minDivisor << "\n";
-    os << "Divisor set number: " << divisorIndex << "\n";
-
-    os << "Less flags: ";
-    printElements(os, lessFlagSet);
-    os << "\n";
 
     os << "Divisors: ";
     printElements(os, divisorSet);
@@ -80,47 +93,54 @@ void printResult(std::ostream& os, Number minDivisor, LoopIndex divisorIndex,
     return;
 }
 
-Number sumUpToBorder(Border border, bool quiet, std::ostream& os) {
-    constexpr size_t ElementsInRegister = 4;  // A 256-bit YMM register holds four doubles or uint_64s;
-    constexpr size_t SizeOfInputValues = 17;  // args + all YMM registers
-    constexpr size_t SizeOfReturnValues = 7;  // Must larger than return values!
-    constexpr size_t SizeOfFlags = 1;
-    constexpr size_t SizeOfDivisors = 3;
+Number sumUpToBorder(Border border, SizeOfUnits sizeOfUnits, bool quiet, std::ostream& os) {
+    constexpr size_t ElementsInRegister = 4;  // A 256-bit YMM register holds four doubles or uint_64s
+    constexpr size_t SizeOfInputValues = 17;  // Parameters and all YMM registers
+    constexpr size_t SizeOfReturnValues = MaxSizeOfDivisors * 2;  // Must larger than return values!
 
     alignas(32) Border borderSet[ElementsInRegister] {0};
     alignas(32) Number paramSet[ElementsInRegister * SizeOfInputValues] {0};
     alignas(32) Number resultSet[ElementsInRegister * SizeOfReturnValues] {0};
 
-    // 0 for border > value non-0 for otherwise
-    alignas(32) LessFlag lessFlagSet[ElementsInRegister * SizeOfFlags] {0};
-    alignas(32) Number   divisorSet[ElementsInRegister * SizeOfDivisors] {0};
-    alignas(32) Number   sumSet[ElementsInRegister * SizeOfDivisors] {0};
-    static_assert(sizeof(lessFlagSet) + sizeof(divisorSet) + sizeof(sumSet) <= sizeof(resultSet));
-
     std::fill(std::begin(borderSet), std::end(borderSet), border);
     std::memmove(paramSet, borderSet, sizeof(borderSet));
+    static_assert(sizeof(paramSet) >= sizeof(borderSet), "Too small");
 
-    const auto divisorIndex = callSumUpto(paramSet, resultSet);
-    std::memmove(lessFlagSet, resultSet, sizeof(lessFlagSet));
-    std::memmove(divisorSet, resultSet + ElementsInRegister * SizeOfFlags, sizeof(divisorSet));
-    std::memmove(sumSet, resultSet + ElementsInRegister * (SizeOfFlags + SizeOfDivisors), sizeof(sumSet));
+    // 0 for border >= value non-0 for otherwise
+    const bool NoParallel = (sizeOfUnits == 0);
 
-    const auto minDivisor = findMinIndex(divisorIndex, lessFlagSet, ElementsInRegister, divisorSet);
+    // NoParallel = true
+    //   sum 1/i sequential
+    // NoParallel = false
+    //   sum sum 1/[i..(i + 4 * sizeOfUnits - 1)] parallel
+    SizeOfUnits sizeOfDivisors = std::max(decltype(sizeOfUnits){1}, sizeOfUnits);
+    sizeOfDivisors = std::min(sizeOfDivisors, MaxSizeOfDivisors);
+    SizeOfUnits sizeOfElements = sizeOfDivisors * ElementsInRegister;
+    NumberSet divisorSet(sizeOfElements, 0);
+    NumberSet sumSet(sizeOfElements, 0);
+
+    callSumUpto(paramSet, resultSet, sizeOfDivisors, NoParallel);
+    for(auto i = decltype(sizeOfElements){0}; i < sizeOfElements; ++i) {
+        divisorSet.at(i) = resultSet[i];
+        sumSet.at(i) = resultSet[i + ElementsInRegister * MaxSizeOfDivisors];
+    }
+
+    const auto minDivisor = findMinDivisor(border, divisorSet, sumSet);
     os << std::setprecision(std::numeric_limits<double>::max_digits10);
     if (!quiet) {
-        printResult(os, minDivisor, divisorIndex, lessFlagSet, divisorSet, sumSet);
+        printResult(os, minDivisor, divisorSet, sumSet);
     }
     return minDivisor;
 }
 
-// Assumes tolerance > 0
 bool nearNumber(Number expected, Number actual, Number tolerance) {
     const auto diff = expected - actual;
-    return ((-tolerance < diff) & (diff < tolerance));
+    const Number tol = std::fabs(tolerance);
+    return ((-tol < diff) & (diff < tol));
 }
 
 bool nearNumber(Number expected, Number actual) {
-    const Number Tolerance = 1e-7;
+    constexpr Number Tolerance = 1e-7;
     return nearNumber(expected, actual, Tolerance);
 }
 
@@ -157,23 +177,25 @@ bool selfTestFixed(void) {
     };
 
     bool failed = false;
-    Border border = 1;
 
-    std::ostringstream os;
-    for (const auto& expected : expectedSet) {
-        const auto actual = sumUpToBorder(border, true, os);
-        if (!nearNumber(expected, actual)) {
-            std::cout << "A test failed in selfTestFixed()\n";
-            failed |= true;
+    for(SizeOfUnits sizeOfUnits = 0; sizeOfUnits < SizeOfUnitsTested; ++sizeOfUnits) {
+        Border border = 1;
+        std::ostringstream os;
+        for (const auto& expected : expectedSet) {
+            const auto actual = sumUpToBorder(border, sizeOfUnits, true, os);
+            if (!nearNumber(expected, actual)) {
+                std::cout << "A test failed in selfTestFixed()\n";
+                failed |= true;
+            }
+            ++border;
         }
-        ++border;
     }
 
     return failed;
 }
 
 bool selfTestLoop(void) {
-    constexpr Number maxIndex = 1e+9;
+    constexpr Number maxIndex = 1e+8;
     Number sum = 0;
     std::vector<Number> divisorSet;
 
@@ -190,16 +212,18 @@ bool selfTestLoop(void) {
     }
 
     bool failed = false;
-    Border border = 1;
 
-    std::ostringstream os;
-    for(const auto& expected : divisorSet) {
-        const auto actual = sumUpToBorder(border, true, os);
-        if (!nearNumber(expected, actual)) {
-            std::cout << "A test failed in selfTestLoop()\n";
-            failed |= true;
+    for(SizeOfUnits sizeOfUnits = 0; sizeOfUnits < SizeOfUnitsTested; ++sizeOfUnits) {
+        Border border = 1;
+        std::ostringstream os;
+        for(const auto& expected : divisorSet) {
+            const auto actual = sumUpToBorder(border, sizeOfUnits, true, os);
+            if (!nearNumber(expected, actual)) {
+                std::cout << "A test failed in selfTestLoop()\n";
+                failed |= true;
+            }
+            ++border;
         }
-        ++border;
     }
 
     return failed;
@@ -212,7 +236,7 @@ bool selfTestPrint(void) {
     constexpr Number expected = 12367;
 
     std::ostringstream os;
-    auto actual = sumUpToBorder(border, false, os);
+    auto actual = sumUpToBorder(border, 0, false, os);
     if (!nearNumber(expected, actual)) {
         std::cout << "A test failed in selfTestPrint()\n";
         failed |= true;
@@ -232,9 +256,17 @@ bool selfTest(void) {
 }
 
 int main(int argc, char* argv[]) {
-    int border = 0;
+    Border border = 0;
+    SizeOfUnits sizeOfUnits = 0;
+
     if (argc > 1) {
-        border = std::atoi(argv[1]);
+        std::istringstream is(argv[1]);
+        is >> border;
+    }
+
+    if (argc > 2) {
+        std::istringstream is(argv[2]);
+        is >> sizeOfUnits;
     }
 
     // No arguments
@@ -248,7 +280,7 @@ int main(int argc, char* argv[]) {
     }
 
     // With an argument
-    sumUpToBorder(border, false, std::cout);
+    sumUpToBorder(border, sizeOfUnits, false, std::cout);
     return 0;
 }
 

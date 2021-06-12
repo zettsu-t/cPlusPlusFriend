@@ -16,8 +16,8 @@ LDFLAGS=
 LIBS=
 
 TIME=time
-SMALL_BORDER=22
-LARGE_BORDER=30
+SMALL_BORDER=22 2
+LARGE_BORDER=30 2
 
 .PHONY: all clean rebuild test shortrun longrun
 
