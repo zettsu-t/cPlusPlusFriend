@@ -9,6 +9,7 @@ parameterUI <- function(id) {
     sizeVarUI("nbplot"),
     probVarUI("nbplot"),
     muVarUI("nbplot"),
+    quantileVarUI("nbplot"),
     resetButtonUI("nbplot")
   )
 }
@@ -21,7 +22,8 @@ parameterServer <- function(id) {
     params <- list(
       size = reactive(input$size),
       prob = reactive(input$prob),
-      mu = reactive(input$mu)
+      mu = reactive(input$mu),
+      quantile = reactive(input$quantile)
     )
     params
   })

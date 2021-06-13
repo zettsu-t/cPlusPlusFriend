@@ -22,3 +22,11 @@ test_that("density_nbinom_mu_from_size_prob", {
   actual <- dnbinom(xs, size = size, mu = mu)
   expect_equal(object = actual, expected = expected, tolerance = 1e-5)
 })
+
+test_that("calculate_mu", {
+  expect_equal(object = calculate_mu(size = 5.0, prob = 0.6), expected = "3.333")
+})
+
+test_that("calculate_size", {
+  expect_equal(object = calculate_size(prob = 0.25, mu = 12.0), expected = 4.0, tolerance = 1e-7)
+})
