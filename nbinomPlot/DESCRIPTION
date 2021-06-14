@@ -12,9 +12,10 @@ Encoding: UTF-8
 LazyData: true
 Imports: 
     shiny,
-    shinytest,
     pkgload,
     tibble,
     ggplot2
 Suggests: 
-    testthat
+    testthat,
+    shinytest
+RoxygenNote: 7.1.0

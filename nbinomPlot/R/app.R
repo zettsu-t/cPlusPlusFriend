@@ -6,6 +6,7 @@
 library(shiny)
 
 #' Launch a Shiny app
+#' @export
 negativeBinomialApp <- function() {
   ## UI and SERVER must have a common id.
   ui <- function(input, output, session) {
