@@ -5,7 +5,7 @@
 #' @param id An ID to namespace the module
 parameterUI <- function(id) {
   ## UIs must have a common id.
-  sidebarPanel(
+  shiny::sidebarPanel(
     sizeVarUI("nbplot"),
     probVarUI("nbplot"),
     muVarUI("nbplot"),
@@ -18,12 +18,12 @@ parameterUI <- function(id) {
 #'
 #' @param id An ID to namespace the module
 parameterServer <- function(id) {
-  moduleServer(id, function(input, output, session) {
+  shiny::moduleServer(id, function(input, output, session) {
     params <- list(
-      size = reactive(input$size),
-      prob = reactive(input$prob),
-      mu = reactive(input$mu),
-      quantile = reactive(input$quantile)
+      size = shiny::reactive(input$size),
+      prob = shiny::reactive(input$prob),
+      mu = shiny::reactive(input$mu),
+      quantile = shiny::reactive(input$quantile)
     )
     params
   })

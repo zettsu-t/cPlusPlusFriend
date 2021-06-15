@@ -5,14 +5,14 @@
 #' @param id An ID to namespace the module
 muVarUI <- function(id) {
   ## Have a unique id.
-  textInput(NS(id, "mu"), "Mu Paramater", value = "1.0")
+  shiny::textInput(shiny::NS(id, "mu"), "Mu Paramater", value = "1.0")
 }
 
 #' Mu parameter of a negative binomial distribution Server
 #'
 #' @param id An ID to namespace the module
 muVarServer <- function(id) {
-  moduleServer(id, function(input, output, session) {
-    reactive(input$mu)
+  shiny::moduleServer(id, function(input, output, session) {
+    shiny::reactive(input$mu)
   })
 }

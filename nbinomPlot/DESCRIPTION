@@ -4,7 +4,7 @@ Version: 0.1.0
 Authors@R: person(family="Zettsu", given="Tatsuya", email="zettsu.tatsuya@gmail.com", role=c("aut", "cre"))
 Author: Zettsu Tatsuya <zettsu.tatsuya@gmail.com>
 Maintainer: Zettsu Tatsuya <zettsu.tatsuya@gmail.com>
-Description: A Shiny app to plot negative binomial distributions interactively
+Description: This is a Shiny app to plot negative binomial distributions interactively
 Depends:
     R (>= 3.0.0)
 License: MIT + file LICENSE
@@ -16,6 +16,7 @@ Imports:
     tibble,
     ggplot2
 Suggests: 
-    testthat,
+    testthat (>= 3.0.0),
     shinytest
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
+Config/testthat/edition: 3

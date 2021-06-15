@@ -5,7 +5,7 @@
 #' @param id An ID to namespace the module
 mainPanelUI <- function(id) {
   ## Have a unique id.
-  plotOutput(NS(id, "plot"))
+  shiny::plotOutput(shiny::NS(id, "plot"))
 }
 
 calculate_mu <- function(size, prob) {
@@ -18,7 +18,7 @@ calculate_size <- function(prob, mu) {
 
 update_mu <- function(session, size, prob) {
   mu <- calculate_mu(size = size, prob = prob)
-  updateTextInput(session, "mu", value = mu)
+  shiny::updateTextInput(session, "mu", value = mu)
 }
 
 draw_nbinom <- function(lower_quantile, size, prob) {
@@ -36,34 +36,34 @@ draw_nbinom <- function(lower_quantile, size, prob) {
 #' @param id An ID to namespace the module
 #' @param params Negative binomial parameters to draw
 mainPanelServer <- function(id, params) {
-  max_size <- reactiveVal(default_max_size)
+  max_size <- shiny::reactiveVal(default_max_size)
 
-  moduleServer(id, function(input, output, session) {
+  shiny::moduleServer(id, function(input, output, session) {
     ## Change parameters here. Not in negativeBinomialServer.
-    observeEvent(input$size, {
+    shiny::observeEvent(input$size, {
       update_mu(session = session, size = input$size, prob = input$prob)
     })
 
-    observeEvent(input$prob, {
+    shiny::observeEvent(input$prob, {
       update_mu(session = session, size = input$size, prob = input$prob)
     })
 
-    observeEvent(input$mu, {
+    shiny::observeEvent(input$mu, {
       size <- calculate_size(prob = input$prob, mu = as.numeric(input$mu))
       max_size(max(size, max_size()))
-      updateSliderInput(session, "size", max = max_size(), value = size)
+      shiny::updateSliderInput(session, "size", max = max_size(), value = size)
     })
 
-    observeEvent(input$reset, {
+    shiny::observeEvent(input$reset, {
       max_size(default_max_size)
-      updateSliderInput(session, "size", value = default_size, max = default_max_size)
-      updateSliderInput(session, "prob", value = default_prob)
+      shiny::updateSliderInput(session, "size", value = default_size, max = default_max_size)
+      shiny::updateSliderInput(session, "prob", value = default_prob)
     })
 
-    output$plot <- renderPlot({
-      stopifnot(is.reactive(params$quantile))
-      stopifnot(is.reactive(params$size))
-      stopifnot(is.reactive(params$prob))
+    output$plot <- shiny::renderPlot({
+      stopifnot(shiny::is.reactive(params$quantile))
+      stopifnot(shiny::is.reactive(params$size))
+      stopifnot(shiny::is.reactive(params$prob))
 
       lower_quantile <- as.numeric(params$quantile())
       size <- params$size()

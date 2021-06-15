@@ -1,4 +1,3 @@
-library(nbinomPlot)
 context("test nbinomPlot")
 
 test_that("calculate_nbinom_mu_from_size_prob", {

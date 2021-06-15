@@ -1,11 +1,7 @@
-#' A Shiny app to plot negative binomial distributions interactively
-
-## Build this package and run
-## pkgload::load_all(".")
-## negativeBinomialApp()
 library(shiny)
 
-#' Launch a Shiny app
+#' @title Launch a Shiny app
+#' @description This function launches an instance of the Shiny app to plot negative binomial distributions interactively
 #' @export
 negativeBinomialApp <- function() {
   ## UI and SERVER must have a common id.
@@ -15,7 +11,9 @@ negativeBinomialApp <- function() {
   server <- function(input, output, session) {
     negativeBinomialServer("nbplot")
   }
-  shinyApp(ui, server)
+  shiny::shinyApp(ui, server)
 }
 
+## Build this package and run
+## pkgload::load_all(".")
 negativeBinomialApp()

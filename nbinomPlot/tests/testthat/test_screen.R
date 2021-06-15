@@ -1,9 +1,10 @@
-library(testthat)
+context("test nbinomPlot screen")
 library(shiny)
 library(shinytest)
 
 test_that("main_screen", {
   skip_on_os("windows")
+  skip_if_not(interactive())
 
   ## To use expect_snapshot_file()
   testthat::local_edition(3)

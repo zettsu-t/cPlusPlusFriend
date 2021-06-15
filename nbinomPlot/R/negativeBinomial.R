@@ -4,12 +4,12 @@
 #'
 #' @param id An ID to namespace the module
 negativeBinomialUI <- function(id) {
-  fluidPage(
-    titlePanel("Negative Binomial Distribution"),
-    sidebarLayout(
+  shiny::fluidPage(
+    shiny::titlePanel("Negative Binomial Distribution"),
+    shiny::sidebarLayout(
       ## UI and Server must have a common id.
       parameterUI("nbplot"),
-      mainPanel(mainPanelUI("nbplot"))
+      shiny::mainPanel(mainPanelUI("nbplot"))
     )
   )
 }
