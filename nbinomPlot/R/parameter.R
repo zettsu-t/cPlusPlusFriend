@@ -9,6 +9,7 @@ parameterUI <- function(id) {
     sizeVarUI("nbplot"),
     probVarUI("nbplot"),
     muVarUI("nbplot"),
+    updateMuButtonUI("nbplot"),
     quantileVarUI("nbplot"),
     resetButtonUI("nbplot")
   )

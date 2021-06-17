@@ -48,7 +48,9 @@ mainPanelServer <- function(id, params) {
       update_mu(session = session, size = input$size, prob = input$prob)
     })
 
-    shiny::observeEvent(input$mu, {
+    ## Do not take events from input$mu directly to avoid an infinite update loop
+    ## between size and mu parameters.
+    shiny::observeEvent(input$update_mu, {
       size <- calculate_size(prob = input$prob, mu = as.numeric(input$mu))
       max_size(max(size, max_size()))
       shiny::updateSliderInput(session, "size", max = max_size(), value = size)
