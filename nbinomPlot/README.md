@@ -40,7 +40,7 @@ Test and check this package
 You can test source code in this package on R.
 
 1. Open __nbinomPlot/nbinomPlot.Rproj__ on RStudio or launch the R command on a terminal.
-1. Execute . `devtools::test()` on the console.
+1. Execute `devtools::test()` on the console.
 
 Note that __nbinomPlot/tests/testthat/\_snaps/screen/tests/screenshots/__ is not created automatically and you have to create the output directory if you save snapshots in tests of this package.
 
