@@ -82,3 +82,8 @@ Read a line using std::getline(std::ifstream), convert it into an int using boos
 Interleaving is like you guess missing characters in a book. If the edge of the book gets torn, you possibly compensate what would be written. If a couple of pages are lost, you cannot imagine them.
 If you want to change a member in an instance of a class from its const member function, the mutable keyword and const_cast<T*>(this) come to mind. Hold on! Callers of the function expect it is thread-safe!
 Do not delete\n/*\nLocal Variables:\nc-file-style: "..."\n*/\nin a source file! The magic is to edit the file on Emacs.
+R and its packages have many color names and chartreuse is one of them. It is green like Chartreuse verte, which is 55% alcohol herbal liquor.
+Some C++ compilers do not accept putc as a member function. The C standard permits putc as a macro instead of a function and it causes compilation errors in C++.
+If a C++ static code analyzer warns "This std::precision may affect the stream out of the function.", use boost::io::ios_flags_saver to save and restore manipulators of the I/O stream.
+If apt-get fails, it is possibly because apt-get does not know any HTTP proxy. Did you sudo with the -E option?
+Reluctant regex patterns are useful to extract trailing digits of group123 and C++ // comments. Using greedy regex patterns, we get 3 from group123 and a part of C++ comments which contains // or ///.
