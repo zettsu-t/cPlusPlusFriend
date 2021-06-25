@@ -87,3 +87,10 @@ Some C++ compilers do not accept putc as a member function. The C standard permi
 If a C++ static code analyzer warns "This std::precision may affect the stream out of the function.", use boost::io::ios_flags_saver to save and restore manipulators of the I/O stream.
 If apt-get fails, it is possibly because apt-get does not know any HTTP proxy. Did you sudo with the -E option?
 Reluctant regex patterns are useful to extract trailing digits of group123 and C++ // comments. Using greedy regex patterns, we get 3 from group123 and a part of C++ comments which contains // or ///.
+There are three-character operators in programming languages. <=> (the three-way comparison operator or the spaceship operator) is defined in Perl, Ruby, C++, and some other languages. !!! is available in R and not equal to "not(not(not()))".
+Floppy disk icons are common after floppy disks became obsolete. We call a plastic eraser a rubber although it is not made from natural or synthetic rubber.
+Do you want run-length encoding? Use rle() in R.
+The byte order mark (BOM) is a nuisance in regex pattern matching. Sometimes we need a workaround to ignore BOMs. \b matches a BOM in egrep.
+I wonder if a variable named *time holds a duration or a timestamp.
+Huffman coding is instantaneous. Element symbols are not instantaneous (H/He, C/Cu).
+We need slack to meet a deadline. Rate monotonic scheduling tells us it with formulas.
