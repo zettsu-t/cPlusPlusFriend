@@ -94,3 +94,9 @@ The byte order mark (BOM) is a nuisance in regex pattern matching. Sometimes we 
 I wonder if a variable named *time holds a duration or a timestamp.
 Huffman coding is instantaneous. Element symbols are not instantaneous (H/He, C/Cu).
 We need slack to meet a deadline. Rate monotonic scheduling tells us it with formulas.
+"Give an example of a non-commutative multiplication operator."\nIn math class : Multiply matrices\nA programmer : 'A' * 3 in Ruby
+'Yield' is not available as a member function in a Windows C++ compiler. winbase.h defines Yield as a macro with an empty body and it causes strange compilation errors.
+The auto keyword in C++ is powerful and versatile but sometimes fails to grasp your intention. One example is a proxy class. Another is that\nstd::atomic<int> a;\nauto v=a;\nfails and it requires the explicit type of v or load().
+Well-thought-out coding rules are like new shoes for us. They make us feel weird before we get accustomed to them, and we feel comfortable after realizing what they give us to write high-quality software.
+File.exists? (deprecated since Ruby 2.1) is same as File.exist? but json.loads in Python is different from json.load.
+In software testing,\nNull hypothesis: This software has a bug.\nAlternative hypothesis: This software is good enough (not perfect).
