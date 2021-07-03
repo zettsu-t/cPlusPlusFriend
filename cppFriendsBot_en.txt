@@ -100,3 +100,5 @@ The auto keyword in C++ is powerful and versatile but sometimes fails to grasp y
 Well-thought-out coding rules are like new shoes for us. They make us feel weird before we get accustomed to them, and we feel comfortable after realizing what they give us to write high-quality software.
 File.exists? (deprecated since Ruby 2.1) is same as File.exist? but json.loads in Python is different from json.load.
 In software testing,\nNull hypothesis: This software has a bug.\nAlternative hypothesis: This software is good enough (not perfect).
+We cannot initialize pthread_t variables before calling pthread_create. pthread_t is an opaque type and its contents are undefined.
+A multi-statement macro "do {...} while(0);" has a redundant ";". Remove it, or a compilation error occurs if the macro is followed by an else clause.
