@@ -102,3 +102,15 @@ File.exists? (deprecated since Ruby 2.1) is same as File.exist? but json.loads i
 In software testing,\nNull hypothesis: This software has a bug.\nAlternative hypothesis: This software is good enough (not perfect).
 We cannot initialize pthread_t variables before calling pthread_create. pthread_t is an opaque type and its contents are undefined.
 A multi-statement macro "do {...} while(0);" has a redundant ";". Remove it, or a compilation error occurs if the macro is followed by an else clause.
+In R, we can write testthat::expect_is(df, "data.frame") and read it as "expect that df is a data.frame". Note that expect_is() was deprecated in testthat_3.x, and you should use its alternatives.
+Emacs replaces strings without changing their cases. When you replace color to colour, COLOR becomes COLOUR and Color becomes Colour.
+TLB (translation lookaside buffer) is a cache of page-directory and page-table entries. 80386 (i386) has on-chip cache memory in this sense.
+Have you discussed whether a trailing comma is required or not when a code generator writes C/C++ enum values? Both are correct in C99 and C++11.
+std::remove and std::erase in C++ are confusing so boost::remove_erase and std::erase_if come in handy. To explain a usage of std::erase, std::unique is adequate than std::remove, IMO.
+Wi-Fi is the abbreviation for Wireless Fidelity. Fidelity reminds some people of the investment company rather than Wi-Fi.
+Identity mapping is an example of the null object pattern. f=identity is elegant than 'if (cond) map(xs, f) else xs'. R has the identity function for this purpose.
+Programmers write errata in the form s/regexp/replacement/ in their tweets like "C++ Templates: The Complete Guide 2nd Edition".\nhttp://www.tmplbook.com/
+To initialize a unit test in Google Test, define SetUp(), not setup() or setUp(). Using the override keyword is a good practice to avoid this mistake.
+'if constexpr' in C++ requires its statement-true and statement-false be well-formed. It means PEXCEPTION_POINTERS->ContextRecord->{Rip|Eip} causes compilation errors and #ifdef is necessary there.
+The auto keyword had been unused for a long time and revived as type deduction in C++11. Will the register keyword be?
+I had my hair cut weeks ago. Programmers can discard wrong decisions by a version control system (VCS), but hairdressers can't revert hair if they cut it too short. VCSs are the best thing since sliced bread.
