@@ -114,3 +114,10 @@ To initialize a unit test in Google Test, define SetUp(), not setup() or setUp()
 'if constexpr' in C++ requires its statement-true and statement-false be well-formed. It means PEXCEPTION_POINTERS->ContextRecord->{Rip|Eip} causes compilation errors and #ifdef is necessary there.
 The auto keyword had been unused for a long time and revived as type deduction in C++11. Will the register keyword be?
 I had my hair cut weeks ago. Programmers can discard wrong decisions by a version control system (VCS), but hairdressers can't revert hair if they cut it too short. VCSs are the best thing since sliced bread.
+In R, variable names can contain dots. It is like UNIX file systems that treat dots in filenames as usual characters, not as delimiters of filename extensions.
+Different filenames do not always mean they have different entities since they can be hard or symbolic links. std::filesystem::equivalent is available to check it.
+We must describe clobbers in GCC inline assembly. Do not forget implicitly used registers such as integer divisions.
+You can treat infix operators as usual functions in some programming languages. In R, dplyr::summarize_all takes functional::Compose(functional::Curry(`+`,1),log10,mean) .
+When a build system generates a *.d file from a *.cpp file, gcc requires the -MG option. Otherwise, it causes compilation errors.
+What C++ templates can do and #define macros cannot is recursion.
+Move semantics is a point in understanding C++. It is like drag and drop between two Explorer windows, which copies a file if drives of the windows are different, moves if same.
