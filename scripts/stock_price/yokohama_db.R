@@ -30,7 +30,7 @@ create_table_query <- "CREATE TABLE yokohama_wards (
   male  INTEGER,
   female INTEGER,
   per_household DOUBLE,
-  pre_area DOUBLE,
+  per_area DOUBLE,
   diff_household INTEGER,
   diff_population INTEGER
 );"
