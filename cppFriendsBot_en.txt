@@ -121,3 +121,10 @@ You can treat infix operators as usual functions in some programming languages. 
 When a build system generates a *.d file from a *.cpp file, gcc requires the -MG option. Otherwise, it causes compilation errors.
 What C++ templates can do and #define macros cannot is recursion.
 Move semantics is a point in understanding C++. It is like drag and drop between two Explorer windows, which copies a file if drives of the windows are different, moves if same.
+It is a trick of expanding a C struct that the first member of the struct is the size in bytes of the struct. This technique is used in the Windows API.
+Detune stands for throttling the performance of a device. Another meaning is shifting the pitch of sounds to make a chorus effect. It is famous in the video game Nemesis (Gradius).
+IMO, the difficulty of out-of-order execution is handling with interrupts and faults. A page fault in out-of-order execution on a CISC chip becomes a nightmare...
+The jsonlite package in R writes all values into arrays. It implies R has no scalar variables and single element vectors act like scalar variables.
+std::unique_ptr::release() in C++ is used to pass a facet to a std::locale object. It avoids releasing the facet twice.
+In a software development project with C and without C++, its coding rule should prevent code from using C++ keywords. Do your unit tests run on a C++ unit test framework like GoogleTest?
+The ReLU function is a branch-free algorithm. Max(x, 0) is better than 'if (x >= 0) x else 0'.\nxorps %%xmm4, %%xmm4\nmovaps (%0), %%xmm5\nmaxps %%xmm5, %%xmm4\nmovaps %%xmm4, (%0)
