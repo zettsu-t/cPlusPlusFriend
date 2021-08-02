@@ -75,8 +75,6 @@ css_cell <- purrr::reduce(seq_len(NROW(df_cells)),
   x <- df_cells[row_num,]
   bg_color <- stringr::str_extract(x$fg_color, ".{6}$")
   style <- paste0("background-color: ", bg_color, ";")
-  print(x$row)
-  print(x$col)
   acc[x$row, x$col] <- style
   acc
 })
