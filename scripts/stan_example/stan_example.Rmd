@@ -1,0 +1,158 @@
+---
+title: "R + Stan + cmdstanr を使う"
+author: "Zettsu Tatsuya"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+<style type="text/css">
+  code, r {
+    font-family: "Migu 1M";
+  }
+</style>
+
+```{r setup_r_packages, include=FALSE, cache=TRUE}
+## knitrで使うパッケージ
+library(kableExtra)
+library(reticulate)
+library(xfun)
+## 必要ならpython3にパスを通す
+reticulate::use_python("/usr/bin/python3.8")
+```
+
+R から Stan を使う方法です。 cmdstanr を導入する方法は、[こちら](https://norimune.net/3609)を参考にしました。Windows で cmdstanr を使うと grep がエラーになるので、Docker上で RStudio Serverを起動して、 localhost:8787 から使います。
+
+## Dockerイメージを作って起動する
+
+RStudioにログインするとき、Username は rstudio 、PasswordはDockerコンテナを起動するときに下記で指定するパスワードである。Windowsのファイルシステムをマウントすると便利だろう。
+
+```{bash docker, eval=FALSE, echo=TRUE}
+docker build . -t stan
+docker run -e PASSWORD=yourpassword -p 8787:8787 -d -v C:/path/to/stan_example:/home/rstudio/work -it stan
+```
+
+## Stanを使う準備をする
+
+### Rのパッケージを使う
+
+Stanをインストールする。
+
+```{r setup_stan, message=FALSE, warning=FALSE, cache=TRUE}
+library(tidyverse)
+library(cmdstanr)
+library(posterior)
+library(bayesplot)
+install_cmdstan()
+bayesplot::color_scheme_set("brightblue")
+```
+
+### モデルをコンパイルする
+
+Stanのコードを示す。[Stan公式の例](https://mc-stan.org/users/documentation/case-studies/identifying_mixture_models.html)とほぼ同じである。
+
+log_mix は log_sum_exp を簡単に書く記法である。ラベルスイッチングを防ぐために、平均値の順序を固定している(添え字が大きい方が平均値が大きい)。
+
+```{r show_model, eval = TRUE, echo = FALSE, cache=TRUE, cache.extra=file.info("mixture_norm.stan")}
+cat(xfun::read_utf8("mixture_norm.stan"), sep = "\n")
+```
+
+Stanモデルをコンパイルする。
+
+```{r setup_model, cache=TRUE, cache.extra=file.info("mixture_norm.stan")}
+model <- cmdstanr::cmdstan_model("mixture_norm.stan")
+```
+
+### データを準備する
+
+Small, large の二つの正規分布を混ぜる。
+
+```{r setup_data, message=FALSE, warning=FALSE, cache=TRUE}
+given_seed <- 12345
+set.seed(given_seed)
+
+n <- 2000
+ratio <- 0.4
+n_small <- ceiling(n * ratio)
+n_large <- n - n_small
+mu_small <- 0.0
+mu_large <- 2.5
+sigma_small <- 0.75
+sigma_large <- 1.25
+
+make_data_set <- function(n, mu, sigma, label) {
+  df <- tibble::tibble(y = rnorm(n, mu, sigma))
+  df$label <- label
+  df
+}
+
+df_small <- make_data_set(n_small, mu_small, sigma_small, "small")
+df_large <- make_data_set(n_large, mu_large, sigma_large, "large")
+df <- dplyr::bind_rows(df_small, df_large) %>%
+  dplyr::mutate(label = factor(label))
+
+readr::write_csv(df, "data.csv")
+input_data <- list(N = NROW(df), Y = df$y)
+```
+
+```{r print_data, message=FALSE, warning=FALSE, cache=TRUE}
+g <- ggplot(df)
+g <- g + geom_histogram(aes(x = y, fill = label), position = "dodge")
+g <- g + scale_fill_manual(values = c("orange", "royalblue3"))
+plot(g)
+
+print(mean(df_small$y))
+print(mean(df_large$y))
+print(sd(df_small$y))
+print(sd(df_large$y))
+```
+
+## Stanを実行する
+
+### Stanでモデルのパラメータを求める
+
+数分掛かるので待つ。
+
+```{r fit_by_stan, message=FALSE, warning=FALSE, cache=TRUE}
+fit <- model$sample(
+  data = input_data, seed = given_seed, chains = 4, parallel_chains = 2,
+  iter_warmup = 5000, iter_sampling = 2500, refresh = 2500
+)
+fit$summary()
+```
+
+### 事後分布を表示する
+
+R hatをみて、モデルパラメータが収束したことを確認する。
+
+```{r draw_rhat, cache=TRUE}
+mcmc_rhat(rhat(fit))
+```
+
+事後分布をみる。元の分布と大体同じである。
+
+```{r draw_hist, cache=TRUE}
+mcmc_hist(fit$draws("mus"))
+mcmc_hist(fit$draws("sigma_s"))
+mcmc_hist(fit$draws("sigma_l"))
+mcmc_hist(fit$draws("theta"))
+
+mcmc_trace(fit$draws("mus"))
+mcmc_trace(fit$draws("sigma_s"))
+mcmc_trace(fit$draws("sigma_l"))
+mcmc_trace(fit$draws("theta"))
+```
