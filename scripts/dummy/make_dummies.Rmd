@@ -1,6 +1,6 @@
 ---
 title: "ダミー化と補間いろいろ"
-author: "プログラマたんbot"
+author: "Zettsu Tatsuya"
 date: '`r format(Sys.time(), "%Y/%m/%d")`'
 output:
   html_document:
@@ -21,10 +21,8 @@ urlcolor: blue
 ---
 
 ```{r load, include=FALSE}
-library(dplyr)
-library(readr)
-library(tidyr)
-library(tibble)
+library(tidyverse)
+library(assertthat)
 library(caret)
 library(dummies)
 library(fastDummies)
@@ -39,19 +37,19 @@ library(kableExtra)
 
 [参考資料](https://fuminorikawami.hatenablog.com/entry/2018/10/27/170129)を元に、いろいろなパッケージの、いろいろなパラメータでダミー化する。
 
-各パッケージの動作をまとめた、1-to-N または 1-to-N-1ダミー化は、最初に書いたのがパッケージのデフォルト値である。NAをNAのままにするか、NAというカテゴリを作るかも、両方できる場合は最初に書いたのがパッケージのデフォルト値である。
+各パッケージの動作をまとめた、1-to-N または 1-to-N-1ダミー化を選べることが多い。NAをNAのままにするか、NAというカテゴリを作るかも指定できることがある。最初に書いたのがパッケージのデフォルト値である。
 
 |パッケージ|1-to-N または 1-to-N-1ダミー化|NA(欠測値)|
 |:------------------|:--------------|:--------------------------------|
 |caret::dummyVars|NまたはN-1|NAのまま|
-|dummies::dummy.data.frame|N-1のみ|NAのまま|
+|dummies::dummy.data.frame|Nのみ|NAというカテゴリを作る|
 |makedummies::makedummies|N-1またはN|NAのまま|
 |fastDummies::dummy_cols|NまたはN-1|NAというカテゴリを作る/作らない|
 |pandas.get_dummies|NまたはN-1|NAのまま/NAというカテゴリを作る|
 
 ### データフレームをロードする
 
-列の型は、nがnumeric、fがfactorである。列名は以下の通り、順に並ぶ。
+列の型は、nがnumeric、fがfactorである。characterではなくfactorにする。列名は以下の通り、順に並ぶ。
 
 - rankは、1を先頭とする行番号
 - r, p, q, sはカテゴリ(factor)。NAを含んでいたりいなかったりする。列名はアルファベット順ではない。
@@ -65,12 +63,48 @@ df <- readr::read_csv('with_na.csv', col_types = 'nfnfnffn')
 df %>% kable() %>% kable_styling()
 ```
 
+ダミー化前後の列数は以下の通りになる。
+
+```{r expected_n_columns, echo=FALSE}
+size_rows <- NROW(df)
+size_base_columns <- NCOL(df)
+size_n_1_dummy_columns <- size_base_columns
+size_n_1_na_dummy_columns <- size_n_1_dummy_columns + 3
+size_n_dummy_columns <- size_n_1_dummy_columns + 4
+size_n_na_dummy_columns <- size_n_dummy_columns + 3
+size_base_n_1_dummy_columns <- size_n_1_dummy_columns + 4
+size_base_n_1_na_dummy_columns <- size_n_1_na_dummy_columns + 4
+size_base_n_dummy_columns <- size_n_dummy_columns + 4
+size_base_n_na_dummy_columns <- size_n_na_dummy_columns + 4
+
+size_set <- c(size_base_columns,
+  size_n_1_dummy_columns, size_n_1_na_dummy_columns,
+  size_n_dummy_columns, size_n_na_dummy_columns,
+  size_base_n_1_dummy_columns, size_base_n_1_na_dummy_columns,
+  size_base_n_dummy_columns, size_base_n_na_dummy_columns)
+
+dummying_to_set <- c("なし", rep(c("N-1", "N-1", "N", "N"), 2))
+dummying_na_set <- c("含む", rep(c("NAのまま", "NAというカテゴリを作る"), 4))
+dummying_base_set <- c("", rep(c("消す"), 4), rep(c("残す"), 4))
+
+df_expected <- tibble(x1 = dummying_to_set, x2 = dummying_na_set,
+                      x3 = dummying_base_set, x4 = size_set) %>%
+  dplyr::arrange(desc(x1), desc(x2), desc(x3))
+colnames(df_expected) <- c("ダミー化", "値がNA", "ダミー化元の列", "列数")
+df_expected %>% kable() %>% kable_styling()
+```
+
 ### caret::dummyVars
 
 NカテゴリをN変数にする(全カテゴリを足すと1sになる)。tibbleのNAはNAのまま残り、「NAというカテゴリ」は作らない。ダミー化前の列はなくなり、元々の列名の順序は維持される。
 
 ```{r caret}
 mat_predict <- predict(caret::dummyVars(~., df), df)
+```
+
+```{r assert_caret, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_predict) == size_n_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_predict) == NROW(df)))
 ```
 
 ```{r show_caret, echo=FALSE}
@@ -83,13 +117,18 @@ fullRank = TRUEにすると、NカテゴリをN-1変数にする。
 mat_predict <- predict(caret::dummyVars(~., df, fullRank = TRUE), df)
 ```
 
+```{r assert_caret_fullrank, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_predict) == size_n_1_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_predict) == NROW(df)))
+```
+
 ```{r show_caret_fullrank, echo=FALSE}
 mat_predict %>% kable() %>% kable_styling()
 ```
 
-以下のcode chunkをcache = TRUEにしなおかつ `df_large <- NULL, mat_predict_large <- NULL` でメモリを解放しないと、PCのDRAMが8GBだとlazyLoadDBinsertVariableできないというエラーが発生する。
+以下のcode chunkをcache = TRUEにしなおかつ `df_large <- NULL, mat_predict_large <- NULL` でメモリを解放しないと、 lazyLoadDBinsertVariable できないというエラーが発生する。この種のエラーは、R Markdownのコードチャンクに cache.lazy=FALSE を設定すると回避できる。
 
-```{r caret_large, cache=FALSE}
+```{r caret_large}
 n_cols <- 10000
 n_samples <- 10000
 df_large <- purrr::map(1:n_cols, function(x) {
@@ -109,16 +148,119 @@ n_cols <- 20000にすると、プロテクションスタックがあふれる�
 # mat_predict_large <- NULL
 ```
 
+ダミー変数の列名は、ダミー化前の変数名と変数の値をつなげて作る。両者の区切り文字列を引数sepで指定する。ダミー変数がfactorのときは引数sepが反映されるが、ダミー変数が文字列(character)のときはダミー化できるが区切り文字列が反映されない。
+
+```{r caret_sep_setup}
+df_characters <- tibble(x1 = c("p", "q", "r"))
+df_factors <- dplyr::mutate_all(df_characters, factor)
+```
+
+factorをダミー化すると区切り文字 .. がつき、
+
+```{r caret_factor_dummies}
+df_factor_dummies <- predict(
+  caret::dummyVars(~ ., data = df_factors, sep = "..", fullRank = FALSE), df_factors)
+print(class(df_factors$x1))
+```
+
+```{r assert_caret_factor_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NROW(df_characters) == NROW(df_factors)))
+invisible(assertthat::assert_that(NCOL(df_factor_dummies) == NROW(df_factors)))
+invisible(all(stringr::str_detect(colnames(df_factor_dummies), "\\.\\.")))
+```
+
+```{r print_caret_factor_dummies, echo=FALSE}
+df_factor_dummies %>% kable() %>% kable_styling()
+```
+
+characterをダミー化すると区切り文字 .. がつかない。
+
+```{r caret_character_dummies}
+df_character_dummies <- predict(
+  caret::dummyVars(~ ., data = df_characters, sep = "..", fullRank = FALSE), df_characters)
+print(class(df_characters$x1))
+```
+
+```{r assert_caret_character_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_character_dummies) == NROW(df_factors)))
+invisible(!any(stringr::str_detect(colnames(df_character_dummies), "\\.\\.")))
+```
+
+```{r print_caret_character_dummies, echo=FALSE}
+df_character_dummies %>% kable() %>% kable_styling()
+```
+
 ### dummies::dummy.data.frame
 
-NカテゴリをN-1変数にする(baselineカテゴリからの差になる)。tibbleのNAはNAのまま残り、NAというカテゴリは作らない。ダミー化前の列はなくなり、元々の列名の順序は維持される。
+NカテゴリをN変数にする(全カテゴリを足すと1sになる)。NAというカテゴリができる。ダミー化前の列はなくなり、元々の列名の順序は維持される。入力は data.frame にする。
 
-```{r dummies_dummy_data_frame}
-mat_dummies <- dummies::dummy.data.frame(df)
+```{r dummies_dummy_data_frame, warning = FALSE}
+data_frame_df <- as.data.frame(df)
+print(class(data_frame_df))
+df_dummies <- dummies::dummy.data.frame(data_frame_df)
+print(class(df_dummies))
+```
+
+```{r assert_dummies_dummy_data_frame, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_dummies) == size_n_na_dummy_columns))
+invisible(assertthat::assert_that(NROW(df_dummies) == NROW(df)))
 ```
 
 ```{r show_dummies_dummy_data_frame, echo=FALSE}
-mat_dummies %>% kable() %>% kable_styling()
+df_dummies %>% kable() %>% kable_styling()
+```
+
+data.frameの替わりにtibbleを入力するとダミー化できず、入力がdata.frameになったものが返ってくる。
+
+```{r dummies_dummy_tibble, warning = FALSE}
+print(class(df))
+df_dummies_from_tibble <- dummies::dummy.data.frame(df)
+print(class(df_dummies_from_tibble))
+```
+
+```{r assert_dummies_dummy_tibble, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_dummies_from_tibble) == NCOL(df)))
+invisible(assertthat::assert_that(NROW(df_dummies_from_tibble) == NROW(df)))
+```
+
+```{r show_dummies_dummy_tibble, echo=FALSE}
+df_dummies_from_tibble %>% kable() %>% kable_styling()
+```
+
+dummies::dummy.data.frame は、factorもcharacterも同様にダミー化する。
+
+```{r dummies_sep_setup}
+df_characters <- data.frame(x1 = c("p", "q", "r"), stringsAsFactors = FALSE)
+df_factors <- dplyr::mutate_all(df_characters, factor)
+```
+
+```{r dummies_factor_dummies, warning = FALSE}
+df_factor_dummies <- dummies::dummy.data.frame(df_factors, sep = "..")
+print(class(df_factors$x1))
+```
+
+```{r assert_dummies_factor_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NROW(df_characters) == NROW(df_factors)))
+invisible(assertthat::assert_that(NCOL(df_factor_dummies) == NROW(df_factors)))
+invisible(all(stringr::str_detect(colnames(df_factor_dummies), "\\.\\.")))
+```
+
+```{r print_dummies_factor_dummies, echo=FALSE}
+df_factor_dummies %>% kable() %>% kable_styling()
+```
+
+```{r dummies_character_dummies, warning = FALSE}
+df_character_dummies <- dummies::dummy.data.frame(df_characters, sep = "..")
+print(class(df_characters$x1))
+```
+
+```{r assert_dummies_character_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_character_dummies) == NROW(df_factors)))
+invisible(all(stringr::str_detect(colnames(df_character_dummies), "\\.\\.")))
+```
+
+```{r print_dummies_character_dummies, echo=FALSE}
+df_character_dummies %>% kable() %>% kable_styling()
 ```
 
 ### makedummies::makedummies
@@ -127,6 +269,11 @@ basal_level 引数で、NカテゴリをN変数にするかN-1変数にするか
 
 ```{r makedummies_n}
 mat_makedummies_n <- makedummies::makedummies(df, basal_level = TRUE)
+```
+
+```{r assert_makedummies_n, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_makedummies_n) == size_n_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_makedummies_n) == NROW(df)))
 ```
 
 ```{r show_makedummies_n, echo=FALSE}
@@ -139,8 +286,52 @@ basal_level = FALSEにすると、NカテゴリをN-1変数にする。デフォ
 mat_makedummies_n_1 <- makedummies::makedummies(df, basal_level = FALSE)
 ```
 
+```{r assert_makedummies_n_1, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_makedummies_n_1) == size_n_1_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_makedummies_n_1) == NROW(df)))
+```
+
 ```{r show_makedummies_n_1, echo=FALSE}
 mat_makedummies_n_1 %>% kable() %>% kable_styling()
+```
+
+ダミー変数の列名は、ダミー化前の変数名と変数の値をつなげて作る。両者の区切り文字列は _ 固定である。
+
+```{r makedummies_sep_setup}
+df_characters <- tibble(x1 = c("p", "q", "r"))
+df_factors <- dplyr::mutate_all(df_characters, factor)
+```
+
+factorはダミー化するが、
+
+```{r makedummies_factor_dummies}
+df_factor_dummies <- makedummies::makedummies(df_factors, basal_level = TRUE)
+print(class(df_factors$x1))
+```
+
+```{r assert_makedummies_factor_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NROW(df_characters) == NROW(df_factors)))
+invisible(assertthat::assert_that(NCOL(df_factor_dummies) == NROW(df_factors)))
+invisible(all(stringr::str_detect(colnames(df_factor_dummies), "_")))
+```
+
+```{r print_makedummies_factor_dummies, echo=FALSE}
+df_factor_dummies %>% kable() %>% kable_styling()
+```
+
+characterはダミー化しないので、ダミー化したければfactorにあらかじめ変換する。
+
+```{r makedummies_character_dummies}
+df_character_dummies <- makedummies::makedummies(df_characters, basal_level = TRUE)
+print(class(df_characters$x1))
+```
+
+```{r assert_makedummies_character_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_character_dummies) == NCOL(df_characters)))
+```
+
+```{r print_makedummies_character_dummies, echo=FALSE}
+df_character_dummies %>% kable() %>% kable_styling()
 ```
 
 ### fastDummies::dummy_cols
@@ -149,6 +340,11 @@ remove_first_dummy 引数で、NカテゴリをN変数にするかN-1変数に�
 
 ```{r fastDummies_n}
 mat_fastDummies_n <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE)
+```
+
+```{r assert_fastDummies_n, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n) == size_base_n_na_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n) == NROW(df)))
 ```
 
 ```{r show_fastDummies_n, echo=FALSE}
@@ -161,6 +357,11 @@ ignore_na = TRUE にすると、NAというカテゴリは作らない。
 mat_fastDummies_n_na <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE, ignore_na = TRUE)
 ```
 
+```{r assert_fastDummies_n_na, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n_na) == size_base_n_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n_na) == NROW(df)))
+```
+
 ```{r show_fastDummies_n_na, echo=FALSE}
 mat_fastDummies_n_na %>% kable() %>% kable_styling()
 ```
@@ -171,12 +372,22 @@ remove_first_dummy = TRUE にして、NカテゴリをN-1変数にする。ignor
 mat_fastDummies_n_1 <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, ignore_na = FALSE)
 ```
 
+```{r assert_fastDummies_default_n_1, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n_1) == size_base_n_1_na_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n_1) == NROW(df)))
+```
+
 ```{r show_fastDummies_default_n_1, echo=FALSE}
 mat_fastDummies_n_1 %>% kable() %>% kable_styling()
 ```
 
 ```{r fastDummies_default_n_1_na}
 mat_fastDummies_n_1_na <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, ignore_na = TRUE)
+```
+
+```{r assert_fastDummies_default_n_1_na, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n_1_na) == size_base_n_1_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n_1_na) == NROW(df)))
 ```
 
 ```{r show_fastDummies_default_n_1_na, echo=FALSE}
@@ -189,6 +400,11 @@ mat_fastDummies_n_1_na %>% kable() %>% kable_styling()
 mat_fastDummies_n_filtered <- fastDummies::dummy_cols(df, remove_first_dummy = FALSE, remove_selected_columns = TRUE, ignore_na = TRUE)
 ```
 
+```{r assert_fastDummies_remove_n, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n_filtered) == size_n_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n_filtered) == NROW(df)))
+```
+
 ```{r show_fastDummies_remove_n, echo=FALSE}
 mat_fastDummies_n_filtered %>% kable() %>% kable_styling()
 ```
@@ -197,8 +413,49 @@ mat_fastDummies_n_filtered %>% kable() %>% kable_styling()
 mat_fastDummies_n_1_filtered <- fastDummies::dummy_cols(df, remove_first_dummy = TRUE, remove_selected_columns = TRUE, ignore_na = TRUE)
 ```
 
+```{r assert_fastDummies_remove_n_1, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat_fastDummies_n_1_filtered) == size_n_1_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat_fastDummies_n_1_filtered) == NROW(df)))
+```
+
 ```{r show_fastDummies_remove_n_1, echo=FALSE}
 mat_fastDummies_n_1_filtered %>% kable() %>% kable_styling()
+```
+
+fastDummies::dummy_cols は、factorもcharacterも同様にダミー化する。
+
+```{r fastDummies_sep_setup}
+df_characters <- tibble(x1 = c("p", "q", "r"))
+df_factors <- dplyr::mutate_all(df_characters, factor)
+```
+
+```{r fastDummies_factor_dummies}
+df_factor_dummies <- fastDummies::dummy_cols(df_factors, remove_first_dummy = FALSE)
+print(class(df_factors$x1))
+```
+
+```{r assert_fastDummies_factor_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NROW(df_characters) == NROW(df_factors)))
+invisible(assertthat::assert_that(NCOL(df_factor_dummies) == (NROW(df_factors) + 1)))
+invisible(all(stringr::str_detect(colnames(df_factor_dummies), "_")))
+```
+
+```{r print_fastDummies_factor_dummies, echo=FALSE}
+df_factor_dummies %>% kable() %>% kable_styling()
+```
+
+```{r fastDummies_character_dummies}
+df_character_dummies <- fastDummies::dummy_cols(df_characters, remove_first_dummy = FALSE)
+print(class(df_characters$x1))
+```
+
+```{r assert_fastDummies_character_dummies, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(df_character_dummies) == (NROW(df_factors) + 1)))
+invisible(all(stringr::str_detect(colnames(df_character_dummies), "_")))
+```
+
+```{r print_fastDummies_character_dummies, echo=FALSE}
+df_character_dummies %>% kable() %>% kable_styling()
 ```
 
 ### tidyrでNAを補間する
@@ -212,17 +469,21 @@ df <- readr::read_csv('with_na.csv', col_types = 'nfnfnffn')
 mat <- makedummies::makedummies(df, basal_level = TRUE)
 ```
 
+```{r assert_load_before_interpolate, echo=FALSE}
+invisible(assertthat::assert_that(NCOL(mat) == size_n_dummy_columns))
+invisible(assertthat::assert_that(NROW(mat) == NROW(df)))
+```
+
 ```{r show_load_before_interpolate, echo=FALSE}
 mat %>% kable() %>% kable_styling()
 ```
 
-tidyr::fillを使って、各列を補間する。purrr::reduceを使うと、それぞれの列について補間できる。
+tidyr::fillを使って、各列を補間する。
 
 ```{r matrix_interpolate1}
 mat_interpolated_1 <- purrr::reduce(.x = colnames(mat), .init = mat, .f = function(df, col_name) {
   df %>%
-    tidyr::fill(col_name, .direction = 'down') %>%
-    tidyr::fill(col_name, .direction = 'up')
+    tidyr::fill(all_of(col_name), .direction = 'downup')
 })
 ```
 
@@ -230,27 +491,9 @@ mat_interpolated_1 <- purrr::reduce(.x = colnames(mat), .init = mat, .f = functi
 mat_interpolated_1 %>% kable() %>% kable_styling()
 ```
 
-以下のようにするとメッセージが出なくなる。
-
-```{r matrix_interpolate2}
-mat_interpolated_2 <- purrr::reduce(.x = colnames(mat), .init = mat, .f = function(df, col_name) {
-  df %>%
-    dplyr::mutate(.prev_val = col_name, .next_val = col_name) %>%
-    tidyr::fill(col_name, .direction = 'down') %>%
-    tidyr::fill(col_name, .direction = 'up') %>%
-    dplyr::mutate(col_name = ifelse(.prev_val == .next_val, .prev_val, col_name)) %>%
-    dplyr::select(-c(.prev_val, .next_val))
-})
-```
-
-```{r show_matrix_interpolate2, echo=FALSE}
-mat_interpolated_2 %>% kable() %>% kable_styling()
-```
-
-
 ## Pythonでダミー化して補間する
 
-PythonではPandasを使う。WindowsではAnadondaのpython.exeをPATHで見つけられるようにすると、Pythonの実行結果をこのR markdownファイルに埋め込むことができる。
+PythonではPandasを使う。python.exeをPATHで見つけられるようにすると、Pythonの実行結果をこのR markdownファイルに埋め込むことができる。
 
 ```{python, echo=TRUE}
 import pandas as pd
@@ -263,7 +506,6 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 ```
-
 
 ### Pandasでダミー化する
 

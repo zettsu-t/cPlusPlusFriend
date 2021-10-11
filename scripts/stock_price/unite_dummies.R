@@ -69,9 +69,12 @@ make_example <- function(to_factor) {
 df_dummies_factors <- make_example(to_factor = TRUE)
 df_dummies_chrs <- make_example(to_factor = FALSE)
 
+print_dummy_variables <- function(df) {
+  print(predict(caret::dummyVars(~ ., data = df, sep = "..", fullRank = FALSE), df))
+  print(makedummies::makedummies(df, basal_level = TRUE))
+}
+
 df_chrs <- tibble(x1 = c("p", "q", "r"))
 df_factors <- dplyr::mutate_all(df_chrs, factor)
-print(predict(caret::dummyVars(~ ., data = df_chrs, sep = "..", fullRank = FALSE), df_chrs))
-print(predict(caret::dummyVars(~ ., data = df_factors, sep = "..", fullRank = FALSE), df_chrs))
-print(makedummies::makedummies(df_chrs, basal_level = TRUE))
-print(makedummies::makedummies(df_factors, basal_level = TRUE))
+print_dummy_variables(df_factors)
+print_dummy_variables(df_chrs)
