@@ -1,0 +1,17 @@
+Package: rcpp20popcount
+Type: Package
+Title: A C++20 sample
+Version: 0.0.0.9000
+Authors@R: person('Zettsu', 'Tatsuya', email = 'zettsu.tatsuya@gmail.com', role = c('cre', 'aut'))
+Description: This is an Rcpp sample with C++20.
+License: MIT + file LICENSE
+LinkingTo: Rcpp
+Imports:
+    Rcpp,
+    BH
+Encoding: UTF-8
+LazyData: true
+Suggests:
+    testthat (>= 3.0.0),
+    microbenchmark
+RoxygenNote: 7.1.2
