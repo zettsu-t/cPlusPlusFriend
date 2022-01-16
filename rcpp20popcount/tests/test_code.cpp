@@ -4,8 +4,8 @@
 class TestPopcount : public ::testing::Test {};
 
 TEST_F(TestPopcount, Ordinary) {
-    const NumberVector xs {0, 1, 2, 3, 4, 5, 6, 7, 8};
-    const NumberVector expected {0, 1, 1, 2, 1, 2, 2, 3, 1};
+    const NumberVector xs {0, 1, 2, 3, 4, 5, 6, 7, 8, 65535, 65536, 2147483646, 2147483647};
+    const NumberVector expected {0, 1, 1, 2, 1, 2, 2, 3, 1, 16, 1, 30, 31};
     const auto actual = cpp_popcount(xs);
 
     ASSERT_EQ(expected.size(), actual.size());

@@ -13,14 +13,18 @@ Rcpp::NumericVector cpp_popcount(Rcpp::NumericVector xs)
 #ifndef UNIT_TEST_CPP
     using NumberVector = Rcpp::NumericVector;
 #endif
-    NumberVector popcounts;
+    // Zero initialization
+    NumberVector popcounts(xs.size());
+
+    size_t i = 0;
     for (const auto& x : xs) {
         unsigned long uint_x = 0;
         if ((x >= 0) && (x <= std::numeric_limits<decltype(uint_x)>::max())) {
             uint_x = static_cast<decltype(uint_x)>(x);
         }
         auto y = std::popcount(uint_x);
-        popcounts.push_back(y);
+        popcounts.at(i) = y;
+        ++i;
     }
     return popcounts;
 }

@@ -1,0 +1,55 @@
+---
+title: "rcpp20popcount"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{nbinomPlot}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "##"
+)
+```
+
+```{r setup}
+library(rcpp20popcount)
+library(ggplot2)
+library(magrittr)
+library(microbenchmark)
+library(purrr)
+library(tibble)
+```
+
+```{r run, out.width = '100%'}
+measure_time <- function(n, times) {
+  xs <- floor(runif(n, min = 0, max = (2 ** 30) - 1))
+
+  use_r <- function() {
+    purrr::map_dbl(xs, ~ sum(intToBits(.x) > 0))
+  }
+
+  use_cpp <- function() {
+    rcpp20popcount::popcount(xs)
+  }
+
+  microbenchmark::microbenchmark(use_r(), use_cpp(), times = times) %>%
+    tibble::as_tibble() %>%
+    dplyr::mutate(time = time / 1e+9) %>%
+    dplyr::mutate(log10_time = log10(time))
+}
+
+df_result <- measure_time(n = 1e+5, times = 1000)
+
+g <- ggplot(df_result, aes(x=time, y=expr, fill=expr))
+g <- g + geom_violin()
+g <- g + scale_fill_manual(values = c("royalblue", "navy"))
+g <- g + xlim(c(0, max(df_result$time)))
+g <- g + xlab("time [second]")
+g <- g + ylab("package")
+g <- g + theme_bw()
+g <- g + theme(legend.position='none')
+plot(g)
+```
