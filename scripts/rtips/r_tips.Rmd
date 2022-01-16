@@ -1,0 +1,339 @@
+---
+title: "R tips"
+author: "Zettsu Tatsuya"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+```{r setup_r_packages, include=FALSE, cache=TRUE}
+## knitrで使うパッケージ
+library(extrafont)
+library(kableExtra)
+library(reticulate)
+library(xfun)
+
+output_format <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+output_format <- if (is.null(output_format)) {
+  "html"
+} else if (output_format == "gfm-yaml_metadata_block") {
+  "gfm"
+} else {
+  output_format
+}
+
+is_html <- (output_format == "html")
+
+get_font_or_default <- function(name) {
+  font_set <- extrafont::fonts()
+  if (is.null(font_set) || !(name %in% font_set)) {
+    "sans"
+  } else {
+    name
+  }
+}
+
+font_name <- get_font_or_default("Segoe UI")
+font_name_jp <- get_font_or_default("Migu 1M")
+```
+
+```{r code_background_color, results="asis", eval=is_html, echo=FALSE}
+cat('<style type="text/css" rel="stylesheet">\n.python { background-color: lavender }\n.r { background-color: seashell }\n.python-output { background-color: #ececec }\n.r-output { background-color: #f9f9f9 }\n</style>\n')
+```
+
+「Pythonプログラマが30分でわかるR」には載せきれないtips。
+
+### Emacsでタグジャンプする
+
+Emacsでソースコードを編集していて、 Alt-. を押して関数の定義に飛ぶことができる。その準備として、名前とソースコードの位置の対応表 **TAGS** ファイル を作っておく。
+
+PythonやC++のソースコードについては etags で作る。
+
+```{bash etags, eval=FALSE, echo=TRUE}
+find . \( -name "*.py" -o -name ".cpp" \) -print | etags -L -
+```
+
+Rのソースコードについては、 Rの `rtags` 関数で作る。R以外のプログラミング言語についても TAGS を作ることができる。
+
+```{r rtags, eval=FALSE, echo=TRUE}
+suppressMessages(rtags(path = ".", pattern = "[.]*\\.(R|py|cpp)$",
+  verbose = TRUE, ofile = "TAGS", append = FALSE, recursive = TRUE))
+```
+
+### 実行時間を測る
+
+CSVファイルを読むのに、 data.table と readr のどちらが速いか測る。それぞれ110回実行するので、数十秒かかる。
+
+```{r setup_benchmark, message=FALSE, warning=FALSE, cache=TRUE}
+library(data.table)
+library(tidyverse)
+library(microbenchmark)
+```
+
+```{r function_benchmark, cache=TRUE}
+measure_read_csv <- function(n, times) {
+  df_large <- tibble::tibble(a = rnorm(n = n), b = rnorm(n = n))
+  temp_filename <- tempfile(fileext = ".csv")
+  on.exit(unlink(temp_filename))
+  readr::write_csv(df_large, temp_filename)
+
+  repeat_reading <- function() {
+    use_data.table <- function() {
+      suppressMessages(data.table::fread(temp_filename, showProgress = FALSE))
+    }
+    use_readr <- function() {
+      suppressMessages(readr::read_csv(temp_filename, progress = FALSE))
+    }
+
+    microbenchmark::microbenchmark(use_data.table(), use_readr(), times = times,
+                                   control = list(warmup = 10))
+  }
+
+  extract_method_name <- function(xs) {
+    purrr::map_chr(xs, function(x) {
+      stringr::str_match(x, "use_(.*)\\(\\)")[1,2]
+    })
+  }
+
+  # time in nanoseconds
+  repeat_reading() %>%
+    tibble::as_tibble() %>%
+    dplyr::mutate(expr = extract_method_name(expr)) %>%
+    dplyr::mutate(time = time / 1e+9)
+}
+
+df_result <- measure_read_csv(n = 1e+7, times = 100)
+```
+
+処理時間を violin plot で表示する。
+
+```{r measure_benchmark, cache=TRUE}
+g <- ggplot(df_result, aes(x=time, y=expr, fill=expr))
+g <- g + geom_violin()
+g <- g + scale_fill_manual(values = c("royalblue", "navy"))
+g <- g + xlim(c(0, max(df_result$time)))
+g <- g + xlab("time [second]")
+g <- g + ylab("package")
+g <- g + theme_bw()
+g <- g + theme(
+  legend.position='none',
+  aspect.ratio = 0.6,
+  text = element_text(family = font_name),
+  axis.text = element_text(family = font_name, size = 12),
+  axis.title = element_text(family = font_name, size = 16),
+  plot.title = element_text(family = font_name, size = 20)
+)
+plot(g)
+```
+
+### 絵文字を使う
+
+emoパッケージを使うと、R Markdownに絵文字を埋め込める `r emo::ji("thumbs_up")` 。
+
+```{r setup_emoji, message=FALSE, warning=FALSE, cache=TRUE}
+# devtools::install_github("hadley/emo")
+library(emo)
+```
+
+Smileに分類される絵文字の名称一覧を得て、それぞれ表示する。
+
+```{r show_emojis, cache=TRUE}
+emo::ji_keyword$smile
+knitr::asis_output(purrr::map_chr(emo::ji_keyword$smile, emo::ji))
+```
+
+### clang++とC++20を使う
+
+clang++の最新版をインストールしてから、 **~/.R/Makevars** に `CXX20="clang++-12"` と書く。C++17 までは g++ などデフォルトのC++コンパイラを使う。
+
+```{bash setup_cpp20, eval=FALSE, echo=TRUE}
+sudo apt-get install -y clang-12 lldb-12 lld-12
+mkdir -p /home/rstudio/.R
+echo 'CXX20="clang++-12"' >> /home/rstudio/.R/Makevars
+```
+
+パッケージの **src/Makevars** に、 `CXX_STD=CXX20` と書く
+
+```{bash make_cpp20_package, eval=FALSE, echo=TRUE}
+CXX_STD=CXX20
+```
+
+パッケージをビルドすると、C++20でコンパイルする。これで `std::popcount()` が使える。
+
+```{r r_cpp20_package, eval=FALSE, echo=TRUE, cache=TRUE}
+library(devtools)
+devtools::install_local(force = TRUE)
+```
+
+### Natural sort
+
+文字列の並び替えにおいて、数字の集まりを文字列ではなく数値として扱いたいことがある。バージョン番号の作法に従えば、 v1.0 < v1.10 < v1.2 ではなく、 v1.0 < v1.2 < v1.10 である。これを natural sort と呼び、Windows Explorer や `ls -v` はこのように並び替える。
+
+```{r sort_naive, eval=FALSE, echo=FALSE, cache=TRUE}
+sort(c("v1.0", "v1.10", "v1.2"))
+```
+
+Natural sort は、例えば、以下のように書ける。
+
+```{r setup_natural_sort, cache=TRUE}
+library(tidyverse)
+library(functional)
+```
+
+```{r natural_sort, cache=TRUE}
+natural_sort <- function(xs) {
+  (suppressWarnings(stringr::str_match_all(xs, "(\\d+|\\D+)") %>%
+    purrr::map(~ tibble::as_tibble(t(.x[,1, drop=FALSE]))) %>%
+      dplyr::bind_rows() %>%
+      dplyr::mutate_if(functional::Compose(na.omit, as.numeric, is.na, `!`, all), as.numeric) %>%
+      dplyr::mutate(across(where(is.character), ~ ifelse(is.na(.), "", .))) %>%
+      dplyr::mutate(across(where(is.numeric), ~ ifelse(is.na(.), -Inf, .))) %>%
+      dplyr::mutate(original = xs) %>%
+      dplyr::arrange_all()))$original
+}
+```
+
+1. 連続する数字、連続する数字以外、という文字列の集まりを切り出す。各行は切り出した部分文字列、1列目が部分文字列全体、2列目以降が各 capture group である。
+1. 部分文字列だけ集めて capture group を除き、 `natural_sort` の引数が各行に対応した tibble を作る
+1. 数字に変換可能な列を数字に変換し、数字に変換可能でない列は文字列のままにする
+1. dplyr::arrangeはNAは常に最後尾に持ってくるので、先頭に持ってくるようにNAを書き換える
+1. 左の列から辞書順に順番に並び替えて、元の文字列を取り出す
+
+```{r call_natural_sort, cache=TRUE}
+versions <- c("v1.0", "v1.0.0", "v1.0.1", "v1.2.1", "v1.10", "v1.10.1", "v2", "v2.0", "v10.4")
+shuffled_versions <- sample(versions)
+sorted_versions <- natural_sort(versions)
+sorted_versions
+```
+
+```{r confirm_natural_sort, eval=TRUE, echo=FALSE, message=FALSE, cache=TRUE}
+invisible(assertthat::assert_that(identical(versions, sorted_versions)))
+
+confirm_sorted <- function(expected, n_trial) {
+  all(purrr::map_lgl(seq_len(n_trial), function(i) {
+    actual <- natural_sort(sample(expected))
+    identical(expected, actual)
+  }))
+}
+
+invisible(assertthat::assert_that(
+  confirm_sorted(
+    expected = c("v1.0", "v1.2", "v1.10"), n_trial = 20)))
+
+invisible(assertthat::assert_that(
+  confirm_sorted(
+    expected = c("v1.0", "v1.0.0", "v1.0.1", "v1.2.1", "v1.10", "v1.10.1", "v2", "v2.0"),
+    n_trial = 100)))
+```
+
+### 時間割問題
+
+「N人の部下と一人ずつ面談します。時間帯をN枠作りましたので、皆さんそれぞれの時間帯に、その時間帯にしたい..したくないを数字(大きいほど好ましい)で記入してください」
+
+「さて、できるだけ全員の希望を叶えるように時間帯を割り当てるにはどうすればいいのか」
+
+「それ、二部グラフマッチング問題として解けるよ」
+
+```{r setup_matching, message=FALSE, cache=TRUE}
+library(tidyverse)
+library(magrittr)
+library(assertthat)
+library(lpSolve)
+```
+
+5人の従業員と、5つの時間帯(開始時間)がある。それぞれの従業員(各行は)、それぞれの時間帯(各列)に好ましさ(数字が大きいほど好ましい)をつける。
+
+```{r matching_parameters, cache=TRUE}
+employees <- c("A", "B", "C", "D", "E")
+choices <- c("08:00", "11:00", "13:00", "16:00", "19:00")
+
+weights <- matrix(c(
+  c(0, 0, 0, 0, 0),
+  c(1, 1, 2, 2, -1),
+  c(0, 2, 2, 1, 0),
+  c(2, 2, 1, 1, 1),
+  c(3, 2, 1, 1, 1)
+), nrow = NROW(employees))
+```
+
+```{r matching_parameters_table, eval=TRUE, echo=FALSE, cache=TRUE}
+requests <- c("別にいつでもいい",
+  "午前より午後の方がいいけど、夜は不可",
+  "昼休み前後がいい。そうでなければ夕方",
+  "午後より午前がいい",
+  "朝いちばんがよく、そうでなければ午後より午前がいい"
+)
+
+df_employees <- tibble::tibble(
+  employee = employees,
+  request = requests
+)
+```
+
+```{r print_matching_parameters_table, eval=TRUE, echo=FALSE, cache=TRUE}
+df_employees_print <- df_employees
+colnames(df_employees_print) <- c("従業員", "希望時間帯")
+df_employees_print %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling()
+```
+
+各従業員の望ましさを、平均0、分散1(すべて同じ好ましさでなければ)、非負にそろえて、 lpSolve に解かせよう。
+
+```{r solve_matching, cache=TRUE}
+weights <- scale(weights)
+weights[is.nan(weights)] <- 0
+weights <- weights - min(weights)
+weights <- t(weights)
+assignment <- round(lpSolve::lp.assign(weights, direction = "max")$solution)
+```
+
+```{r confirm_matching, eval=TRUE, echo=FALSE, cache=TRUE}
+invisible(assertthat::assert_that(all(assignment %in% c(0, 1))))
+invisible(assertthat::assert_that(all(colSums(assignment) == 1)))
+invisible(assertthat::assert_that(all(rowSums(assignment) == 1)))
+```
+
+行を見ても列を見ても、割り当て(1)が1個ずつあるのが分かる。
+
+```{r print_solution, eval=TRUE, echo=FALSE, message=FALSE, cache=TRUE}
+df_solution <- as.data.frame(assignment)
+colnames(df_solution) <- choices
+rownames(df_solution) <- employees
+df_solution %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling()
+```
+
+割り当ては希望通りになっている。
+
+```{r print_matching, eval=TRUE, echo=FALSE, message=FALSE, cache=TRUE}
+df_assignment <- dplyr::inner_join(df_employees,
+  purrr::map(seq_len(NROW(employees)), function(x) {
+    employee <- employees[x]
+    choice <- choices[which(assignment[x, ] > 0)][1]
+    tibble::tibble(
+      employee = employee, choice = choice
+    )
+  }) %>%
+    dplyr::bind_rows())
+
+colnames(df_assignment) <- c("従業員", "希望時間帯", "割り当て")
+df_assignment %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling()
+```
