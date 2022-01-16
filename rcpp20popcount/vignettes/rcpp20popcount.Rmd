@@ -37,11 +37,10 @@ measure_time <- function(n, times) {
 
   microbenchmark::microbenchmark(use_r(), use_cpp(), times = times) %>%
     tibble::as_tibble() %>%
-    dplyr::mutate(time = time / 1e+9) %>%
-    dplyr::mutate(log10_time = log10(time))
+    dplyr::mutate(time = time / 1e+9)
 }
 
-df_result <- measure_time(n = 1e+5, times = 1000)
+df_result <- measure_time(n = 1e+6, times = 100)
 
 g <- ggplot(df_result, aes(x=time, y=expr, fill=expr))
 g <- g + geom_violin()
@@ -49,6 +48,7 @@ g <- g + scale_fill_manual(values = c("royalblue", "navy"))
 g <- g + xlim(c(0, max(df_result$time)))
 g <- g + xlab("time [second]")
 g <- g + ylab("package")
+g <- g + scale_x_log10()
 g <- g + theme_bw()
 g <- g + theme(legend.position='none')
 plot(g)
