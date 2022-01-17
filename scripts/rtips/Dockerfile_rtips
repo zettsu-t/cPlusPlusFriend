@@ -9,6 +9,7 @@ RUN Rscript -e 'remotes::install_version("data.table")'
 RUN Rscript -e 'remotes::install_version("microbenchmark")'
 RUN Rscript -e 'devtools::install_github("hadley/emo")'
 RUN Rscript -e 'remotes::install_version("lpSolve")'
+RUN Rscript -e 'remotes::install_version("zeallot")'
 
 RUN mkdir -p /home/rstudio/.R
 RUN echo 'CXX20="clang++-12"' >> /home/rstudio/.R/Makevars

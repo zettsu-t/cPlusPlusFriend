@@ -74,6 +74,50 @@ suppressMessages(rtags(path = ".", pattern = "[.]*\\.(R|py|cpp)$",
   verbose = TRUE, ofile = "TAGS", append = FALSE, recursive = TRUE))
 ```
 
+### Minとmaxを同時に得る
+
+ベクトルの要素から最小値(min)と最大値(max)を同時に得るには、 `range` を使う。返り値の第1要素が最小値、第2要素が最大値である。引数の `na.rm` と `finite` も重宝する。
+
+```{r minmax, cache=TRUE}
+v <- c(-1, 0, -Inf, NA, NaN, 1)
+range(v, na.rm = TRUE, finite = TRUE)
+```
+
+返り値の第1要素と第2要素を `[]` で取り出してもよいのだが、多重代入の方がきれいだろう。 zeallot パッケージの `%<-%` を使う。
+
+```{r setup_multiple_assignment, message=FALSE, warning=FALSE, cache=TRUE}
+library(zeallot)
+```
+
+```{r multiple_assignment, cache=TRUE}
+c(min_v, max_v) %<-% range(v, na.rm = TRUE, finite = TRUE)
+min_v
+max_v
+```
+
+### 要素がn個のベクトルからインデックス1:nを作る
+
+`seq_len` でよいが、実は `seq_along` がある。
+
+```{r seq_along}
+seq_along(c(2, 3, 5))
+seq_along(c(3.14))
+seq_along(c())
+```
+
+では `seq_along` は `seq_len(NROW(x))` かというと、xがベクトルならそうだが、x が data.frame というか tibble のときはそうならない。data.frameはリストてきであることを思い出そう。
+
+```{r setup_tibble, message=FALSE, warning=FALSE, cache=TRUE}
+library(tibble)
+```
+
+```{r seq_along_tibble}
+df_4x2 <- tibble::tibble(a=1:4, b=5:8)
+seq_along(df_4x2)
+seq_len(NCOL(df_4x2))
+seq_len(NROW(df_4x2))
+```
+
 ### 実行時間を測る
 
 CSVファイルを読むのに、 data.table と readr のどちらが速いか測る。それぞれ110回実行するので、数十秒かかる。
@@ -116,7 +160,7 @@ measure_read_csv <- function(n, times) {
     dplyr::mutate(time = time / 1e+9)
 }
 
-df_result <- measure_read_csv(n = 1e+7, times = 100)
+df_result <- measure_read_csv(n = 1e+5, times = 100)
 ```
 
 処理時間を violin plot で表示する。
