@@ -95,6 +95,27 @@ min_v
 max_v
 ```
 
+### NULLならデフォルト値を使う
+
+Rubyの `target ||= value` は、左辺 `target` が nil か false なら、右辺の値を代入する。左辺 `target` が false ではないと解っているなら、nil ならデフォルト値を設定するという動作に使える。
+
+```{ruby value_or_default_ruby, cache=TRUE}
+a = nil
+a ||= 1
+print(a)
+```
+
+Rでは rlang パッケージの `%||%` が似ている。公式マニュアルに "It's inspired by the way that Ruby's or operation (||) works." と書いてある。
+
+```{r setup_value_or_default, message=FALSE, warning=FALSE, cache=TRUE}
+library(rlang)
+```
+
+```{r value_or_default_r, cache=TRUE}
+a <- NULL
+a %||% 1
+```
+
 ### 要素がn個のベクトルからインデックス1:nを作る
 
 `seq_len` でよいが、実は `seq_along` がある。
@@ -160,7 +181,7 @@ measure_read_csv <- function(n, times) {
     dplyr::mutate(time = time / 1e+9)
 }
 
-df_result <- measure_read_csv(n = 1e+5, times = 100)
+df_result <- measure_read_csv(n = 1e+7, times = 100)
 ```
 
 処理時間を violin plot で表示する。
