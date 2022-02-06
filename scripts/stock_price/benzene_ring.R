@@ -41,7 +41,7 @@ g <- g + geom_circle(aes(x0 = x0, y0 = y0, r = r),
   color = "black", size = 3, data = df_benzene_ring
 )
 g <- g + geom_label(aes(x = x_pos, y = y_to, label = name),
-  label.size = NA, fill = "white", cex = 15, data = df_methyl_group, parse = T
+  label.size = NA, fill = "white", cex = 15, data = df_methyl_group, parse = TRUE
 )
 g <- g + coord_fixed()
 g <- g + theme_light()
