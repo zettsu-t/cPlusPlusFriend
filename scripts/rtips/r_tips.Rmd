@@ -20,7 +20,7 @@ classoption: xelatex,ja=standard
 urlcolor: blue
 ---
 
-```{r setup_r_packages, include=FALSE, cache=TRUE}
+```{r setup, include=FALSE, cache=TRUE}
 ## knitrで使うパッケージ
 library(extrafont)
 library(kableExtra)
@@ -70,8 +70,10 @@ find . \( -name "*.py" -o -name ".cpp" \) -print | etags -L -
 Rのソースコードについては、 Rの `rtags` 関数で作る。R以外のプログラミング言語についても TAGS を作ることができる。
 
 ```{r rtags, eval=FALSE, echo=TRUE}
-suppressMessages(rtags(path = ".", pattern = "[.]*\\.(R|py|cpp)$",
-  verbose = TRUE, ofile = "TAGS", append = FALSE, recursive = TRUE))
+suppressMessages(rtags(
+  path = ".", pattern = "[.]*\\.(R|py|cpp)$",
+  verbose = TRUE, ofile = "TAGS", append = FALSE, recursive = TRUE
+))
 ```
 
 ### Minとmaxを同時に得る
@@ -95,6 +97,53 @@ min_v
 max_v
 ```
 
+### 値がすべて同じ列を除く
+
+`janitor::remove_constant` を使うと、値がすべて同じ列を除くことができる。
+
+```{r setup_remove_constant, message=FALSE, warning=FALSE, cache=TRUE}
+library(janitor)
+```
+
+```{r remove_constant, message=FALSE, warning=FALSE, cache=TRUE}
+df_constant_vars <- tibble::tibble(
+  const_num = 1, const_str = "A",
+  index = 1:4, name = c("A", "B", "C", "D")
+)
+df_constant_removed <- janitor::remove_constant(df_constant_vars)
+```
+
+```{r print_removing_constants, eval=TRUE, echo=FALSE, cache=TRUE}
+df_constant_vars %>%
+  kableExtra::kable(align = "l") %>%
+  kableExtra::kable_styling(full_width = FALSE, position = "float_left")
+df_constant_removed %>%
+  kableExtra::kable(align = "l") %>%
+  kableExtra::kable_styling(full_width = FALSE, position = "left")
+```
+
+`scale` は行列の列を平均0、不偏分散1に変換するが、列の値がすべて同じときは0ではなくNaNになる。おそらく列の値を0で割っているのだろう。NaN なら0にするという後処理を施す。
+
+```{r fill_constant_columns, message=FALSE, warning=FALSE, cache=TRUE}
+mat_constants <- matrix(c(1:4, rep(5, 4)), ncol = 2)
+mat_scaled_constants <- scale(mat_constants)
+mat_filled_constants <- apply(mat_scaled_constants, 2, function(x) ifelse(is.nan(x), 0, x))
+```
+
+```{r print_constant_columns, eval=TRUE, echo=FALSE, cache=TRUE}
+mat_constants %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling(full_width = FALSE, position = "float_left")
+
+mat_scaled_constants %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling(full_width = FALSE, position = "float_left")
+
+mat_filled_constants %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling(full_width = FALSE, position = "left")
+```
+
 ### NULLならデフォルト値を使う
 
 Rubyの `target ||= value` は、左辺 `target` が nil か false なら、右辺の値を代入する。左辺 `target` が false ではないと解っているなら、nil ならデフォルト値を設定するという動作に使える。
@@ -116,6 +165,21 @@ a <- NULL
 a %||% 1
 ```
 
+### 関数合成
+
+「Pythonプログラマが30分でわかるR」では、関数合成に `functional::Compose` を使っていた。これはこれでよいが同様なことを、 `purrr::compose` を使ってできる。Tidyverse をインポートすれば使えるので、こちらの方が便利だろう。`purrr::compose` の関数の適用順序は、 `functional::Compose` とは逆に右から左である(`.dir = forward` 引数で左から右にできる)。
+
+```{r hms_to_seconds, message=FALSE, cache=TRUE}
+library(purrr)
+library(lubridate)
+hms_to_seconds <- purrr::compose(lubridate::seconds, lubridate::hms)
+```
+
+```{r launch_hms_to_seconds, cache=TRUE}
+hms_to_seconds("00:01:04")
+hms_to_seconds("01:00:04")
+```
+
 ### 要素がn個のベクトルからインデックス1:nを作る
 
 `seq_len` でよいが、実は `seq_along` がある。
@@ -133,11 +197,42 @@ library(tibble)
 ```
 
 ```{r seq_along_tibble}
-df_4x2 <- tibble::tibble(a=1:4, b=5:8)
+df_4x2 <- tibble::tibble(a = 1:4, b = 5:8)
 seq_along(df_4x2)
 seq_len(NCOL(df_4x2))
 seq_len(NROW(df_4x2))
 ```
+
+### ランレングス符号化
+
+そのものずばり `rle` で、ベクトルをランレングス符号化できる。その逆は `inverse.rle` である。
+
+```{r rle, cache=TRUE}
+original_vec <- c("A", "A", "A", "B", "C", "C", "C", "C")
+rle_coding <- rle(original_vec)
+print(rle_coding)
+invisible(assertthat::assert_that(identical(inverse.rle(rle_coding), original_vec)))
+```
+
+元々のデータがランレングス符号化されたもの、つまり element_set の各要素が repeat_set 個ずつあるときに復号するには、 `rep` を使う。 `rep` は複数個の要素を取れるのである。
+
+```{r inverse_rle, cache=TRUE}
+element_set <- c("A", "B", "C")
+repeat_set <- c(3, 1, 4)
+rep(element_set, repeat_set)
+```
+
+### 負の要素番号の意味
+
+Rでは、負のインデックス番号(-n : nは正の整数)は、n番目の要素を除くという意味になる。
+
+```{r negative_index, cache=TRUE}
+(1:3)[-2]
+```
+
+私見では、次の記法に似ている。集合 $S=\{S_i\, for \, i=1..n\}$ に対して、 $S$ から $S_i$ を除いたものを $S_{-i}$ と書く。この記法の例として、ゲーム理論の支配戦略がある。
+
+支配戦略とは、他人がどういう戦略をとっても自分は戦略sより戦略tを取る方が常に利得が高いことである。このときtはsを支配すると呼ぶ。これはプレイヤー $i$ , プレイヤー $i$ の戦略 $s_i, t_i$, プレイヤー $i$ 以外の戦略の組 $s_{-i}$, 利得関数 $f$ について、 $f(t_i, s_{-i}) > f(s_i, s_{-i})\,for\,\forall s_{-i}$ が成立することである。
 
 ### 実行時間を測る
 
@@ -164,13 +259,15 @@ measure_read_csv <- function(n, times) {
       suppressMessages(readr::read_csv(temp_filename, progress = FALSE))
     }
 
-    microbenchmark::microbenchmark(use_data.table(), use_readr(), times = times,
-                                   control = list(warmup = 10))
+    microbenchmark::microbenchmark(use_data.table(), use_readr(),
+      times = times,
+      control = list(warmup = 10)
+    )
   }
 
   extract_method_name <- function(xs) {
     purrr::map_chr(xs, function(x) {
-      stringr::str_match(x, "use_(.*)\\(\\)")[1,2]
+      stringr::str_match(x, "use_(.*)\\(\\)")[1, 2]
     })
   }
 
@@ -187,7 +284,7 @@ df_result <- measure_read_csv(n = 1e+7, times = 100)
 処理時間を violin plot で表示する。
 
 ```{r measure_benchmark, cache=TRUE}
-g <- ggplot(df_result, aes(x=time, y=expr, fill=expr))
+g <- ggplot(df_result, aes(x = time, y = expr, fill = expr))
 g <- g + geom_violin()
 g <- g + scale_fill_manual(values = c("royalblue", "navy"))
 g <- g + xlim(c(0, max(df_result$time)))
@@ -195,7 +292,7 @@ g <- g + xlab("time [second]")
 g <- g + ylab("package")
 g <- g + theme_bw()
 g <- g + theme(
-  legend.position='none',
+  legend.position = "none",
   aspect.ratio = 0.6,
   text = element_text(family = font_name),
   axis.text = element_text(family = font_name, size = 12),
@@ -220,6 +317,10 @@ Smileに分類される絵文字の名称一覧を得て、それぞれ表示す
 emo::ji_keyword$smile
 knitr::asis_output(purrr::map_chr(emo::ji_keyword$smile, emo::ji))
 ```
+
+### Easter eggs
+
+Rの隠し機能 (easter eggs) として、 `????name` を実行すると `??` や `?` と同様の関数のヘルプを探すものがある。探した結果がどうなるかは、まあ実行してみてください。
 
 ### clang++とC++20を使う
 
@@ -262,13 +363,13 @@ library(functional)
 ```{r natural_sort, cache=TRUE}
 natural_sort <- function(xs) {
   (suppressWarnings(stringr::str_match_all(xs, "(\\d+|\\D+)") %>%
-    purrr::map(~ tibble::as_tibble(t(.x[,1, drop=FALSE]))) %>%
-      dplyr::bind_rows() %>%
-      dplyr::mutate_if(functional::Compose(na.omit, as.numeric, is.na, `!`, all), as.numeric) %>%
-      dplyr::mutate(across(where(is.character), ~ ifelse(is.na(.), "", .))) %>%
-      dplyr::mutate(across(where(is.numeric), ~ ifelse(is.na(.), -Inf, .))) %>%
-      dplyr::mutate(original = xs) %>%
-      dplyr::arrange_all()))$original
+    purrr::map(~ tibble::as_tibble(t(.x[, 1, drop = FALSE]))) %>%
+    dplyr::bind_rows() %>%
+    dplyr::mutate_if(functional::Compose(na.omit, as.numeric, is.na, `!`, all), as.numeric) %>%
+    dplyr::mutate(across(where(is.character), ~ ifelse(is.na(.), "", .))) %>%
+    dplyr::mutate(across(where(is.numeric), ~ ifelse(is.na(.), -Inf, .))) %>%
+    dplyr::mutate(original = xs) %>%
+    dplyr::arrange_all()))$original
 }
 ```
 
@@ -297,12 +398,61 @@ confirm_sorted <- function(expected, n_trial) {
 
 invisible(assertthat::assert_that(
   confirm_sorted(
-    expected = c("v1.0", "v1.2", "v1.10"), n_trial = 20)))
+    expected = c("v1.0", "v1.2", "v1.10"), n_trial = 20
+  )
+))
 
 invisible(assertthat::assert_that(
   confirm_sorted(
     expected = c("v1.0", "v1.0.0", "v1.0.1", "v1.2.1", "v1.10", "v1.10.1", "v2", "v2.0"),
-    n_trial = 100)))
+    n_trial = 100
+  )
+))
+```
+
+### お絵描き
+
+ggplot2とggplot2 extensionsを使うとお絵描きができる。ベンゼン環を描いてみよう。
+
+```{r setup_drawing, message=FALSE, cache=TRUE}
+library(tidyverse)
+library(ggforce)
+library(ggpubr)
+```
+
+線分と円を data.frame の各行に記述する。
+
+```{r setup_benzene_ring, cache=TRUE}
+height <- 1.0
+width <- sqrt(3) / 2.0
+df_hexagon <- tibble::tibble(
+  x = c(0, -width, -width, 0, width, width),
+  y = c(height, height / 2, -height / 2, -height, -height / 2, height / 2),
+  xend = c(-width, -width, 0, width, width, 0),
+  yend = c(height / 2, -height / 2, -height, -height / 2, height / 2, height)
+)
+df_ring <- tibble::tibble(x0 = 0, y0 = 0, r = 0.75)
+```
+
+data.frame を描画する。左が座標軸あり、右が図形だけである。
+
+```{r draw_benzene_ring, fig.align="center", cache=TRUE}
+g <- ggplot()
+g <- g + geom_segment(
+  aes(x = x, y = y, xend = xend, yend = yend),
+  color = "black", size = 2, lineend = "round", data = df_hexagon
+)
+g <- g + geom_circle(aes(x0 = x0, y0 = y0, r = r), color = "black", size = 2, data = df_ring)
+g <- g + theme_light()
+g1 <- g + theme(aspect.ratio = 1.0, axis.title = element_blank())
+g2 <- g + theme(
+  aspect.ratio = 1.0, axis.title = element_blank(),
+  panel.border = element_blank(), axis.ticks = element_blank(),
+  panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  axis.text = element_blank(),
+  plot.margin = margin(t = 0, r = 0, b = 10, l = 0, unit = "pt")
+)
+ggpubr::ggarrange(g1, g2, widths = c(1, 0.9), heights = c(1, 0.9))
 ```
 
 ### 時間割問題
@@ -336,7 +486,8 @@ weights <- matrix(c(
 ```
 
 ```{r matching_parameters_table, eval=TRUE, echo=FALSE, cache=TRUE}
-requests <- c("別にいつでもいい",
+requests <- c(
+  "別にいつでもいい",
   "午前より午後の方がいいけど、夜は不可",
   "昼休み前後がいい。そうでなければ夕方",
   "午後より午前がいい",
@@ -387,7 +538,8 @@ df_solution %>%
 割り当ては希望通りになっている。
 
 ```{r print_matching, eval=TRUE, echo=FALSE, message=FALSE, cache=TRUE}
-df_assignment <- dplyr::inner_join(df_employees,
+df_assignment <- dplyr::inner_join(
+  df_employees,
   purrr::map(seq_len(NROW(employees)), function(x) {
     employee <- employees[x]
     choice <- choices[which(assignment[x, ] > 0)][1]
@@ -395,7 +547,8 @@ df_assignment <- dplyr::inner_join(df_employees,
       employee = employee, choice = choice
     )
   }) %>%
-    dplyr::bind_rows())
+    dplyr::bind_rows()
+)
 
 colnames(df_assignment) <- c("従業員", "希望時間帯", "割り当て")
 df_assignment %>%
