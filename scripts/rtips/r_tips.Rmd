@@ -97,6 +97,99 @@ min_v
 max_v
 ```
 
+### NULLならデフォルト値を使う
+
+Rubyの `target ||= value` は、左辺 `target` が nil か false なら、右辺の値を代入する。左辺 `target` が false ではないと解っているなら、nil ならデフォルト値を設定するという動作に使える。
+
+```{ruby value_or_default_ruby, cache=TRUE}
+a = nil
+a ||= 1
+print(a)
+```
+
+Rでは rlang パッケージの `%||%` が似ている。公式マニュアルに "It's inspired by the way that Ruby's or operation (||) works." と書いてある。
+
+```{r setup_value_or_default, message=FALSE, warning=FALSE, cache=TRUE}
+library(rlang)
+```
+
+```{r value_or_default_r, cache=TRUE}
+a <- NULL
+a %||% 1
+```
+
+### 関数合成
+
+「Pythonプログラマが30分でわかるR」では、関数合成に `functional::Compose` を使っていた。これはこれでよいが同様のことを、 `purrr::compose` を使ってできる。Tidyverse をインポートすれば使えるので、こちらの方が便利だろう。`purrr::compose` の関数の適用順序は、 `functional::Compose` とは逆に右から左である(`.dir = forward` 引数で左から右にできる)。
+
+```{r hms_to_seconds, message=FALSE, cache=TRUE}
+library(purrr)
+library(lubridate)
+hms_to_seconds <- purrr::compose(lubridate::seconds, lubridate::hms)
+```
+
+```{r launch_hms_to_seconds, cache=TRUE}
+hms_to_seconds("00:01:04")
+hms_to_seconds("01:00:04")
+```
+
+### Syntactic sugar
+
+プログラミング言語において、必須要素ではなく他の方法で同じ実装ができるが、あると読み書きしやすい記法のことを syntactic sugar と呼ぶ。
+
+```{r setup_pipe, message=FALSE, warning=FALSE, cache=TRUE}
+library(magrittr)
+library(rlang)
+```
+
+関数呼び出しを入れ子にするより、`%>%` を使ってつないだ方が、左から右に読めるので可読性が高い。
+
+```{r pipe, cache=TRUE}
+f <- function (x) { x + 1 }
+g <- function (x, y) { x * 2 + 1 }
+h <- function (x, y) { (x ** 3) + 1 }
+h(g(f(1),2),3)
+f(1) %>% g(2) %>% h(3)
+```
+
+R 4.1 からはR組み込みの `|>` が使える。ただし左の結果は右の第一引数になり、第一引数以外にはできない。
+
+```{r builtin_pipe, cache=TRUE}
+f(1) |> g(2) |> h(3)
+```
+
+```{r check_pipe, eval=TRUE, echo=FALSE, cache=TRUE}
+invisible(assertthat::assert_that(assertthat::are_equal(f(1) %>% g(2) %>% h(3), h(g(f(1),2),3))))
+invisible(assertthat::assert_that(assertthat::are_equal(f(1) |> g(2) |> h(3), h(g(f(1),2),3))))
+```
+
+デフォルトでは `%>%` で渡したものは渡した先の第一引数になるが、 placeholder `.` を使えば第二引数にも名前付き引数にもできる。
+
+```{r pipe_second, cache=TRUE}
+10 %>% seq(from = 10, to = 50, by = .)
+```
+
+Syntactic sugar と言えば、data.frameの列を取り出す操作は、`$列名` でも `[[列名]]` でもできる。前者だと、列名に変数を使えないのでハードコーディングになるのと、名前によってはバッククォートを使う必要があるが、その方が読みやすいことも多々あるだろう。定番の iris を読もう。
+
+```{r syntactic_sugar, cache=TRUE}
+data("iris")
+invisible(assertthat::assert_that(assertthat::are_equal(iris$Species, iris[["Species"]])))
+```
+
+`$` は関数なので、実は do.call で呼び出せる。文字列もシンボルも渡せる。
+
+```{r syntactic_sugar_infix, cache=TRUE}
+head(do.call(`$`, list(iris, "Species")))
+head(do.call(`$`, list(iris, rlang::sym("Species"))))
+```
+
+```{r check_syntactic_sugar, eval=TRUE, echo=FALSE, cache=TRUE}
+invisible(assertthat::assert_that(assertthat::are_equal(
+    do.call(`$`, list(iris, "Species")),
+    do.call(`$`, list(iris, rlang::sym("Species")))
+)))
+```
+
 ### 値がすべて同じ列を除く
 
 `janitor::remove_constant` を使うと、値がすべて同じ列を除くことができる。
@@ -144,40 +237,23 @@ mat_filled_constants %>%
   kableExtra::kable_styling(full_width = FALSE, position = "left")
 ```
 
-### NULLならデフォルト値を使う
+### 相関係数が高い組み合わせを選ぶ
 
-Rubyの `target ||= value` は、左辺 `target` が nil か false なら、右辺の値を代入する。左辺 `target` が false ではないと解っているなら、nil ならデフォルト値を設定するという動作に使える。
+観測値として、行が標本、列が特徴量の data.frame や marrix があるとき、相関係数が高い特徴量の組を選びたいことがある。相関係数表は `cor` で得られるがそのあとの処理が大変である。という質問が [stackoverflow.com](https://stackoverflow.com/questions/35805555/return-max-correlation-and-row-name-from-corr-matrix) にあったのだが、今なら corrr を使って簡単にできると答えた。
 
-```{ruby value_or_default_ruby, cache=TRUE}
-a = nil
-a ||= 1
-print(a)
+```{r setup_max_correlation, message=FALSE, warning=FALSE, cache=TRUE}
+library(corrr)
+library(dplyr)
 ```
 
-Rでは rlang パッケージの `%||%` が似ている。公式マニュアルに "It's inspired by the way that Ruby's or operation (||) works." と書いてある。
-
-```{r setup_value_or_default, message=FALSE, warning=FALSE, cache=TRUE}
-library(rlang)
-```
-
-```{r value_or_default_r, cache=TRUE}
-a <- NULL
-a %||% 1
-```
-
-### 関数合成
-
-「Pythonプログラマが30分でわかるR」では、関数合成に `functional::Compose` を使っていた。これはこれでよいが同様なことを、 `purrr::compose` を使ってできる。Tidyverse をインポートすれば使えるので、こちらの方が便利だろう。`purrr::compose` の関数の適用順序は、 `functional::Compose` とは逆に右から左である(`.dir = forward` 引数で左から右にできる)。
-
-```{r hms_to_seconds, message=FALSE, cache=TRUE}
-library(purrr)
-library(lubridate)
-hms_to_seconds <- purrr::compose(lubridate::seconds, lubridate::hms)
-```
-
-```{r launch_hms_to_seconds, cache=TRUE}
-hms_to_seconds("00:01:04")
-hms_to_seconds("01:00:04")
+```{r max_correlation, message=FALSE, warning=FALSE, cache=TRUE}
+set.seed(12345)
+mat <- matrix(runif(40), ncol = 4)
+colnames(mat) <- c("A", "B", "C", "D")
+corrr::correlate(mat) %>%
+  corrr::stretch(remove.dups = TRUE) %>%
+  dplyr::arrange(desc(r)) %>%
+  na.omit()
 ```
 
 ### 要素がn個のベクトルからインデックス1:nを作る
@@ -353,11 +429,16 @@ devtools::install_local(force = TRUE)
 sort(c("v1.0", "v1.10", "v1.2"))
 ```
 
-Natural sort は、例えば、以下のように書ける。
+`stringr::str_sort` を引数 `numeric = TRUE` を指定して使うと、数字の集まりを数値として並び替える。
+
+```{r sort_numerical, cache=TRUE}
+stringr::str_sort(c("v1.0", "v1.10", "v1.2"), numeric = TRUE)
+```
+
+なので車輪を再発明する必要はないのだが、自分で実装するなら以下のように書ける。
 
 ```{r setup_natural_sort, cache=TRUE}
 library(tidyverse)
-library(functional)
 ```
 
 ```{r natural_sort, cache=TRUE}
@@ -365,7 +446,9 @@ natural_sort <- function(xs) {
   (suppressWarnings(stringr::str_match_all(xs, "(\\d+|\\D+)") %>%
     purrr::map(~ tibble::as_tibble(t(.x[, 1, drop = FALSE]))) %>%
     dplyr::bind_rows() %>%
-    dplyr::mutate_if(functional::Compose(na.omit, as.numeric, is.na, `!`, all), as.numeric) %>%
+    dplyr::mutate_if(
+      purrr::compose(na.omit, as.numeric, is.na, `!`, all, .dir = "forward"), as.numeric
+    ) %>%
     dplyr::mutate(across(where(is.character), ~ ifelse(is.na(.), "", .))) %>%
     dplyr::mutate(across(where(is.numeric), ~ ifelse(is.na(.), -Inf, .))) %>%
     dplyr::mutate(original = xs) %>%
@@ -380,34 +463,28 @@ natural_sort <- function(xs) {
 1. 左の列から辞書順に順番に並び替えて、元の文字列を取り出す
 
 ```{r call_natural_sort, cache=TRUE}
-versions <- c("v1.0", "v1.0.0", "v1.0.1", "v1.2.1", "v1.10", "v1.10.1", "v2", "v2.0", "v10.4")
-shuffled_versions <- sample(versions)
-sorted_versions <- natural_sort(versions)
+expected_versions <- c(
+  "v0.0.0.9000", "v1.0", "v1.0.0", "v1.0.1", "v1.2.1",
+  "v1.10", "v1.10.1", "v2", "v2.0", "v10.4"
+)
+shuffled_versions <- sample(expected_versions)
+sorted_versions <- natural_sort(expected_versions)
+shuffled_versions
 sorted_versions
 ```
 
 ```{r confirm_natural_sort, eval=TRUE, echo=FALSE, message=FALSE, cache=TRUE}
-invisible(assertthat::assert_that(identical(versions, sorted_versions)))
+invisible(assertthat::assert_that(identical(expected_versions, sorted_versions)))
 
 confirm_sorted <- function(expected, n_trial) {
   all(purrr::map_lgl(seq_len(n_trial), function(i) {
-    actual <- natural_sort(sample(expected))
-    identical(expected, actual)
+    actual_stringr <- stringr::str_sort(sample(expected), numeric = TRUE)
+    actual_impl <- natural_sort(sample(expected))
+    identical(expected, actual_impl) & identical(expected, actual_stringr)
   }))
 }
 
-invisible(assertthat::assert_that(
-  confirm_sorted(
-    expected = c("v1.0", "v1.2", "v1.10"), n_trial = 20
-  )
-))
-
-invisible(assertthat::assert_that(
-  confirm_sorted(
-    expected = c("v1.0", "v1.0.0", "v1.0.1", "v1.2.1", "v1.10", "v1.10.1", "v2", "v2.0"),
-    n_trial = 100
-  )
-))
+invisible(assertthat::assert_that(confirm_sorted(expected = expected_versions,  n_trial = 100)))
 ```
 
 ### お絵描き
