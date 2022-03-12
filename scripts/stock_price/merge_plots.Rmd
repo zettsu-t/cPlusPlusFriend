@@ -1,0 +1,134 @@
+---
+title: "複数の絵を統合する"
+author: "Zettsu Tatsuya"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    self_contained: true
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(assertthat)
+library(cowplot)
+library(e1071)
+library(ggfortify)
+library(glmnet)
+library(grid)
+library(gridExtra)
+library(patchwork)
+```
+
+`autoplot` で描いた複数の図を結合したいが、 `grid.arrange` で描くといきなり表示してしまうので、他の方法が必要という検証である。[こちら](https://sinhrks.hatenablog.com/entry/2015/12/04/010411)の内容を参考にしています。
+
+一般化線形回帰の人工データを3個作って回帰する。それぞれの回帰結果を `autoplot` で図にする。
+
+```{r make_and_fit, echo = FALSE}
+## n個の標本、p個の説明変数、k個の非ゼロ説明変数から、二値の結果を作る
+make_and_fit <- function(n, p, k, seed) {
+  set.seed(seed)
+  xs <- matrix(rnorm(n * p), ncol = p)
+  assertthat::assert_that(assertthat::are_equal(mean(xs), 0, tol = 6.0 / sqrt(n)))
+
+  coeffs <- exp(rnorm(p)) * (1:p %in% sample(1:p, k))
+  assertthat::assert_that(assertthat::are_equal(sum(!dplyr::near(abs(coeffs), 0)), k))
+
+  cs <- (xs %*% coeffs) + rexp(n, 10.0)
+  cs <- cs - mean(cs)
+  ys <- rbinom(n, 1, sigmoid(cs))
+  assertthat::assert_that(all(ys %in% c(0, 1)))
+
+  model <- cv.glmnet(xs, ys, family = "binomial")
+  list(xs = xs, cs = cs, ys = ys, model = model)
+}
+```
+
+```{r find_seed, eval = FALSE, echo = FALSE}
+## seedを探す
+find_seed <- function(n, p, k, n_trial) {
+  purrr::map(floor(runif(n_trial, 0, 999999999)), function(seed) {
+    result <- make_and_fit(n = n, p = p, k = k, seed = seed)
+    n_var <- result$model$index[1,1]
+    abs_diff <- abs(k - n_var)
+    df <- tibble(seed = seed, n_var = n_var, abs_diff = abs_diff)
+    if (abs_diff < 3) {
+      print(df)
+    }
+   df
+  }) %>%
+    dplyr::bind_rows() %>%
+    dplyr::arrange(abs_diff)
+}
+
+find_seed(n = 100, p = 500, k = 40, n_trial = 100)
+```
+
+```{r merge_and_draw_dist}
+merge_and_draw_dist <- function() {
+  purrr::map(c(415830565, 129765156, 176668253), function(seed) {
+    model <- make_and_fit(n = 100, p = 500, k = 40, seed = seed)$model
+    autoplot(model) + labs(title = paste("seed = ", seed))
+  })
+}
+
+model_plots <- merge_and_draw_dist()
+```
+
+それぞれの図は、 `[[1]]` で選んで描ける。
+
+```{r plot_each, fig.align = "center"}
+plot(model_plots[[1]])
+plot(model_plots[[2]])
+plot(model_plots[[3]])
+```
+
+`gridExtra::grid.arrange` で描くと、絵を描くだけでなくその場で表示してしまう。
+
+```{r draw_by_grid_arrange, out.width = "100%"}
+draw_by_grid_arrange <- function(gs) {
+  do.call(gridExtra::grid.arrange, c(gs, nrow = 1))
+}
+
+invisible(draw_by_grid_arrange(model_plots))
+```
+
+`gridExtra::arrangeGrob` で描くと絵が返るので、必要に応じてplotすればよい。
+
+```{r draw_by_arrange_grob}
+draw_by_arrange_grob <- function(gs) {
+  gridExtra::arrangeGrob(grobs = gs, ncol = NROW(gs), nrow = 1)
+}
+
+plots_arrange_grob <- draw_by_arrange_grob(model_plots)
+```
+
+```{r plot_arrange_grob, out.width = "100%"}
+plot(plots_arrange_grob)
+```
+
+[こちら](https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange)にある他のパッケージも同様に、絵を描くことと表示することは分かれている。
+
+```{r draw_by_cowplot_plot_grid}
+draw_by_cowplot_plot_grid <- function(gs) {
+  cowplot::plot_grid(plotlist = gs, nrow = 1)
+}
+
+plots_cowplot <- draw_by_cowplot_plot_grid(model_plots)
+```
+
+```{r plots_cowplot, out.width = "100%"}
+plot(plots_cowplot)
+```
+
+```{r draw_by_patchwork_wrap_plots}
+draw_by_patchwork_wrap_plots <- function(gs) {
+  patchwork::wrap_plots(gs)
+}
+
+plots_patchwork <- draw_by_patchwork_wrap_plots(model_plots)
+```
+
+```{r plots_patchwork, out.width = "100%"}
+plot(plots_patchwork)
+```
