@@ -4,7 +4,7 @@
 class Int {
     friend std::ostream& operator<<(std::ostream&, const Int&);
 public:
-    // The explicit keyword is required on either the ctor or the conversion constructor below.
+    // The explicit keyword is required on either the ctor or the conversion below.
     constexpr explicit Int(int x) : m_(x) {}
     constexpr Int operator +(const Int& r) const { return Int(m_ + r.m_); }
     constexpr operator int() const { return m_; }
