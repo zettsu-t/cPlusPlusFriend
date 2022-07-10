@@ -51,11 +51,10 @@ scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
   list(xs = xs, ys = ys, mat_count = mat_count)
 }
 
-create_image <- function(result, png_filename = NA) {
-  mat <- result$mat_count
+create_image <- function(mat, color_func, png_filename = NA) {
   mat_color <- array(0.0, c(NCOL(mat), NROW(mat), 3))
 
-  df_color <- tibble::tibble(color = viridis::magma(n = diff(range(mat)) + 1)) %>%
+  df_color <- tibble::tibble(color = color_func(n = diff(range(mat)) + 1)) %>%
     dplyr::mutate(color = stringr::str_replace_all(color, "#?(..)", "\\1_")) %>%
     tidyr::separate(col = "color", into = c("r", "g", "b", "a", "other"), sep = "_") %>%
     dplyr::mutate_all(function(x) {
@@ -78,4 +77,7 @@ create_image <- function(result, png_filename = NA) {
 }
 
 result <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, n_pixels = 1000)
-img <- create_image(result = result, png_filename = "juliaset.png")
+plot(create_image(mat = result$mat_count, color_func = viridis::magma, png_filename = "juliaset_r.png"))
+
+mat_rust <- as.matrix(read.table("rust/juliaset/rust_juliaset.csv",  header = FALSE, sep = ","))
+plot(create_image(mat_rust, color_func = viridis::mako, png_filename = "juliaset_rust.png"))
