@@ -2,8 +2,10 @@
 extern crate assert_float_eq;
 
 use csv::WriterBuilder;
-use ndarray_csv::Array2Writer;
+use ndarray::prelude::*;
+use ndarray_csv::{Array2Writer};
 use std::fs::File;
+use image::RgbImage;
 
 /// A count that represents how many times a point is transformed
 type Count = i32;
@@ -16,6 +18,9 @@ type Point = num::complex::Complex<Coordinate>;
 
 /// A set of coordinates
 type CoordinateSet = ndarray::Array1<Coordinate>;
+
+/// RGB colors at pixels in a screen
+type Bitmap = ndarray::Array3<u8>;
 
 /// All counts in a screen
 type CountSet = ndarray::Array2<Count>;
@@ -132,11 +137,49 @@ fn scan_points(
     converge_point_set(xs, ys, offset, max_iter, eps)
 }
 
+/// Draws a PNG image from an input screen
+///
+/// # Arguments
+///
+/// * `count_set` Counts of a Julia set in a screen
+/// * `png_filename` An output PNG filename
+fn draw_image(count_set: CountSet, png_filename: &str) {
+    type BitmapCoord = usize;
+
+    let (height, width) = count_set.dim();
+    let shape = [height, width, 3];
+    let mut bitmap = Bitmap::zeros(shape);
+    let max_count = *(count_set.iter().max().unwrap()) as BitmapCoord;
+
+    let gradient = colorous::CIVIDIS;
+    let color_map: Vec<colorous::Color> = (0..=(max_count))
+        .map(|i| gradient.eval_rational(i, max_count))
+        .collect();
+
+    let mut count_bitmap_r = count_set.mapv(|e| color_map[e as BitmapCoord].r);
+    let count_slice_r = count_bitmap_r.slice_mut(s![.., ..]);
+    bitmap.slice_mut(s![.., .., 0]).assign(&count_slice_r);
+
+    let mut count_bitmap_g = count_set.mapv(|e| color_map[e as BitmapCoord].g);
+    let count_slice_g = count_bitmap_g.slice_mut(s![.., ..]);
+    bitmap.slice_mut(s![.., .., 1]).assign(&count_slice_g);
+
+    let mut count_bitmap_b = count_set.mapv(|e| color_map[e as BitmapCoord].b);
+    let count_slice_b = count_bitmap_b.slice_mut(s![.., ..]);
+    bitmap.slice_mut(s![.., .., 2]).assign(&count_slice_b);
+
+    let raw = bitmap.into_raw_vec();
+    let image = RgbImage::from_raw(width as u32, height as u32, raw)
+        .expect("Creating an image failed");
+    image.save(png_filename).expect("Saving an image failed");
+}
+
 fn main() {
     let count_set = scan_points(0.382, 0.382, 75, 1024);
     let file = File::create("rust_juliaset.csv").expect("creating file failed");
     let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
     writer.serialize_array2(&count_set).expect("write failed");
+    draw_image(count_set, "rust_juliaset.png");
 }
 
 #[test]
