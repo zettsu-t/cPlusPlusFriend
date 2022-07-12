@@ -103,7 +103,7 @@ fn converge_point_set(
     mat_counts
 }
 
-/// Returns pixels on a axis in a screen
+/// Returns pixel coordinates on an axis in a screen
 ///
 /// # Arguments
 ///

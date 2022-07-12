@@ -2,10 +2,23 @@ library(tidyverse)
 library(raster)
 library(viridis)
 
-transform_point <- function(z, offset) {
-  z * z + offset
+#' Transform a point under the rule of Julia sets
+#'
+#' @param from An original point
+#' @param offset An offset to be added
+#' @return The transformed point under the rule of Julia sets
+transform_point <- function(from, offset) {
+  from * from + offset
 }
 
+#' Count how many times a point is transformed
+#'
+#' @param point_x The x coordinate of a point
+#' @param point_y The y coordinate of a point
+#' @param offset An offset to be added
+#' @param max_iter The maximum number of iterations
+#' @param eps Tolerance to check if transformations are converged
+#' @return How many times a point is transformed
 converge_point <- function(point_x, point_y, offset, max_iter, eps) {
   z <- complex(real = point_x, imaginary = point_y)
   count <- 0
@@ -27,7 +40,15 @@ converge_point <- function(point_x, point_y, offset, max_iter, eps) {
   count
 }
 
-converge_point_set <- function(offset, max_iter, eps, xs, ys) {
+#' Count how many times each point in a screen is transformed
+#'
+#' @param xs X coordinates of points in a screen
+#' @param ys Y coordinates of points in a screen
+#' @param offset An offset to be added
+#' @param max_iter The maximum number of iterations
+#' @param eps Tolerance to check if transformations are converged
+#' @return How many times each point in a screen is transformed
+converge_point_set <- function(xs, ys, offset, max_iter, eps) {
   mat_counts <- matrix(0, nrow = NROW(ys), ncol = NROW(xs))
   purrr::walk(seq_len(NROW(ys)), function(y_index) {
     purrr::walk(seq_len(NROW(xs)), function(x_index) {
@@ -41,34 +62,56 @@ converge_point_set <- function(offset, max_iter, eps, xs, ys) {
   mat_counts
 }
 
-scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
-  abs_length <- sqrt(2) + 0.1
-  xs <- seq(from = -abs_length, to = abs_length, length.out = n_pixels)
-  ys <- seq(from = -abs_length, to = abs_length, length.out = n_pixels)
-  offset <- complex(real = x_offset, imaginary = y_offset)
-  eps <- 1e-5
-  mat_count <- converge_point_set(offset = offset, max_iter = max_iter, eps = eps, xs = xs, ys = ys)
-  list(xs = xs, ys = ys, mat_count = mat_count)
+#' Calculate pixel coordinates on an axis in a screen
+#'
+#' @param half_length Maximum x and y coordinates relative to (0,0)
+#' @param n_pixels Numbers of pixels in X and Y axes
+#' @return Pixel coordinates on an axis in a screen
+map_coordinates <- function(half_length, n_pixels) {
+  seq(from = -half_length, to = half_length, length.out = n_pixels)
 }
 
-create_image <- function(mat, color_func, png_filename = NA) {
-  mat_color <- array(0.0, c(NCOL(mat), NROW(mat), 3))
+#' Scan how many times each point in a screen is transformed
+#'
+#' @param x_offset An x offset to be added
+#' @param y_offset A y offset to be added
+#' @param max_iter The maximum number of iterations
+#' @param n_pixels Numbers of pixels in X and Y axes
+#' @return How many times each point in a screen is transformed
+scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
+  half_length <- sqrt(2.0) + 0.1
+  xs <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
+  ys <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
+  offset <- complex(real = x_offset, imaginary = y_offset)
+  eps <- 1e-5
+  converge_point_set(xs = xs, ys = ys, offset = offset, max_iter = max_iter, eps = eps)
+}
 
-  df_color <- tibble::tibble(color = color_func(n = diff(range(mat)) + 1)) %>%
+#' Draw a PNG image from an input screen
+#'
+#' @param count_set Counts of a Julia set in a screen
+#' @param color_func A color function to fill pixels
+#' @param png_filename An output PNG filename
+#' @return A PNG image from an input screen
+draw_image <- function(count_set, color_func, png_filename = NA) {
+  shape <- c(NCOL(count_set), NROW(count_set))
+  mat_color <- array(0.0, c(shape, 3))
+
+  df_color <- tibble::tibble(color = color_func(n = diff(range(count_set)) + 1)) %>%
     dplyr::mutate(color = stringr::str_replace_all(color, "#?(..)", "\\1_")) %>%
     tidyr::separate(col = "color", into = c("r", "g", "b", "a", "other"), sep = "_") %>%
     dplyr::mutate_all(function(x) {
       strtoi(x, 16)
     })
 
-  mat_color[, , 1] <- array(df_color$r[mat + 1], c(NCOL(mat), NROW(mat)))
-  mat_color[, , 2] <- array(df_color$g[mat + 1], c(NCOL(mat), NROW(mat)))
-  mat_color[, , 3] <- array(df_color$b[mat + 1], c(NCOL(mat), NROW(mat)))
+  mat_color[, , 1] <- array(df_color$r[count_set + 1], shape)
+  mat_color[, , 2] <- array(df_color$g[count_set + 1], shape)
+  mat_color[, , 3] <- array(df_color$b[count_set + 1], shape)
   mat_color <- mat_color / 255.0
   img <- as.raster(mat_color)
 
   if (!is.na(png_filename)) {
-    png(png_filename, height = dim(mat)[1], width = dim(mat)[2])
+    png(png_filename, height = shape[1], width = shape[2])
     plot(img)
     dev.off()
   }
@@ -76,8 +119,17 @@ create_image <- function(mat, color_func, png_filename = NA) {
   img
 }
 
-result <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, n_pixels = 1000)
-plot(create_image(mat = result$mat_count, color_func = viridis::magma, png_filename = "juliaset_r.png"))
+count_set <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, n_pixels = 1000)
+plot(draw_image(
+  count_set = count_set, color_func = viridis::magma,
+  png_filename = "juliaset_r.png"
+))
 
-mat_rust <- as.matrix(read.table("rust/juliaset/rust_juliaset.csv",  header = FALSE, sep = ","))
-plot(create_image(mat_rust, color_func = viridis::mako, png_filename = "juliaset_rust.png"))
+pixel_filename <- "rust/juliaset/rust_juliaset.csv"
+if (file.exists(pixel_filename)) {
+  count_rust <- as.matrix(read.table(pixel_filename, header = FALSE, sep = ","))
+  plot(draw_image(
+    count_set = count_rust, color_func = viridis::mako,
+    png_filename = "juliaset_rust.png"
+  ))
+}
