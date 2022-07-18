@@ -144,7 +144,7 @@ fn scan_points(
         let mut mat_counts = CountSet::zeros([n_ys, xs.shape()[0]]);
         let mut children = vec![];
         let mut y_base: usize = 0;
-        let n_cpus = 1; // num_cpus::get();
+        let n_cpus = num_cpus::get();
         let x_view = xs.view();
         for ys_sub in ys.axis_chunks_iter(Axis(0), n_ys / n_cpus) {
             children.push(
@@ -179,8 +179,18 @@ fn scan_points(
 /// * `count_set` Counts of a Julia set in a screen
 /// * `png_filename` An output PNG filename
 fn draw_image(count_set: CountSet, png_filename: &str) {
-    type BitmapCoord = usize;
+    macro_rules! set_color {
+        (  $bitmap:expr, $count_set:expr, $color_map:expr, $rgb:tt, $index_t:ty ) => {
+            let count_bitmap =
+                ($count_set).mapv(|i| $color_map[<$index_t>::try_from(i).unwrap()].$rgb);
+            let count_slice = count_bitmap.slice(s![.., ..]);
+            $bitmap.assign(&count_slice);
+        };
+    }
 
+    println!("Drawing an image");
+
+    type BitmapCoord = usize;
     let (height, width) = count_set.dim();
     let shape = [height, width, 3];
     let mut bitmap = Bitmap::zeros(shape);
@@ -195,18 +205,54 @@ fn draw_image(count_set: CountSet, png_filename: &str) {
         .map(|i| gradient.eval_rational(i, max_count))
         .collect();
 
-    let mut count_bitmap_r = count_set.mapv(|i| color_map[BitmapCoord::try_from(i).unwrap()].r);
-    let count_slice_r = count_bitmap_r.slice_mut(s![.., ..]);
-    bitmap.slice_mut(s![.., .., 0]).assign(&count_slice_r);
+    crossbeam::scope(|scope| {
+        let mut children = vec![];
 
-    let mut count_bitmap_g = count_set.mapv(|i| color_map[BitmapCoord::try_from(i).unwrap()].g);
-    let count_slice_g = count_bitmap_g.slice_mut(s![.., ..]);
-    bitmap.slice_mut(s![.., .., 1]).assign(&count_slice_g);
+        for (index, mut bitmap_slice) in bitmap.axis_iter_mut(Axis(2)).enumerate() {
+            let count_set_view = count_set.view();
+            let color_map_view = &color_map[..];
+            if index == 0 {
+                children.push(scope.spawn(move |_| {
+                    set_color!(
+                        bitmap_slice,
+                        &count_set_view,
+                        color_map_view,
+                        r,
+                        BitmapCoord
+                    );
+                }));
+            } else if index == 1 {
+                children.push(scope.spawn(move |_| {
+                    set_color!(
+                        bitmap_slice,
+                        &count_set_view,
+                        color_map_view,
+                        g,
+                        BitmapCoord
+                    );
+                }));
+            } else if index == 2 {
+                children.push(scope.spawn(move |_| {
+                    set_color!(
+                        bitmap_slice,
+                        &count_set_view,
+                        color_map_view,
+                        b,
+                        BitmapCoord
+                    );
+                }));
+            } else {
+                panic!("Unknown color index")
+            }
+        }
 
-    let mut count_bitmap_b = count_set.mapv(|i| color_map[BitmapCoord::try_from(i).unwrap()].b);
-    let count_slice_b = count_bitmap_b.slice_mut(s![.., ..]);
-    bitmap.slice_mut(s![.., .., 2]).assign(&count_slice_b);
+        for child in children {
+            child.join().unwrap();
+        }
+    })
+    .unwrap();
 
+    println!("Writing a PNG image");
     let raw = bitmap.into_raw_vec();
     let image = RgbImage::from_raw(
         u32::try_from(width).unwrap(),
@@ -223,6 +269,7 @@ fn main() {
         Some(arg) => arg.parse::<PixelSize>().unwrap(),
         None => 1024,
     };
+    println!("Scanning points");
     let count_set = scan_points(0.382, 0.382, 75, n_pixels);
 
     let file = File::create("rust_juliaset.csv").expect("creating file failed");
