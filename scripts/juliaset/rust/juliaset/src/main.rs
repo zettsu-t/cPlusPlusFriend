@@ -1,11 +1,13 @@
 #[cfg_attr(test, macro_use)]
 extern crate assert_float_eq;
+extern crate crossbeam;
 
 use csv::WriterBuilder;
 use image::RgbImage;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
 use std::convert::TryFrom;
+use std::env;
 use std::fs::File;
 
 /// A count that represents how many times a point is transformed
@@ -14,11 +16,15 @@ type Count = i32;
 /// A coordinate in screens
 type Coordinate = f32;
 
-/// A coordinate set in screens
+/// A number of pixels
+type PixelSize = isize;
+
+/// A point as two coordinates in screens
 type Point = num::complex::Complex<Coordinate>;
 
-/// A set of coordinates
+/// A set of coordinates and its view
 type CoordinateSet = ndarray::Array1<Coordinate>;
+type CoordinateSetView<'a> = ndarray::ArrayView1<'a, Coordinate>;
 
 /// RGB colors at pixels in a screen
 type Bitmap = ndarray::Array3<u8>;
@@ -42,13 +48,13 @@ fn transform_point(from: Point, offset: Point) -> Point {
 ///
 /// * `point_x` The x coordinate of a point
 /// * `point_y` The y coordinate of a point
-/// * `offset` An offset to be added
+/// * `point_offset` An offset to be added to points
 /// * `max_iter` The maximum number of iterations
 /// * `eps` Tolerance to check if transformations are converged
 fn converge_point(
     point_x: Coordinate,
     point_y: Coordinate,
-    offset: Point,
+    point_offset: Point,
     max_iter: Count,
     eps: Coordinate,
 ) -> Count {
@@ -57,7 +63,7 @@ fn converge_point(
     let mut previous_modulus: Coordinate = 10.0;
 
     for _ in 0..max_iter {
-        z = transform_point(z, offset);
+        z = transform_point(z, point_offset);
         let z_modulus = z.norm_sqr();
         if z_modulus > 4.0 {
             break;
@@ -76,27 +82,24 @@ fn converge_point(
 ///
 /// # Arguments
 ///
-/// * `xs` X coordinates of points in a screen
-/// * `ys` Y coordinates of points in a screen
-/// * `offset` An offset to be added
+/// * `xs` A X-coordinates view of points in a screen
+/// * `ys` A Y-coordinates view of points in a screen
+/// * `point_offset` An offset to be added to points
 /// * `max_iter` The maximum number of iterations
 /// * `eps` Tolerance to check if transformations are converged
 fn converge_point_set(
-    xs: CoordinateSet,
-    ys: CoordinateSet,
-    offset: Point,
+    xs: CoordinateSetView,
+    ys: CoordinateSetView,
+    point_offset: Point,
     max_iter: Count,
     eps: Coordinate,
 ) -> CountSet {
-    let x_elements = xs.shape()[0];
-    let y_elements = ys.shape()[0];
-    let shape = [y_elements, x_elements];
-    let mut mat_counts = CountSet::zeros(shape);
+    let mut mat_counts = CountSet::zeros([ys.shape()[0], xs.shape()[0]]);
 
     for (y_index, point_y) in ys.iter().enumerate() {
         for (x_index, point_x) in xs.iter().enumerate() {
             mat_counts[[y_index, x_index]] =
-                converge_point(*point_x, *point_y, offset, max_iter, eps);
+                converge_point(*point_x, *point_y, point_offset, max_iter, eps);
         }
     }
 
@@ -109,7 +112,7 @@ fn converge_point_set(
 ///
 /// * `half_length` Maximum x and y coordinates relative to (0,0)
 /// * `n_pixels` Numbers of pixels in X and Y axes
-fn map_coordinates(half_length: Coordinate, n_pixels: isize) -> CoordinateSet {
+fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSet {
     let n = n_pixels as Coordinate;
     (0..n_pixels)
         .map(|i| ((i as Coordinate) * 2.0 * half_length / n) - half_length)
@@ -128,14 +131,45 @@ fn scan_points(
     x_offset: Coordinate,
     y_offset: Coordinate,
     max_iter: Count,
-    n_pixels: isize,
+    n_pixels: PixelSize,
 ) -> CountSet {
     let half_length = (2.0 as Coordinate).sqrt() + 0.1;
     let xs = map_coordinates(half_length, n_pixels);
     let ys = map_coordinates(half_length, n_pixels);
-    let offset = Point::new(x_offset, y_offset);
+    let point_offset = Point::new(x_offset, y_offset);
     let eps = 1e-5;
-    converge_point_set(xs, ys, offset, max_iter, eps)
+
+    let n_ys = ys.shape()[0];
+    crossbeam::scope(|scope| {
+        let mut mat_counts = CountSet::zeros([n_ys, xs.shape()[0]]);
+        let mut children = vec![];
+        let mut y_base: usize = 0;
+        let n_cpus = 1; // num_cpus::get();
+        let x_view = xs.view();
+        for ys_sub in ys.axis_chunks_iter(Axis(0), n_ys / n_cpus) {
+            children.push(
+                scope.spawn(move |_| {
+                    converge_point_set(x_view, ys_sub, point_offset, max_iter, eps)
+                }),
+            );
+            y_base += ys_sub.len();
+        }
+        assert!(y_base == n_ys);
+
+        let mut y_total: usize = 0;
+        for child in children {
+            let sub_counts = child.join().unwrap();
+            let height = sub_counts.shape()[0];
+            mat_counts
+                .slice_mut(s![y_total..(y_total + height), ..])
+                .assign(&sub_counts);
+            y_total += height;
+        }
+        assert!(y_total == n_ys);
+
+        mat_counts
+    })
+    .unwrap()
 }
 
 /// Draws a PNG image from an input screen
@@ -183,8 +217,14 @@ fn draw_image(count_set: CountSet, png_filename: &str) {
     image.save(png_filename).expect("Saving an image failed");
 }
 
+// Takes the first command line argument as a pixel size if available
 fn main() {
-    let count_set = scan_points(0.382, 0.382, 75, 1024);
+    let n_pixels = match env::args().nth(1) {
+        Some(arg) => arg.parse::<PixelSize>().unwrap(),
+        None => 1024,
+    };
+    let count_set = scan_points(0.382, 0.382, 75, n_pixels);
+
     let file = File::create("rust_juliaset.csv").expect("creating file failed");
     let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
     writer.serialize_array2(&count_set).expect("write failed");
