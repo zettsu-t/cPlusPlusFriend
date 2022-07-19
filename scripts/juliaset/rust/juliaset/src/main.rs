@@ -1,6 +1,7 @@
 #[cfg_attr(test, macro_use)]
 extern crate assert_float_eq;
 extern crate crossbeam;
+extern crate getopts;
 
 use csv::WriterBuilder;
 use image::RgbImage;
@@ -265,17 +266,36 @@ fn draw_image(count_set: CountSet, png_filename: &str) {
 
 // Takes the first command line argument as a pixel size if available
 fn main() {
-    let n_pixels = match env::args().nth(1) {
-        Some(arg) => arg.parse::<PixelSize>().unwrap(),
+    let args: Vec<String> = env::args().collect();
+    let mut opts = getopts::Options::new();
+    opts.optopt("s", "size", "# of pixels in the output image", "Pixel size")
+        .optopt("c", "csv", "set output CSV filename", "CSV filename")
+        .optopt("o", "image", "set output PNG filename", "PNG filename");
+    let matches = opts.parse(&args[1..]).unwrap();
+
+    let n_pixels = match matches.opt_str("s") {
+        Some(s) => s.parse::<PixelSize>().unwrap(),
         None => 1024,
     };
+
     println!("Scanning points");
     let count_set = scan_points(0.382, 0.382, 75, n_pixels);
 
-    let file = File::create("rust_juliaset.csv").expect("creating file failed");
-    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-    writer.serialize_array2(&count_set).expect("write failed");
-    draw_image(count_set, "rust_juliaset.png");
+    match matches.opt_str("c") {
+        Some(csv_filename) => {
+            println!("Writing a CSV file");
+            let file = File::create(csv_filename).expect("creating file failed");
+            let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+            writer.serialize_array2(&count_set).expect("write failed");
+        }
+        None => (),
+    };
+
+    let png_filename = match matches.opt_str("o") {
+        Some(s) => s,
+        None => "rust_juliaset.png".to_string(),
+    };
+    draw_image(count_set, &png_filename);
 }
 
 #[test]
