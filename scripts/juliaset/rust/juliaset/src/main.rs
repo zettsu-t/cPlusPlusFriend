@@ -3,13 +3,16 @@ extern crate assert_float_eq;
 extern crate crossbeam;
 extern crate getopts;
 
+use assert_cmd::prelude::*;
 use csv::WriterBuilder;
 use image::RgbImage;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
+use predicates::prelude::*;
 use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
+use std::process::Command;
 
 /// A count that represents how many times a point is transformed
 type Count = i32;
@@ -284,9 +287,11 @@ fn main() {
     match matches.opt_str("c") {
         Some(csv_filename) => {
             println!("Writing a CSV file");
-            let file = File::create(csv_filename).expect("creating file failed");
+            let file = File::create(csv_filename).expect("Creating a CSV file failed");
             let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-            writer.serialize_array2(&count_set).expect("write failed");
+            writer
+                .serialize_array2(&count_set)
+                .expect("Writing a CSV file failed");
         }
         None => (),
     };
@@ -306,4 +311,31 @@ fn test_transform_point() {
     let expected = Point::new(-9.0, 21.0);
     assert_float_eq::assert_float_absolute_eq!(actual.re, expected.re, Coordinate::EPSILON);
     assert_float_eq::assert_float_absolute_eq!(actual.im, expected.im, Coordinate::EPSILON);
+}
+
+#[test]
+fn test_invalid_arguments() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd_size = Command::cargo_bin("juliaset")?;
+    cmd_size.arg("-s").arg("0x100").assert().failure();
+
+    let mut cmd_csv = Command::cargo_bin("juliaset")?;
+    cmd_csv
+        .arg("-s")
+        .arg("4")
+        .arg("-c")
+        .arg("")
+        .assert()
+        .failure();
+
+    let mut cmd_image = Command::cargo_bin("juliaset")?;
+    cmd_image
+        .arg("-s")
+        .arg("4")
+        .arg("-o")
+        .arg("foo.txt")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Saving an image failed"));
+
+    Ok(())
 }
