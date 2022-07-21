@@ -6,6 +6,7 @@ extern crate getopts;
 use assert_cmd::prelude::*;
 use csv::WriterBuilder;
 use image::RgbImage;
+use image::io::Reader as ImageReader;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
 use predicates::prelude::*;
@@ -13,6 +14,7 @@ use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
 use std::process::Command;
+use tempfile::Builder;
 
 /// A count that represents how many times a point is transformed
 type Count = i32;
@@ -336,6 +338,31 @@ fn test_invalid_arguments() -> Result<(), Box<dyn std::error::Error>> {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Saving an image failed"));
+
+    let temp_dir = Builder::new()
+        .prefix("test-dir")
+        .rand_bytes(10)
+        .tempdir()?;
+
+    let temp_png_filename = temp_dir.path().join("_test_.png");
+    let png_filename = temp_png_filename
+        .to_str()
+        .unwrap();
+
+    let mut cmd_success = Command::cargo_bin("juliaset")?;
+    let pixel_size: u32 = 16;
+    let pixel_size_str = format!("{}", pixel_size);
+    cmd_success
+        .arg("-s")
+        .arg(pixel_size_str)
+        .arg("-o")
+        .arg(png_filename)
+        .assert()
+        .success();
+
+    let actual_image = ImageReader::open(png_filename)?.decode()?;
+    assert_eq!(actual_image.width(), pixel_size);
+    assert_eq!(actual_image.height(), pixel_size);
 
     Ok(())
 }
