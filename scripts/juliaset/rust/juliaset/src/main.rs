@@ -1,20 +1,27 @@
 #[cfg_attr(test, macro_use)]
 extern crate assert_float_eq;
+
+#[cfg(test)]
+use assert_cmd::prelude::*;
+#[cfg(test)]
+use image::io::Reader as ImageReader;
+#[cfg(test)]
+use predicates::prelude::*;
+#[cfg(test)]
+use std::process::Command;
+#[cfg(test)]
+use tempfile::Builder;
+
 extern crate crossbeam;
 extern crate getopts;
 
-use assert_cmd::prelude::*;
 use csv::WriterBuilder;
 use image::RgbImage;
-use image::io::Reader as ImageReader;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
-use predicates::prelude::*;
 use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
-use std::process::Command;
-use tempfile::Builder;
 
 /// A count that represents how many times a point is transformed
 type Count = i32;
@@ -339,15 +346,10 @@ fn test_invalid_arguments() -> Result<(), Box<dyn std::error::Error>> {
         .failure()
         .stderr(predicate::str::contains("Saving an image failed"));
 
-    let temp_dir = Builder::new()
-        .prefix("test-dir")
-        .rand_bytes(10)
-        .tempdir()?;
+    let temp_dir = Builder::new().prefix("test-dir").rand_bytes(10).tempdir()?;
 
     let temp_png_filename = temp_dir.path().join("_test_.png");
-    let png_filename = temp_png_filename
-        .to_str()
-        .unwrap();
+    let png_filename = temp_png_filename.to_str().unwrap();
 
     let mut cmd_success = Command::cargo_bin("juliaset")?;
     let pixel_size: u32 = 16;
