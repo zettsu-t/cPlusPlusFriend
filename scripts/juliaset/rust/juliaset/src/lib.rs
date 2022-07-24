@@ -13,10 +13,10 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 /// A count that represents how many times a point is transformed
-type Count = i32;
+pub type Count = i32;
 
 /// A coordinate in screens
-type Coordinate = f32;
+pub type Coordinate = f32;
 
 /// A number of pixels
 pub type PixelSize = isize;
@@ -37,6 +37,12 @@ type CountSet = ndarray::Array2<Count>;
 #[derive(Debug, PartialEq)]
 /// A parameter set to draw
 pub struct ParamSet {
+    /// An x offset that is added in iterations
+    x_offset: Coordinate,
+    /// A y offset that is added in iterations
+    y_offset: Coordinate,
+    /// The maximum number of iterations
+    max_iter: Count,
     /// The width and height in pixels of an output image
     n_pixels: PixelSize,
     /// A path to save counts as a table
@@ -50,10 +56,16 @@ impl ParamSet {
     ///
     /// # Arguments
     ///
+    /// * `x_offset` An x offset that is added in iterations
+    /// * `y_offset` A y offset that is added in iterations
+    /// * `max_iter` The maximum number of iterations
     /// * `n_pixels` The width and height in pixels of an output image
     /// * `csv_filename` A path to save counts as a table
     /// * `image_filename` A path to save counts as an image
     pub fn new(
+        x_offset: Coordinate,
+        y_offset: Coordinate,
+        max_iter: Count,
         n_pixels: PixelSize,
         csv_filename: &Option<String>,
         image_filename: &Option<String>,
@@ -61,6 +73,9 @@ impl ParamSet {
         let csv_filepath = csv_filename.as_ref().map(PathBuf::from);
         let image_filepath = image_filename.as_ref().map(PathBuf::from);
         Self {
+            x_offset,
+            y_offset,
+            max_iter,
             n_pixels,
             csv_filepath,
             image_filepath,
@@ -159,8 +174,8 @@ fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSe
 ///
 /// # Arguments
 ///
-/// * `x_offset` An x offset to be added
-/// * `y_offset` A y offset to be added
+/// * `x_offset` An x offset that is added in iterations
+/// * `y_offset` A y offset that is added in iterations
 /// * `max_iter` The maximum number of iterations
 /// * `n_pixels` Numbers of pixels in X and Y axes
 fn scan_points(
@@ -296,10 +311,19 @@ fn draw_image(count_set: CountSet, image_filepath: &Path) {
     image.save(image_filepath).expect("Saving an image failed");
 }
 
-// Takes the first command line argument as a pixel size if available
+/// Draws a Julia set
+///
+/// # Arguments
+///
+/// * `params` A parameter set to draw
 pub fn draw(params: &ParamSet) {
     println!("Scanning points");
-    let count_set = scan_points(0.382, 0.382, 75, params.n_pixels);
+    let count_set = scan_points(
+        params.x_offset,
+        params.y_offset,
+        params.max_iter,
+        params.n_pixels,
+    );
 
     match &params.csv_filepath {
         Some(csv_filepath) => {
@@ -323,26 +347,54 @@ pub fn draw(params: &ParamSet) {
 
 #[test]
 fn test_full_param_set() {
+    let x_offset: Coordinate = 0.5;
+    let y_offset: Coordinate = 0.125;
+    let max_iter: Count = 20;
     let n_pixels: PixelSize = 16;
     let csv_filename = Some("input.csv".to_string());
     let image_filename = Some("input.png".to_string());
     let csv_path = Some(PathBuf::from("input.csv".to_string()));
     let image_path = Some(PathBuf::from("input.png".to_string()));
-    let fullset = ParamSet::new(n_pixels, &csv_filename, &image_filename);
-    assert_eq!(fullset.n_pixels, n_pixels);
-    assert_eq!(fullset.csv_filepath, csv_path);
-    assert_eq!(fullset.image_filepath, image_path);
+
+    let actual = ParamSet::new(
+        x_offset,
+        y_offset,
+        max_iter,
+        n_pixels,
+        &csv_filename,
+        &image_filename,
+    );
+    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
+    assert_eq!(actual.max_iter, max_iter);
+    assert_eq!(actual.n_pixels, n_pixels);
+    assert_eq!(actual.csv_filepath, csv_path);
+    assert_eq!(actual.image_filepath, image_path);
 }
 
 #[test]
 fn test_partial_param_set() {
+    let x_offset: Coordinate = 0.25;
+    let y_offset: Coordinate = 0.375;
+    let max_iter: Count = 10;
     let n_pixels: PixelSize = 32;
     let csv_filename = None;
     let image_filename = None;
-    let fullset = ParamSet::new(n_pixels, &csv_filename, &image_filename);
-    assert_eq!(fullset.n_pixels, n_pixels);
-    assert!(fullset.csv_filepath.is_none());
-    assert!(fullset.image_filepath.is_none());
+
+    let actual = ParamSet::new(
+        x_offset,
+        y_offset,
+        max_iter,
+        n_pixels,
+        &csv_filename,
+        &image_filename,
+    );
+    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
+    assert_eq!(actual.max_iter, max_iter);
+    assert_eq!(actual.n_pixels, n_pixels);
+    assert!(actual.csv_filepath.is_none());
+    assert!(actual.image_filepath.is_none());
 }
 
 #[test]

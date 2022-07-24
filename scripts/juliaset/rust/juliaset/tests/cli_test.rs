@@ -3,6 +3,8 @@ extern crate juliaset;
 #[cfg(test)]
 use assert_cmd::prelude::*;
 #[cfg(test)]
+use csv::ReaderBuilder;
+#[cfg(test)]
 use image::io::Reader as ImageReader;
 #[cfg(test)]
 use predicates::prelude::*;
@@ -58,6 +60,44 @@ fn test_correct_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
     let actual_image = ImageReader::open(png_filename)?.decode()?;
     assert_eq!(actual_image.width(), pixel_size);
     assert_eq!(actual_image.height(), pixel_size);
+
+    Ok(())
+}
+
+#[test]
+fn test_correct_xy_arguments() -> Result<(), Box<dyn std::error::Error>> {
+    let temp_dir = Builder::new().prefix("test-dir").rand_bytes(10).tempdir()?;
+    let temp_csv_filename = temp_dir.path().join("_test_.csv");
+    let csv_filename = temp_csv_filename.to_str().unwrap();
+
+    let mut cmd_success = Command::cargo_bin("juliaset")?;
+    let pixel_size: u32 = 8;
+    let pixel_size_str = format!("{}", pixel_size);
+    cmd_success
+        .arg("-x")
+        .arg("0.5")
+        .arg("-y")
+        .arg("0.125")
+        .arg("-m")
+        .arg("20")
+        .arg("-s")
+        .arg(pixel_size_str)
+        .arg("-c")
+        .arg(csv_filename)
+        .assert()
+        .success();
+
+    let mut reader = ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(csv_filename)?;
+    let mut n_columns: usize = 0;
+
+    for (i, row) in reader.records().enumerate() {
+        assert_eq!(row.unwrap().len(), pixel_size as usize);
+        // 1-based indexing
+        n_columns = i + 1;
+    }
+    assert_eq!(n_columns, pixel_size as usize);
 
     Ok(())
 }
