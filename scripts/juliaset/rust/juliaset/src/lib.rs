@@ -406,3 +406,35 @@ fn test_transform_point() {
     assert_float_eq::assert_float_absolute_eq!(actual.re, expected.re, Coordinate::EPSILON);
     assert_float_eq::assert_float_absolute_eq!(actual.im, expected.im, Coordinate::EPSILON);
 }
+
+#[test]
+fn test_converge_point() {
+    let zero = Point::new(0.0, 0.0);
+    let eps: Coordinate = Coordinate::EPSILON;
+    let actual = converge_point(23.0, 0.0, zero, 100, eps);
+    assert_eq!(actual, 0 as Count);
+
+    let actual = converge_point(1.0 + 1e-7, 0.0, zero, 100, eps);
+    assert_eq!(actual, 22 as Count);
+
+    let actual = converge_point(0.0, 1.0 + 1e-7, zero, 11, eps);
+    assert_eq!(actual, 11 as Count);
+
+    let offset_a = Point::new(0.5, 0.375);
+    let actual = converge_point(0.0, 0.0, offset_a, 100, eps);
+    assert_eq!(actual, 4 as Count);
+
+    let offset_b = Point::new(0.375, 0.5);
+    let actual = converge_point(0.0, 0.0, offset_b, 100, eps);
+    assert_eq!(actual, 8 as Count);
+
+    let actual = converge_point(0.5, 0.375, offset_b, 100, eps);
+    assert_eq!(actual, 3 as Count);
+
+    let actual = converge_point(0.375, 0.5, offset_a, 100, eps);
+    assert_eq!(actual, 7 as Count);
+
+    let offset_c = Point::new(0.375, 0.375);
+    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.1);
+    assert_eq!(actual, 9 as Count);
+}
