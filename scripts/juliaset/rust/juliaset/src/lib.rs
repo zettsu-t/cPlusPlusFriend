@@ -4,13 +4,20 @@ extern crate assert_float_eq;
 extern crate crossbeam;
 extern crate getopts;
 
+#[cfg(test)]
+use csv::ReaderBuilder;
+#[cfg(test)]
+use image::io::Reader as ImageReader;
+#[cfg(test)]
+use tempfile::Builder;
+
 use csv::WriterBuilder;
 use image::RgbImage;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
 use std::convert::TryFrom;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// A count that represents how many times a point is transformed
 pub type Count = i32;
@@ -33,6 +40,21 @@ type Bitmap = ndarray::Array3<u8>;
 
 /// All counts in a screen
 type CountSet = ndarray::Array2<Count>;
+
+#[cfg(test)]
+type ColorElement = u8;
+#[cfg(test)]
+const LOW_COLOR_R: ColorElement = 0;
+#[cfg(test)]
+const LOW_COLOR_G: ColorElement = 32;
+#[cfg(test)]
+const LOW_COLOR_B: ColorElement = 81;
+#[cfg(test)]
+const HIGH_COLOR_R: ColorElement = 253;
+#[cfg(test)]
+const HIGH_COLOR_G: ColorElement = 233;
+#[cfg(test)]
+const HIGH_COLOR_B: ColorElement = 69;
 
 #[derive(Debug, PartialEq)]
 /// A parameter set to draw
@@ -234,8 +256,7 @@ fn scan_points(
 /// # Arguments
 ///
 /// * `count_set` Counts of a Julia set in a screen
-/// * `image_filepath` An output PNG filename
-fn draw_image(count_set: CountSet, image_filepath: &Path) {
+fn draw_image(count_set: CountSet) -> RgbImage {
     macro_rules! set_color {
         (  $bitmap:expr, $count_set:expr, $color_map:expr, $rgb:tt, $index_t:ty ) => {
             let count_bitmap =
@@ -253,10 +274,9 @@ fn draw_image(count_set: CountSet, image_filepath: &Path) {
     let mut bitmap = Bitmap::zeros(shape);
     let max_count_raw = *(count_set.iter().max().unwrap_or(&0));
     let max_count = BitmapCoord::try_from(max_count_raw).unwrap();
-
     let gradient = colorous::CIVIDIS;
-    let color_map: Vec<colorous::Color> = (0..=(max_count))
-        .map(|i| gradient.eval_rational(i, max_count))
+    let color_map: Vec<colorous::Color> = (0..=max_count)
+        .map(|i| gradient.eval_rational(i, max_count + 1))
         .collect();
 
     crossbeam::scope(|scope| {
@@ -308,13 +328,12 @@ fn draw_image(count_set: CountSet, image_filepath: &Path) {
 
     println!("Writing an image");
     let raw = bitmap.into_raw_vec();
-    let image = RgbImage::from_raw(
+    RgbImage::from_raw(
         u32::try_from(width).unwrap(),
         u32::try_from(height).unwrap(),
         raw,
     )
-    .expect("Creating an image failed");
-    image.save(image_filepath).expect("Saving an image failed");
+    .expect("Creating an image failed")
 }
 
 /// Draws a Julia set
@@ -345,7 +364,8 @@ pub fn draw(params: &ParamSet) {
 
     match &params.image_filepath {
         Some(image_filepath) => {
-            draw_image(count_set, image_filepath);
+            let image = draw_image(count_set);
+            image.save(image_filepath).expect("Saving an image failed");
         }
         None => (),
     };
@@ -495,4 +515,119 @@ fn test_map_scan_points() {
     let actual = scan_points(0.25, 0.75, 100, 4) ;
     let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_draw_image_mono_color() {
+    let count_set: CountSet = arr2(&[[1, 1, 1], [1, 1, 1]]);
+    let shape = &count_set.shape();
+    let width = u32::try_from(shape[1]).unwrap();
+    let height = u32::try_from(shape[0]).unwrap();
+    let image = draw_image(count_set);
+
+    for y in 0..height {
+        for x in 0..width {
+            let color = image.get_pixel(x, y);
+            assert_eq!(color[0], HIGH_COLOR_R);
+            assert_eq!(color[1], HIGH_COLOR_G);
+            assert_eq!(color[2], HIGH_COLOR_B);
+        }
+    }
+}
+
+#[test]
+fn test_draw_image_two_colors() {
+    let count_set: CountSet = arr2(&[[0, 0, 0], [1, 0, 0]]);
+    let shape = &count_set.shape();
+    let width = u32::try_from(shape[1]).unwrap();
+    let height = u32::try_from(shape[0]).unwrap();
+    let image = draw_image(count_set);
+
+    for y in 0..height {
+        for x in 0..width {
+            let color = image.get_pixel(x, y);
+            if (x == 0) && (y == 1) {
+                assert_eq!(color[0], HIGH_COLOR_R);
+                assert_eq!(color[1], HIGH_COLOR_G);
+                assert_eq!(color[2], HIGH_COLOR_B);
+            } else {
+                assert_eq!(color[0], LOW_COLOR_R);
+                assert_eq!(color[1], LOW_COLOR_G);
+                assert_eq!(color[2], LOW_COLOR_B);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_draw_image_many_colors() {
+    let count_set: CountSet = arr2(&[[0, 4, 8], [16, 32, 64]]);
+    let shape = &count_set.shape();
+    let width = u32::try_from(shape[1]).unwrap();
+    let height = u32::try_from(shape[0]).unwrap();
+    let image = draw_image(count_set);
+
+    let mut prev = 0;
+    for y in 0..height {
+        for x in 0..width {
+            let current = image.get_pixel(x, y)[0];
+            if (x == 0) && (y == 0) {
+                assert_eq!(current, 0);
+            } else {
+                assert!(current > prev);
+            }
+            prev = current;
+        }
+    }
+}
+
+#[test]
+pub fn test_draw() {
+    let temp_dir = Builder::new().prefix("test-dir").rand_bytes(10).tempdir().unwrap();
+    let temp_csv_filename = temp_dir.path().join("_test_.csv");
+    let temp_png_filename = temp_dir.path().join("_test_.png");
+    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
+    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+
+    let x_offset: Coordinate = 0.5;
+    let y_offset: Coordinate = 0.125;
+    let max_iter: Count = 20;
+    let n_pixels: PixelSize = 16;
+    let params = ParamSet::new(
+        x_offset,
+        y_offset,
+        max_iter,
+        n_pixels,
+        &csv_filename,
+        &image_filename,
+    );
+    draw(&params);
+
+    let csv_path = Some(PathBuf::from(csv_filename.unwrap()));
+    let image_path = Some(PathBuf::from(image_filename.unwrap()));
+    let pixel_size = u32::try_from(n_pixels).unwrap();
+
+    let mut reader = ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(csv_path.unwrap()).unwrap();
+    let mut n_columns: usize = 0;
+
+    for (i, row) in reader.records().enumerate() {
+        assert_eq!(row.as_ref().unwrap().len(), pixel_size as usize);
+        if i == 0 {
+            let cell = &row.as_ref().unwrap()[0];
+            assert_eq!(cell, "0");
+        }
+        // 1-based indexing
+        n_columns = i + 1;
+    }
+    assert_eq!(n_columns, pixel_size as usize);
+
+    let image = ImageReader::open(image_path.unwrap()).unwrap().decode().unwrap().to_rgb8();
+    assert_eq!(image.width(), pixel_size);
+    assert_eq!(image.height(), pixel_size);
+    let color = image.get_pixel(0, 0);
+    assert_eq!(color[0], LOW_COLOR_R);
+    assert_eq!(color[1], LOW_COLOR_G);
+    assert_eq!(color[2], LOW_COLOR_B);
 }
