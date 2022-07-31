@@ -186,15 +186,15 @@ fn converge_point_set(
 /// * `half_length` Maximum x and y coordinates relative to (0,0)
 /// * `n_pixels` Numbers of pixels in X and Y axes
 fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSet {
-    if n_pixels < 1 {
-        CoordinateSet::zeros([0])
-    } else if n_pixels == 1 {
-        CoordinateSet::zeros([1])
-    } else {
-        let n = n_pixels as Coordinate;
-        (0..n_pixels)
-            .map(|i| ((i as Coordinate) * 2.0 * half_length / (n - 1.0)) - half_length)
-            .collect()
+    match n_pixels {
+        1 => CoordinateSet::zeros([1]),
+        n if n < 1 => CoordinateSet::zeros([0]),
+        _ => {
+            let n = n_pixels as Coordinate;
+            (0..n_pixels)
+                .map(|i| ((i as Coordinate) * 2.0 * half_length / (n - 1.0)) - half_length)
+                .collect()
+        }
     }
 }
 
@@ -285,38 +285,41 @@ fn draw_image(count_set: CountSet) -> RgbImage {
         for (index, mut bitmap_slice) in bitmap.axis_iter_mut(Axis(2)).enumerate() {
             let count_set_view = count_set.view();
             let color_map_view = &color_map[..];
-            if index == 0 {
-                children.push(scope.spawn(move |_| {
-                    set_color!(
-                        bitmap_slice,
-                        &count_set_view,
-                        color_map_view,
-                        r,
-                        BitmapCoord
-                    );
-                }));
-            } else if index == 1 {
-                children.push(scope.spawn(move |_| {
-                    set_color!(
-                        bitmap_slice,
-                        &count_set_view,
-                        color_map_view,
-                        g,
-                        BitmapCoord
-                    );
-                }));
-            } else if index == 2 {
-                children.push(scope.spawn(move |_| {
-                    set_color!(
-                        bitmap_slice,
-                        &count_set_view,
-                        color_map_view,
-                        b,
-                        BitmapCoord
-                    );
-                }));
-            } else {
-                panic!("Unknown color index")
+            match index {
+                0 => {
+                    children.push(scope.spawn(move |_| {
+                        set_color!(
+                            bitmap_slice,
+                            &count_set_view,
+                            color_map_view,
+                            r,
+                            BitmapCoord
+                        );
+                    }));
+                }
+                1 => {
+                    children.push(scope.spawn(move |_| {
+                        set_color!(
+                            bitmap_slice,
+                            &count_set_view,
+                            color_map_view,
+                            g,
+                            BitmapCoord
+                        );
+                    }));
+                }
+                2 => {
+                    children.push(scope.spawn(move |_| {
+                        set_color!(
+                            bitmap_slice,
+                            &count_set_view,
+                            color_map_view,
+                            b,
+                            BitmapCoord
+                        );
+                    }));
+                }
+                _ => panic!("Unknown color index"),
             }
         }
 
@@ -508,11 +511,11 @@ fn test_map_coordinates_many() {
 
 #[test]
 fn test_map_scan_points() {
-    let actual_capped = scan_points(0.25, 0.75, 3, 4) ;
+    let actual_capped = scan_points(0.25, 0.75, 3, 4);
     let expected_capped: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 3, 0], [0, 3, 2, 0], [0, 1, 0, 0]]);
     assert_eq!(actual_capped, expected_capped);
 
-    let actual = scan_points(0.25, 0.75, 100, 4) ;
+    let actual = scan_points(0.25, 0.75, 100, 4);
     let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
     assert_eq!(actual, expected);
 }
@@ -583,7 +586,11 @@ fn test_draw_image_many_colors() {
 
 #[test]
 pub fn test_draw() {
-    let temp_dir = Builder::new().prefix("test-dir").rand_bytes(10).tempdir().unwrap();
+    let temp_dir = Builder::new()
+        .prefix("test-dir")
+        .rand_bytes(10)
+        .tempdir()
+        .unwrap();
     let temp_csv_filename = temp_dir.path().join("_test_.csv");
     let temp_png_filename = temp_dir.path().join("_test_.png");
     let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
@@ -609,7 +616,8 @@ pub fn test_draw() {
 
     let mut reader = ReaderBuilder::new()
         .has_headers(false)
-        .from_path(csv_path.unwrap()).unwrap();
+        .from_path(csv_path.unwrap())
+        .unwrap();
     let mut n_columns: usize = 0;
 
     for (i, row) in reader.records().enumerate() {
@@ -623,7 +631,11 @@ pub fn test_draw() {
     }
     assert_eq!(n_columns, pixel_size as usize);
 
-    let image = ImageReader::open(image_path.unwrap()).unwrap().decode().unwrap().to_rgb8();
+    let image = ImageReader::open(image_path.unwrap())
+        .unwrap()
+        .decode()
+        .unwrap()
+        .to_rgb8();
     assert_eq!(image.width(), pixel_size);
     assert_eq!(image.height(), pixel_size);
     let color = image.get_pixel(0, 0);
