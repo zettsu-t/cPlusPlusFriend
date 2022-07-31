@@ -47,3 +47,5 @@ invisible(converge(init = offset_b, offset = offset_a, max_iter = 1000, limit = 
 
 offset_c <- complex(real = 0.375, imaginary = 0.375)
 invisible(converge(init = offset_c, offset = offset_c, max_iter = 1000, limit = 2.0))
+
+scan_points(x_offset = 0.25, y_offset = 0.75, max_iter = 3, n_pixels = 4)
