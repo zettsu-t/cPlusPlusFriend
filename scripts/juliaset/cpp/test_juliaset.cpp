@@ -253,9 +253,9 @@ TEST_F(TestMakeGradientColors, One) {
     const auto table = make_gradient_colors(0);
     ASSERT_EQ(1, table.size());
     const auto pixel = table.at(0);
-    EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
-    EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
-    EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
+    EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
+    EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
+    EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
 }
 
 TEST_F(TestMakeGradientColors, Three) {
@@ -288,24 +288,26 @@ TEST_F(TestMakeGradientColors, Three) {
 class TestDrawImage : public ::testing::Test {};
 
 TEST_F(TestDrawImage, Monotone) {
-    CountSet count_set(boost::extents[2][3]);
-    auto n_ys = count_set.shape()[0];
-    auto n_xs = count_set.shape()[1];
+    for (Count count = 0; count < 3; ++count) {
+        CountSet count_set(boost::extents[2][3]);
+        auto n_ys = count_set.shape()[0];
+        auto n_xs = count_set.shape()[1];
 
-    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
-        for(decltype(n_xs) x {0}; x < n_xs; ++x) {
-            count_set[y][x] = 1;
+        for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+            for(decltype(n_xs) x {0}; x < n_xs; ++x) {
+                count_set[y][x] = count;
+            }
         }
-    }
 
-    const auto img = draw_image(count_set);
-    auto view = boost::gil::const_view(img);
-    ASSERT_EQ(n_xs, view.width());
-    ASSERT_EQ(n_ys, view.height());
-    auto pixel = *view.row_begin(0);
-    EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
-    EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
-    EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
+        const auto img = draw_image(count_set);
+        auto view = boost::gil::const_view(img);
+        ASSERT_EQ(n_xs, view.width());
+        ASSERT_EQ(n_ys, view.height());
+        auto pixel = *view.row_begin(0);
+        EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
+        EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
+        EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
+    }
 }
 
 TEST_F(TestDrawImage, TwoColors) {

@@ -106,7 +106,7 @@ RgbPixelTable make_gradient_colors(Count max_count) {
     RgbPixelTable table(max_count + 1);
 
     if (max_count < 1) {
-        table.at(0) = boost::gil::rgb8_pixel_t{LOW_COLOR_R, LOW_COLOR_G, LOW_COLOR_B};
+        table.at(0) = boost::gil::rgb8_pixel_t{HIGH_COLOR_R, HIGH_COLOR_G, HIGH_COLOR_B};
     } else {
         for(decltype(max_count) i {0}; i <= max_count; ++i) {
             auto inner_point = [i, max_count](ColorElement left, ColorElement right) {
@@ -155,4 +155,21 @@ Bitmap draw_image(const CountSet& count_set) {
     }
 
     return img;
+}
+
+void draw(const ParamSet& params) {
+    const auto count_set = scan_points(params.x_offset, params.y_offset,
+        params.max_iter, params.n_pixels);
+
+    if (params.csv_filepath.has_value()) {
+//      write_csv(count_set, params.csv_filepath.value());
+    }
+
+    if (params.image_filepath.has_value()) {
+        auto img = draw_image(count_set);
+        const auto& img_filename = params.image_filepath.value();
+        boost::gil::write_view(img_filename.string(), view(img), boost::gil::png_tag());
+    }
+
+    return;
 }

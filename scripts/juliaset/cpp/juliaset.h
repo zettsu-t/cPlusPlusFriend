@@ -89,4 +89,6 @@ extern RgbPixelTable make_gradient_colors(Count max_count);
 
 extern Bitmap draw_image(const CountSet& count_set);
 
+extern void draw(const ParamSet& params);
+
 #endif // JULIASET_H
