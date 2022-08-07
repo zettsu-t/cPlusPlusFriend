@@ -3,3 +3,4 @@
 FROM rust
 RUN rustup component add rustfmt clippy llvm-tools-preview
 RUN cargo install cargo-edit cargo-tarpaulin rustfilt
+RUN apt-get update && apt-get install -y build-essential clang clang-format clang-tidy cmake libboost-all-dev
