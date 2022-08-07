@@ -133,12 +133,13 @@ fn converge_point(
 ) -> Count {
     let mut z = Point::new(point_x, point_y);
     let mut count: Count = 0;
-    let mut previous_modulus: Coordinate = 10.0;
+    let limit_modulus: Coordinate = 4.0;
+    let mut previous_modulus: Coordinate = limit_modulus * limit_modulus;
 
     for _ in 0..max_iter {
         z = transform_point(z, point_offset);
         let z_modulus = z.norm_sqr();
-        if z_modulus > 4.0 {
+        if z_modulus > limit_modulus {
             break;
         }
         if (previous_modulus - z_modulus).abs() < eps {
@@ -190,9 +191,9 @@ fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSe
         1 => CoordinateSet::zeros([1]),
         n if n < 1 => CoordinateSet::zeros([0]),
         _ => {
-            let n = n_pixels as Coordinate;
+            let span = (n_pixels - 1) as Coordinate;
             (0..n_pixels)
-                .map(|i| ((i as Coordinate) * 2.0 * half_length / (n - 1.0)) - half_length)
+                .map(|i| ((i as Coordinate) * 2.0 * half_length / span) - half_length)
                 .collect()
         }
     }
@@ -438,8 +439,8 @@ fn test_transform_point() {
 
 #[test]
 fn test_converge_point() {
-    let zero = Point::new(0.0, 0.0);
     let eps: Coordinate = Coordinate::EPSILON;
+    let zero = Point::new(0.0, 0.0);
     let actual = converge_point(23.0, 0.0, zero, 100, eps);
     assert_eq!(actual, 0 as Count);
 
@@ -466,6 +467,48 @@ fn test_converge_point() {
     let offset_c = Point::new(0.375, 0.375);
     let actual = converge_point(0.375, 0.375, offset_c, 100, 0.1);
     assert_eq!(actual, 9 as Count);
+}
+
+#[test]
+fn test_converge_point_set_row() {
+    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let ys = CoordinateSet::from_vec(vec![0.375]);
+    let offset = Point::new(0.375, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let actual = converge_point_set(x_view, y_view, offset, 100, 1e-5);
+    assert_eq!(actual.shape()[0], 1);
+    assert_eq!(actual.shape()[1], 2);
+    assert_eq!(actual[[0, 0]], 15);
+    assert_eq!(actual[[0, 1]], 7);
+}
+
+#[test]
+fn test_converge_point_set_column() {
+    let xs = CoordinateSet::from_vec(vec![0.375]);
+    let ys = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let offset = Point::new(0.375, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let actual = converge_point_set(x_view, y_view, offset, 100, 1e-5);
+    assert_eq!(actual.shape()[0], 2);
+    assert_eq!(actual.shape()[1], 1);
+    assert_eq!(actual[[0, 0]], 15);
+    assert_eq!(actual[[1, 0]], 24);
+}
+
+#[test]
+fn test_converge_point_set_limit() {
+    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let ys = CoordinateSet::from_vec(vec![0.375]);
+    let offset = Point::new(0.5, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let actual = converge_point_set(x_view, y_view, offset, 5, 1e-5);
+    assert_eq!(actual.shape()[0], 1);
+    assert_eq!(actual.shape()[1], 2);
+    assert_eq!(actual[[0, 0]], 5);
+    assert_eq!(actual[[0, 1]], 3);
 }
 
 #[test]
@@ -510,30 +553,36 @@ fn test_map_coordinates_many() {
 }
 
 #[test]
-fn test_map_scan_points() {
+fn test_map_scan_points_capped() {
     let actual_capped = scan_points(0.25, 0.75, 3, 4);
     let expected_capped: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 3, 0], [0, 3, 2, 0], [0, 1, 0, 0]]);
     assert_eq!(actual_capped, expected_capped);
+}
 
+#[test]
+fn test_map_scan_points_unlimited() {
     let actual = scan_points(0.25, 0.75, 100, 4);
     let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
     assert_eq!(actual, expected);
 }
 
 #[test]
-fn test_draw_image_mono_color() {
-    let count_set: CountSet = arr2(&[[1, 1, 1], [1, 1, 1]]);
-    let shape = &count_set.shape();
-    let width = u32::try_from(shape[1]).unwrap();
-    let height = u32::try_from(shape[0]).unwrap();
-    let image = draw_image(count_set);
+fn test_draw_image_monotone() {
+    for count in 0..3 {
+        let mut count_set: CountSet = arr2(&[[1, 1, 1], [1, 1, 1]]);
+        count_set *= count;
+        let shape = &count_set.shape();
+        let width = u32::try_from(shape[1]).unwrap();
+        let height = u32::try_from(shape[0]).unwrap();
+        let image = draw_image(count_set);
 
-    for y in 0..height {
-        for x in 0..width {
-            let color = image.get_pixel(x, y);
-            assert_eq!(color[0], HIGH_COLOR_R);
-            assert_eq!(color[1], HIGH_COLOR_G);
-            assert_eq!(color[2], HIGH_COLOR_B);
+        for y in 0..height {
+            for x in 0..width {
+                let color = image.get_pixel(x, y);
+                assert_eq!(color[0], HIGH_COLOR_R);
+                assert_eq!(color[1], HIGH_COLOR_G);
+                assert_eq!(color[2], HIGH_COLOR_B);
+            }
         }
     }
 }
