@@ -3,6 +3,15 @@
 
 namespace {
 using CoordinateSetRef = boost::const_multi_array_ref<Coordinate, 1>;
+using CountVector = std::vector<Count>;
+
+void copy_array(const CountVector& src,
+                CountSet& dst, PixelSize y, PixelSize n_pixels) {
+    boost::const_multi_array_ref<Count, 1> row {src.data(), boost::extents[src.size()]};
+    typename CountSet::array_view<1>::type y_view = dst[boost::indices[y][CountSet::index_range(0, n_pixels)]];
+    y_view = row;
+    return;
+}
 }
 
 class TestParamSet : public ::testing::Test {};
@@ -103,6 +112,56 @@ TEST_F(TestConvergePoint, All) {
     EXPECT_EQ(9, actual_all_c);
 }
 
+class TestConvergePointSet : public ::testing::Test {};
+
+TEST_F(TestConvergePointSet, Row) {
+    CoordinateSet xs(boost::extents[2]);
+    CoordinateSet ys(boost::extents[1]);
+    xs[0] = 0.375;
+    xs[1] = 0.5;
+    ys[0] = 0.375;
+    const Point offset {0.375, 0.375};
+    auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
+    auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
+    auto actual = converge_point_set(view_xs, view_ys, offset, 100, 1e-5f);
+    ASSERT_EQ(1, actual.shape()[0]);
+    ASSERT_EQ(2, actual.shape()[1]);
+    EXPECT_EQ(15, actual[0][0]);
+    EXPECT_EQ(7, actual[0][1]);
+}
+
+TEST_F(TestConvergePointSet, Column) {
+    CoordinateSet xs(boost::extents[1]);
+    CoordinateSet ys(boost::extents[2]);
+    xs[0] = 0.375;
+    ys[0] = 0.375;
+    ys[1] = 0.5;
+    const Point offset {0.375, 0.375};
+    auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
+    auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
+    auto actual = converge_point_set(view_xs, view_ys, offset, 100, 1e-5f);
+    ASSERT_EQ(2, actual.shape()[0]);
+    ASSERT_EQ(1, actual.shape()[1]);
+    EXPECT_EQ(15, actual[0][0]);
+    EXPECT_EQ(24, actual[1][0]);
+}
+
+TEST_F(TestConvergePointSet, Limit) {
+    CoordinateSet xs(boost::extents[2]);
+    CoordinateSet ys(boost::extents[1]);
+    xs[0] = 0.375;
+    xs[1] = 0.5;
+    ys[0] = 0.375;
+    const Point offset {0.5, 0.375};
+    auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
+    auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
+    auto actual = converge_point_set(view_xs, view_ys, offset, 5, 1e-5f);
+    ASSERT_EQ(1, actual.shape()[0]);
+    ASSERT_EQ(2, actual.shape()[1]);
+    EXPECT_EQ(5, actual[0][0]);
+    EXPECT_EQ(3, actual[0][1]);
+}
+
 class TestMapCoordinates : public ::testing::Test {};
 
 TEST_F(TestMapCoordinates, Zero) {
@@ -149,24 +208,14 @@ TEST_F(TestMapCoordinates, Many) {
 
 class TestScanPoints : public ::testing::Test {};
 
-namespace {
-void copy_array(const std::vector<CoordinateSet::value_type>& src,
-                CountSet& dst, PixelSize y, PixelSize n_pixels) {
-    CoordinateSetRef row {src.data(), boost::extents[src.size()]};
-    typename CountSet::array_view<1>::type y_view = dst[boost::indices[y][CountSet::index_range(0, n_pixels)]];
-    y_view = row;
-    return;
-}
-}
-
 TEST_F(TestScanPoints, Capped) {
     constexpr PixelSize n_pixels = 4;
     const auto actual = scan_points(0.25, 0.75, 3, n_pixels);
 
-    std::vector<CoordinateSet::value_type> expected_0 {0, 0, 1, 0};
-    std::vector<CoordinateSet::value_type> expected_1 {0, 2, 3, 0};
-    std::vector<CoordinateSet::value_type> expected_2 {0, 3, 2, 0};
-    std::vector<CoordinateSet::value_type> expected_3 {0, 1, 0, 0};
+    CountVector expected_0 {0, 0, 1, 0};
+    CountVector expected_1 {0, 2, 3, 0};
+    CountVector expected_2 {0, 3, 2, 0};
+    CountVector expected_3 {0, 1, 0, 0};
 
     CountSet expected(boost::extents[n_pixels][n_pixels]);
     copy_array(expected_0, expected, 0, n_pixels);
@@ -180,10 +229,10 @@ TEST_F(TestScanPoints, Unlimited) {
     constexpr PixelSize n_pixels = 4;
     const auto actual = scan_points(0.25, 0.75, 100, n_pixels);
 
-    std::vector<CoordinateSet::value_type> expected_0 {0, 0, 1, 0};
-    std::vector<CoordinateSet::value_type> expected_1 {0, 2, 5, 0};
-    std::vector<CoordinateSet::value_type> expected_2 {0, 5, 2, 0};
-    std::vector<CoordinateSet::value_type> expected_3 {0, 1, 0, 0};
+    CountVector expected_0 {0, 0, 1, 0};
+    CountVector expected_1 {0, 2, 5, 0};
+    CountVector expected_2 {0, 5, 2, 0};
+    CountVector expected_3 {0, 1, 0, 0};
 
     CountSet expected(boost::extents[n_pixels][n_pixels]);
     copy_array(expected_0, expected, 0, n_pixels);
@@ -198,6 +247,15 @@ class TestMakeGradientColors : public ::testing::Test {};
 TEST_F(TestMakeGradientColors, Zero) {
     const auto table = make_gradient_colors(0);
     ASSERT_EQ(1, table.size());
+}
+
+TEST_F(TestMakeGradientColors, One) {
+    const auto table = make_gradient_colors(0);
+    ASSERT_EQ(1, table.size());
+    const auto pixel = table.at(0);
+    EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
+    EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
+    EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
 }
 
 TEST_F(TestMakeGradientColors, Three) {
@@ -225,6 +283,91 @@ TEST_F(TestMakeGradientColors, Three) {
     EXPECT_EQ(mid_point(LOW_COLOR_R, HIGH_COLOR_R), boost::gil::at_c<0>(pixel_mid));
     EXPECT_EQ(mid_point(LOW_COLOR_G, HIGH_COLOR_G), boost::gil::at_c<1>(pixel_mid));
     EXPECT_EQ(mid_point(LOW_COLOR_B, HIGH_COLOR_B), boost::gil::at_c<2>(pixel_mid));
+}
+
+class TestDrawImage : public ::testing::Test {};
+
+TEST_F(TestDrawImage, Monotone) {
+    CountSet count_set(boost::extents[2][3]);
+    auto n_ys = count_set.shape()[0];
+    auto n_xs = count_set.shape()[1];
+
+    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+        for(decltype(n_xs) x {0}; x < n_xs; ++x) {
+            count_set[y][x] = 1;
+        }
+    }
+
+    const auto img = draw_image(count_set);
+    auto view = boost::gil::const_view(img);
+    ASSERT_EQ(n_xs, view.width());
+    ASSERT_EQ(n_ys, view.height());
+    auto pixel = *view.row_begin(0);
+    EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
+    EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
+    EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
+}
+
+TEST_F(TestDrawImage, TwoColors) {
+    CountSet count_set(boost::extents[2][3]);
+    count_set[1][0] = 1;
+    auto n_ys = count_set.shape()[0];
+    auto n_xs = count_set.shape()[1];
+
+    const auto img = draw_image(count_set);
+    auto view = boost::gil::const_view(img);
+    ASSERT_EQ(n_xs, view.width());
+    ASSERT_EQ(n_ys, view.height());
+
+    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+        auto it = view.row_begin(y);
+        for(decltype(n_xs) x {0}; x < n_xs; ++x, ++it) {
+            auto pixel = *it;
+            if ((x == 0) && (y == 1)) {
+                EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
+                EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
+                EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
+            } else {
+                EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
+                EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
+                EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
+            }
+        }
+    }
+}
+
+TEST_F(TestDrawImage, ManyColors) {
+    CountSet count_set(boost::extents[2][3]);
+    auto n_ys = count_set.shape()[0];
+    auto n_xs = count_set.shape()[1];
+
+    Count count = 0;
+    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+        for(decltype(n_xs) x {0}; x < n_xs; ++x) {
+            count_set[y][x] = count;
+            count = (count == 0) ? 4 : (count * 2);
+        }
+    }
+
+    const auto img = draw_image(count_set);
+    auto view = boost::gil::const_view(img);
+    ASSERT_EQ(n_xs, view.width());
+    ASSERT_EQ(n_ys, view.height());
+
+    ColorElement prev = 0;
+    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+        auto it = view.row_begin(y);
+        for(decltype(n_xs) x {0}; x < n_xs; ++x, ++it) {
+            auto pixel = *it;
+            auto current = boost::gil::at_c<0>(pixel);
+            if ((x == 0) && (y == 0)) {
+                EXPECT_FALSE(boost::gil::at_c<0>(pixel));
+            } else {
+                EXPECT_LT(prev, current);
+            }
+            prev = current;
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {

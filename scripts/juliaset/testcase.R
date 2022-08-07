@@ -39,13 +39,18 @@ invisible(converge(init = zero_one, offset = zero, max_iter = 1000, limit = 2.0)
 
 offset_a <- complex(real = 0.5, imaginary = 0.375)
 offset_b <- complex(real = 0.375, imaginary = 0.5)
+offset_c <- complex(real = 0.375, imaginary = 0.375)
+offset_d <- complex(real = 0.5, imaginary = 0.5)
 invisible(converge(init = zero, offset = offset_a, max_iter = 1000, limit = 2.0))
 invisible(converge(init = zero, offset = offset_b, max_iter = 1000, limit = 2.0))
-
 invisible(converge(init = offset_a, offset = offset_b, max_iter = 1000, limit = 2.0))
 invisible(converge(init = offset_b, offset = offset_a, max_iter = 1000, limit = 2.0))
-
-offset_c <- complex(real = 0.375, imaginary = 0.375)
 invisible(converge(init = offset_c, offset = offset_c, max_iter = 1000, limit = 2.0))
 
-scan_points(x_offset = 0.25, y_offset = 0.75, max_iter = 3, n_pixels = 4)
+invisible(converge(init = offset_c, offset = offset_c, max_iter = 1000, limit = 2.0))
+invisible(converge(init = offset_b, offset = offset_c, max_iter = 1000, limit = 2.0))
+
+invisible(converge(init = offset_c, offset = offset_a, max_iter = 11198, limit = 2.0))
+invisible(converge(init = offset_a, offset = offset_a, max_iter = 1118, limit = 2.0))
+
+# scan_points(x_offset = 0.25, y_offset = 0.75, max_iter = 3, n_pixels = 4)
