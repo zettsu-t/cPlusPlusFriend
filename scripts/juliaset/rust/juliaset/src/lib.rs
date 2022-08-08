@@ -431,8 +431,8 @@ fn test_partial_param_set() {
 fn test_transform_point() {
     let from = Point::new(2.0, 4.0);
     let offset = Point::new(3.0, 5.0);
-    let actual = transform_point(from, offset);
     let expected = Point::new(-9.0, 21.0);
+    let actual = transform_point(from, offset);
     assert_float_eq::assert_float_absolute_eq!(actual.re, expected.re, Coordinate::EPSILON);
     assert_float_eq::assert_float_absolute_eq!(actual.im, expected.im, Coordinate::EPSILON);
 }
