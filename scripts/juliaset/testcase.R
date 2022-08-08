@@ -1,4 +1,5 @@
 library(tidyverse)
+library(viridis)
 
 converge <- function(init, offset, max_iter, limit) {
   f <- function(from) {
@@ -54,3 +55,21 @@ invisible(converge(init = offset_c, offset = offset_a, max_iter = 11198, limit =
 invisible(converge(init = offset_a, offset = offset_a, max_iter = 1118, limit = 2.0))
 
 # scan_points(x_offset = 0.25, y_offset = 0.75, max_iter = 3, n_pixels = 4)
+
+df <- readr::read_csv("cpp.csv", col_names = FALSE) %>%
+  dplyr::mutate(y = row_number()) %>%
+  tidyr::pivot_longer(starts_with("X")) %>%
+  tidyr::separate(col = name, into = c("pre", "x"), sep = "\\D+") %>%
+  dplyr::mutate(x = as.numeric(x), y = as.numeric(y))
+
+df_drawn <- df %>%
+  dplyr::arrange(value) %>%
+  dplyr::mutate(value = factor(value))
+
+colors <- viridis::magma(max(df$value) + 1)
+
+g <- ggplot(df_drawn)
+g <- g + geom_tile(aes(x = x, y = y, fill = value))
+g <- g + scale_fill_manual(values = colors)
+g <- g + theme(legend.position = "none", aspect.ratio = 1.0)
+plot(g)

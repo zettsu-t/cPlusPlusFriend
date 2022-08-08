@@ -1,7 +1,10 @@
 #include "juliaset.h"
+#include <boost/algorithm/string/join.hpp>
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <limits>
+#include <sstream>
 
 Point transform_point(const Point& from, const Point& offset) {
     return from * from + offset;
@@ -71,7 +74,7 @@ CountSet scan_points(Coordinate x_offset, Coordinate y_offset, Count max_iter, P
     auto xs = map_coordinates(half_length, n_pixels);
     auto ys = map_coordinates(half_length, n_pixels);
     const Point point_offset {x_offset, y_offset};
-    constexpr Coordinate eps = 1e-5f;
+    constexpr auto eps = DefaultEps;
 
     auto n_xs = xs.shape()[0];
     auto n_ys = ys.shape()[0];
@@ -157,12 +160,27 @@ Bitmap draw_image(const CountSet& count_set) {
     return img;
 }
 
+void write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename) {
+    auto n_rows = count_set.shape()[0];
+    std::ofstream os(csv_filename);
+
+    for(decltype(n_rows) i_row {0}; i_row < n_rows; ++i_row) {
+        const auto column = count_set[boost::indices[i_row][CountSet::index_range()]];
+        std::vector<std::string> cells;
+        std::transform(column.begin(), column.end(), std::back_inserter(cells),
+                       [](auto i) { return std::to_string(i); });
+        std::string joined = boost::algorithm::join(cells, ",");
+        os << joined << "\n";
+    }
+    os << std::flush;
+}
+
 void draw(const ParamSet& params) {
     const auto count_set = scan_points(params.x_offset, params.y_offset,
         params.max_iter, params.n_pixels);
 
     if (params.csv_filepath.has_value()) {
-//      write_csv(count_set, params.csv_filepath.value());
+        write_csv(count_set, params.csv_filepath.value());
     }
 
     if (params.image_filepath.has_value()) {

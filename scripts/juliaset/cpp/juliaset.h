@@ -5,11 +5,13 @@
 #include <cstdint>
 #include <complex>
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <string>
 #include <thread>
 #include <boost/multi_array.hpp>
 #include <boost/gil.hpp>
+#include <boost/gil/extension/dynamic_image/dynamic_image_all.hpp>
 #include <boost/gil/extension/io/png.hpp>
 #include <boost/gil/image.hpp>
 #include <boost/gil/io/write_view.hpp>
@@ -26,6 +28,9 @@ using CoordinateSetView = typename CoordinateSet::array_view<1>::type;
 using RgbPixelTable = std::vector<boost::gil::rgb8_pixel_t>;
 using Bitmap = boost::gil::rgb8_image_t;
 using CountSet = boost::multi_array<Count, 2>;
+
+// Default eps
+constexpr Coordinate DefaultEps = static_cast<Coordinate>(1e-5f);
 
 // Cividis color gradation from yellow to blue
 using ColorElement = uint8_t;
@@ -88,6 +93,8 @@ extern CountSet scan_points(Coordinate x_offset, Coordinate y_offset, Count max_
 extern RgbPixelTable make_gradient_colors(Count max_count);
 
 extern Bitmap draw_image(const CountSet& count_set);
+
+extern void write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename);
 
 extern void draw(const ParamSet& params);
 

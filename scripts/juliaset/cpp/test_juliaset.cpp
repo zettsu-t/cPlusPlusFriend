@@ -1,5 +1,7 @@
 #include "juliaset.h"
 #include <gtest/gtest.h>
+#include <fstream>
+#include <random>
 
 namespace {
 using CoordinateSetRef = boost::const_multi_array_ref<Coordinate, 1>;
@@ -12,6 +14,84 @@ void copy_array(const CountVector& src,
     y_view = row;
     return;
 }
+
+class TempFile {
+public:
+    TempFile(const std::string& extension) {
+        std::random_device seed_gen;
+        std::mt19937 gen(seed_gen());
+        std::uniform_real_distribution<double> dist(0.0, 1.0);
+        auto tempdir_top = std::filesystem::temp_directory_path();
+
+        constexpr int max_retry = 1;
+        for(int trial = 0; trial <= max_retry; ++trial) {
+            if (filepath_.has_value() || filepath_.has_value()) {
+                break;
+            }
+
+            const auto value_dir = static_cast<long long>(dist(gen) * 1000000000000000ll);
+            std::string subdir = "_temp_" + std::to_string(value_dir);
+            decltype(tempdir_top) temp_dir = tempdir_top;
+            temp_dir /= subdir;
+
+            if (std::filesystem::exists(temp_dir)) {
+                continue;
+            }
+
+            std::filesystem::create_directory(temp_dir);
+            if (!std::filesystem::is_directory(temp_dir)) {
+                continue;
+            }
+            topdir_ = temp_dir;
+
+            const auto file_value = static_cast<long long>(dist(gen) * 1000000000000000ll);
+            std::string filename = std::to_string(file_value);
+            filename += extension;
+            auto temp_file = temp_dir;
+            temp_file /= filename;
+
+            if (!std::filesystem::exists(temp_file)) {
+                filepath_ = temp_file;
+            }
+            break;
+        }
+    }
+
+    virtual ~TempFile() {
+        if (filepath_.has_value()) {
+            std::filesystem::remove(filepath_.value());
+        }
+
+        if (topdir_.has_value()) {
+            std::filesystem::remove(topdir_.value());
+        }
+    }
+
+    std::optional<std::filesystem::path> Get() const {
+        return filepath_;
+    }
+
+private:
+    std::optional<std::filesystem::path> topdir_;
+    std::optional<std::filesystem::path> filepath_;
+};
+}
+
+class TestTempFile : public ::testing::Test {};
+
+TEST_F(TestTempFile, All) {
+    std::filesystem::path csv_filepath;
+    {
+        TempFile csv(".csv");
+        const auto actual = csv.Get();
+        ASSERT_TRUE(actual.has_value());
+        csv_filepath = *actual;
+    }
+
+    ASSERT_NE(std::string::npos, csv_filepath.string().find(".csv"));
+    ASSERT_FALSE(std::filesystem::exists(csv_filepath));
+    ASSERT_FALSE(std::filesystem::exists(csv_filepath.parent_path()));
+    ASSERT_TRUE(std::filesystem::exists(csv_filepath.parent_path().parent_path()));
 }
 
 class TestParamSet : public ::testing::Test {};
@@ -81,7 +161,7 @@ class TestConvergePoint : public ::testing::Test {};
 
 TEST_F(TestConvergePoint, All) {
     constexpr Coordinate eps = std::numeric_limits<Coordinate>::epsilon();
-    constexpr Coordinate delta = 1e-7f;
+    constexpr auto delta = static_cast<Coordinate>(1e-7f);
 
     const Point zero {0.0, 0.0};
     const auto actual_zero = converge_point(23.0, 0.0, zero, 100, eps);
@@ -123,7 +203,7 @@ TEST_F(TestConvergePointSet, Row) {
     const Point offset {0.375, 0.375};
     auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
     auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
-    auto actual = converge_point_set(view_xs, view_ys, offset, 100, 1e-5f);
+    auto actual = converge_point_set(view_xs, view_ys, offset, 100, DefaultEps);
     ASSERT_EQ(1, actual.shape()[0]);
     ASSERT_EQ(2, actual.shape()[1]);
     EXPECT_EQ(15, actual[0][0]);
@@ -139,7 +219,7 @@ TEST_F(TestConvergePointSet, Column) {
     const Point offset {0.375, 0.375};
     auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
     auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
-    auto actual = converge_point_set(view_xs, view_ys, offset, 100, 1e-5f);
+    auto actual = converge_point_set(view_xs, view_ys, offset, 100, DefaultEps);
     ASSERT_EQ(2, actual.shape()[0]);
     ASSERT_EQ(1, actual.shape()[1]);
     EXPECT_EQ(15, actual[0][0]);
@@ -155,7 +235,7 @@ TEST_F(TestConvergePointSet, Limit) {
     const Point offset {0.5, 0.375};
     auto view_xs = xs[boost::indices[decltype(xs)::index_range(0, xs.shape()[0])]];
     auto view_ys = ys[boost::indices[decltype(ys)::index_range(0, ys.shape()[0])]];
-    auto actual = converge_point_set(view_xs, view_ys, offset, 5, 1e-5f);
+    auto actual = converge_point_set(view_xs, view_ys, offset, 5, DefaultEps);
     ASSERT_EQ(1, actual.shape()[0]);
     ASSERT_EQ(2, actual.shape()[1]);
     EXPECT_EQ(5, actual[0][0]);
@@ -370,6 +450,68 @@ TEST_F(TestDrawImage, ManyColors) {
             prev = current;
         }
     }
+}
+
+class TestWriteCsv : public ::testing::Test {};
+
+TEST_F(TestWriteCsv, All) {
+    CountSet count_set(boost::extents[2][3]);
+    auto n_ys = count_set.shape()[0];
+    auto n_xs = count_set.shape()[1];
+
+    Count count = 0;
+    for(decltype(n_ys) y {0}; y < n_ys; ++y) {
+        for(decltype(n_xs) x {0}; x < n_xs; ++x) {
+            count_set[y][x] = count;
+            count = (count == 0) ? 4 : (count * 2);
+        }
+    }
+
+    TempFile csv(".csv");
+    const auto csv_filepath = csv.Get();
+    ASSERT_TRUE(csv_filepath.has_value());
+
+    write_csv(count_set, *csv_filepath);
+    std::ifstream ifs(*csv_filepath);
+    std::string actual(std::istreambuf_iterator<char>(ifs), {});
+    std::string expected("0,4,8\n16,32,64\n");
+    EXPECT_EQ(expected, actual);
+}
+
+class TestDraw : public ::testing::Test {};
+
+TEST_F(TestDraw, All) {
+    TempFile csv(".csv");
+    const auto csv_filepath = csv.Get();
+    ASSERT_TRUE(csv_filepath.has_value());
+
+    TempFile png(".png");
+    const auto png_filepath = png.Get();
+    ASSERT_TRUE(png_filepath.has_value());
+
+    constexpr PixelSize n_pixels = 16;
+    const ParamSet params(0.5, 0.125, 20, n_pixels, csv_filepath, png_filepath);
+    draw(params);
+
+    std::ifstream ifs(*csv_filepath);
+    std::string line;
+    PixelSize n_lines = 0;
+    while (std::getline(ifs, line)) {
+        std::istringstream iss(line);
+        EXPECT_EQ(0, line.find("0,"));
+        ++n_lines;
+    }
+    EXPECT_EQ(n_pixels, n_lines);
+
+    Bitmap img;
+    boost::gil::read_image(png_filepath.value().string(), img, boost::gil::png_tag());
+    auto view = boost::gil::const_view(img);
+    ASSERT_EQ(n_pixels, view.width());
+    ASSERT_EQ(n_pixels, view.height());
+    auto pixel = *view.row_begin(0);
+    EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
+    EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
+    EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
 }
 
 int main(int argc, char *argv[]) {
