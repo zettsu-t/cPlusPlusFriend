@@ -314,7 +314,7 @@ TEST_F(TestMapCoordinates, Two) {
     const std::vector<CoordinateSet::value_type> expected_vec{-3.0, 3.0};
     CoordinateSetRef expected{expected_vec.data(), boost::extents[expected_vec.size()]};
     ASSERT_EQ(n_pixels, expected.size());
-    ASSERT_TRUE(expected == actual);
+    ASSERT_EQ(expected, actual);
 }
 
 TEST_F(TestMapCoordinates, Many) {

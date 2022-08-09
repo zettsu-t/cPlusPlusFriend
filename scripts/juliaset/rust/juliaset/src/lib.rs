@@ -31,8 +31,10 @@ pub type PixelSize = isize;
 /// A point as two coordinates in screens
 type Point = num::complex::Complex<Coordinate>;
 
-/// A set of coordinates and its view
+/// A set of coordinates
 type CoordinateSet = ndarray::Array1<Coordinate>;
+
+/// A view for set of coordinates
 type CoordinateSetView<'a> = ndarray::ArrayView1<'a, Coordinate>;
 
 /// RGB colors at pixels in a screen

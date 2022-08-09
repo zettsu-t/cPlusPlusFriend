@@ -168,6 +168,7 @@ void write_csv(const CountSet& count_set, const std::filesystem::path& csv_filen
         std::vector<std::string> cells;
         std::transform(column.begin(), column.end(), std::back_inserter(cells),
                        [](auto i) { return std::to_string(i); });
+        // We can alloc the 'joined' buffer once and replace trailing , to LF.
         std::string joined = boost::algorithm::join(cells, ",");
         os << joined << "\n";
     }

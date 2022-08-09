@@ -7,6 +7,7 @@
 #include <boost/gil/image.hpp>
 #include <boost/gil/io/write_view.hpp>
 #include <boost/multi_array.hpp>
+#include <boost/program_options.hpp>
 #include <cmath>
 #include <complex>
 #if __cplusplus >= 202002L
@@ -35,8 +36,10 @@ using PixelSize = size_t;
 /// A point as two coordinates in screens
 using Point = std::complex<Coordinate>;
 
-/// A set of coordinates and its view
+/// A set of coordinates
 using CoordinateSet = boost::multi_array<Coordinate, 1>;
+
+/// A view for set of coordinates
 using CoordinateSetView = CoordinateSet::const_array_view<1>::type;
 
 /// An indexed RGB color table
