@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
 
 project(juliaset CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 
@@ -36,7 +36,7 @@ set(BASEPATH "${CMAKE_SOURCE_DIR}")
 # Executable unit tests
 add_executable(juliaset juliaset_impl.cpp juliaset.cpp)
 add_executable(test_juliaset juliaset_impl.cpp test_juliaset.cpp)
-target_compile_options(test_juliaset PRIVATE -Wall -Wextra -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter)
+target_compile_options(test_juliaset PRIVATE -Wall -Wextra -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter -DUNIT_TEST)
 target_link_libraries(juliaset png)
 target_link_libraries(test_juliaset gtest_main png pthread)
 gtest_add_tests(TARGET test_juliaset)

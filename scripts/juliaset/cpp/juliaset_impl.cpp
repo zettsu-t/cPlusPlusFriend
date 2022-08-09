@@ -1,16 +1,21 @@
 #include "juliaset.h"
-#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/cast.hpp>
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <sstream>
+#include <type_traits>
 
-Point transform_point(const Point& from, const Point& offset) { return from * from + offset; }
+namespace juliaset {
+Point transform_point(const Point& from, const Point& offset) {
+    return from * from + offset;
+}
 
 Count converge_point(Coordinate point_x, Coordinate point_y, const Point& point_offset,
                      Count max_iter, Coordinate eps) {
-    constexpr Coordinate limit_modulus = 4.0;
+    constexpr Coordinate limit_modulus = 4;
     Coordinate previous_modulus = limit_modulus * limit_modulus;
     Point z{point_x, point_y};
 
@@ -31,7 +36,7 @@ Count converge_point(Coordinate point_x, Coordinate point_y, const Point& point_
     return count;
 }
 
-CountSet converge_point_set(const CoordinateSetView& xs, const CoordinateSetView& ys,
+CountSet converge_point_set(CoordinateSetView& xs, CoordinateSetView& ys,
                             const Point& point_offset, Count max_iter, Coordinate eps) {
     auto xs_size = xs.shape()[0];
     auto ys_size = ys.shape()[0];
@@ -57,9 +62,9 @@ CoordinateSet map_coordinates(Coordinate half_length, PixelSize n_pixels) {
     }
 
     auto coord_set = CoordinateSet(boost::extents[n_pixels]);
-    const auto span = static_cast<Coordinate>(n_pixels - 1);
+    const auto span = checked_cast<Coordinate>(n_pixels - 1);
     for (decltype(n_pixels) i{0}; i < n_pixels; ++i) {
-        const auto coord = static_cast<Coordinate>(i);
+        const auto coord = checked_cast<Coordinate>(i);
         const auto value = (coord * 2 * half_length / span) - half_length;
         coord_set[i] = value;
     }
@@ -68,9 +73,9 @@ CoordinateSet map_coordinates(Coordinate half_length, PixelSize n_pixels) {
 }
 
 CountSet scan_points(Coordinate x_offset, Coordinate y_offset, Count max_iter, PixelSize n_pixels) {
-    constexpr Coordinate half_length = std::sqrt(static_cast<Coordinate>(2)) + 0.1f;
-    auto xs = map_coordinates(half_length, n_pixels);
-    auto ys = map_coordinates(half_length, n_pixels);
+    const Coordinate half_length = std::sqrt(checked_cast<Coordinate>(2)) + 0.1f;
+    const auto xs = map_coordinates(half_length, n_pixels);
+    const auto ys = map_coordinates(half_length, n_pixels);
     const Point point_offset{x_offset, y_offset};
     constexpr auto eps = DefaultEps;
 
@@ -78,17 +83,17 @@ CountSet scan_points(Coordinate x_offset, Coordinate y_offset, Count max_iter, P
     auto n_ys = ys.shape()[0];
     CountSet mat_counts(boost::extents[n_ys][n_xs]);
     auto n_cpus = std::thread::hardware_concurrency();
-    auto x_view = xs[boost::indices[decltype(ys)::index_range()]];
+    CoordinateSetView x_view = xs[boost::indices[decltype(xs)::index_range()]];
 
     using Index = decltype(n_ys);
     Index index_start = 0;
     Index index_span =
-        static_cast<Index>(std::ceil(static_cast<double>(n_ys) / static_cast<double>(n_cpus)));
+        checked_cast<Index>(std::ceil(checked_cast<double>(n_ys) / checked_cast<double>(n_cpus)));
 
     for (decltype(n_cpus) i{0}; i < n_cpus; ++i) {
         Index index_end = index_start + index_span;
         index_end = std::min(index_end, n_ys);
-        decltype(ys)::array_view<1>::type y_view =
+        CoordinateSetView y_view =
             ys[boost::indices[decltype(ys)::index_range(index_start, index_end)]];
 
         const auto sub_counts = converge_point_set(x_view, y_view, point_offset, max_iter, eps);
@@ -110,14 +115,14 @@ RgbPixelTable make_gradient_colors(Count max_count) {
         for (decltype(max_count) i{0}; i <= max_count; ++i) {
             auto inner_point = [i, max_count](ColorElement left, ColorElement right) {
                 using ColorValue = double;
-                const auto weight = static_cast<ColorValue>(i) / static_cast<ColorValue>(max_count);
-                auto value = static_cast<ColorValue>(left) * (1.0 - weight) +
-                             static_cast<ColorValue>(right) * weight;
+                const auto weight = checked_cast<ColorValue>(i) / checked_cast<ColorValue>(max_count);
+                auto value = checked_cast<ColorValue>(left) * (1.0 - weight) +
+                             checked_cast<ColorValue>(right) * weight;
 
                 value = std::clamp(
-                    value, static_cast<ColorValue>(std::numeric_limits<ColorElement>::min()),
-                    static_cast<ColorValue>(std::numeric_limits<ColorElement>::max()));
-                return static_cast<ColorElement>(value);
+                    value, checked_cast<ColorValue>(std::numeric_limits<ColorElement>::min()),
+                    checked_cast<ColorValue>(std::numeric_limits<ColorElement>::max()));
+                return checked_cast<ColorElement>(value);
             };
 
             const auto r = inner_point(LOW_COLOR_R, HIGH_COLOR_R);
@@ -180,9 +185,11 @@ void draw(const ParamSet& params) {
 
     if (params.image_filepath.has_value()) {
         auto img = draw_image(count_set);
-        const auto& img_filename = params.image_filepath.value();
-        boost::gil::write_view(img_filename.string(), view(img), boost::gil::png_tag());
+        const auto img_filename = params.image_filepath.value().string();
+        boost::gil::write_view(img_filename, const_view(img), boost::gil::png_tag());
     }
 
     return;
 }
+
+} // namespace juliaset

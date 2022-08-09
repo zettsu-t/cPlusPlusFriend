@@ -3,22 +3,48 @@
 #include <gtest/gtest.h>
 #include <random>
 
+using namespace juliaset;
+
 namespace {
 using CoordinateSetRef = boost::const_multi_array_ref<Coordinate, 1>;
 using CountVector = std::vector<Count>;
 using Count2dVector = std::vector<std::vector<Count>>;
 
+/**
+ * @brief Copies a vector to a row in a 2-D array
+ * @param[in] src A source vector
+ * @param[in] dst A destination 2-D array
+ * @param[in] y A row number in the array
+ */
 void copy_array(const CountVector& src, CountSet& dst, PixelSize y) {
     boost::const_multi_array_ref<Count, 1> row{src.data(), boost::extents[src.size()]};
-
-    typename CountSet::array_view<1>::type y_view = dst[boost::indices[y][CountSet::index_range()]];
-
+    CountSet::array_view<1>::type y_view = dst[boost::indices[y][CountSet::index_range()]];
     y_view = row;
     return;
 }
 
+/**
+ * @brief Copies a vector of vectors to a 2-D array
+ * @param[in] src A vector of vectors
+ * @param[in] dst A destination 2-D array
+ */
+void copy_2drray(const Count2dVector& src, CountSet& dst) {
+    PixelSize i = 0;
+    for (const auto& row : src) {
+        copy_array(row, dst, i);
+        ++i;
+    }
+    return;
+}
+
+/// A temporary file that only lives in a testing process.
+/// Each instance of TempFile creates a temporary directory
+/// and a temporary filename in the directory.
 class TempFile {
   public:
+    /**
+     * @param[in] extension A trailing string that possibly starts with a dot
+     */
     TempFile(const std::string& extension) {
         using RandomNumber = double;
         std::random_device seed_gen;
@@ -77,10 +103,16 @@ class TempFile {
         }
     }
 
+    /**
+     * @brief Returns a reference to a temporary filename
+     * @return A temporary filename if available
+     */
     const std::optional<std::filesystem::path>& Get() const { return filepath_; }
 
   private:
+    /// A temporary directory that exists
     std::optional<std::filesystem::path> topdir_;
+    /// A temporary filename
     std::optional<std::filesystem::path> filepath_;
 };
 } // namespace
@@ -88,15 +120,19 @@ class TempFile {
 class TestTempFile : public ::testing::Test {};
 
 TEST_F(TestTempFile, All) {
+    const std::string extension {".csv"};
     std::filesystem::path csv_filepath;
     {
-        TempFile csv(".csv");
+        TempFile csv(extension);
         const auto& actual = csv.Get();
         ASSERT_TRUE(actual.has_value());
-        csv_filepath = *actual;
+        csv_filepath = actual.value();
     }
 
-    ASSERT_NE(std::string::npos, csv_filepath.string().find(".csv"));
+    const auto filename = csv_filepath.string();
+    ASSERT_NE(std::string::npos, filename.find(".csv"));
+    ASSERT_GT(filename.size(), extension.size());
+    ASSERT_EQ(filename.size() - extension.size(), filename.rfind(".csv"));
     ASSERT_FALSE(std::filesystem::exists(csv_filepath));
     ASSERT_FALSE(std::filesystem::exists(csv_filepath.parent_path()));
     ASSERT_TRUE(std::filesystem::exists(csv_filepath.parent_path().parent_path()));
@@ -209,8 +245,8 @@ TEST_F(TestConvergePointSet, Row) {
     ys[0] = 0.375;
 
     const Point offset{0.375, 0.375};
-    const auto view_xs = xs[boost::indices[decltype(xs)::index_range()]];
-    const auto view_ys = ys[boost::indices[decltype(ys)::index_range()]];
+    CoordinateSetView view_xs = xs[boost::indices[decltype(xs)::index_range()]];
+    CoordinateSetView view_ys = ys[boost::indices[decltype(ys)::index_range()]];
     const auto actual = converge_point_set(view_xs, view_ys, offset, 100, DefaultEps);
     ASSERT_EQ(1, actual.shape()[0]);
     ASSERT_EQ(2, actual.shape()[1]);
@@ -226,8 +262,8 @@ TEST_F(TestConvergePointSet, Column) {
     ys[1] = 0.5;
 
     const Point offset{0.375, 0.375};
-    const auto view_xs = xs[boost::indices[decltype(xs)::index_range()]];
-    const auto view_ys = ys[boost::indices[decltype(ys)::index_range()]];
+    CoordinateSetView view_xs = xs[boost::indices[decltype(xs)::index_range()]];
+    CoordinateSetView view_ys = ys[boost::indices[decltype(ys)::index_range()]];
     const auto actual = converge_point_set(view_xs, view_ys, offset, 100, DefaultEps);
     ASSERT_EQ(2, actual.shape()[0]);
     ASSERT_EQ(1, actual.shape()[1]);
@@ -243,8 +279,8 @@ TEST_F(TestConvergePointSet, Limit) {
     ys[0] = 0.375;
 
     const Point offset{0.5, 0.375};
-    const auto view_xs = xs[boost::indices[decltype(xs)::index_range()]];
-    const auto view_ys = ys[boost::indices[decltype(ys)::index_range()]];
+    CoordinateSetView view_xs = xs[boost::indices[decltype(xs)::index_range()]];
+    CoordinateSetView view_ys = ys[boost::indices[decltype(ys)::index_range()]];
     const auto actual = converge_point_set(view_xs, view_ys, offset, 5, DefaultEps);
     ASSERT_EQ(1, actual.shape()[0]);
     ASSERT_EQ(2, actual.shape()[1]);
@@ -306,13 +342,8 @@ class TestScanPoints : public ::testing::Test {};
 TEST_F(TestScanPoints, Capped) {
     constexpr PixelSize n_pixels = 4;
     const Count2dVector count_set{{0, 0, 1, 0}, {0, 2, 3, 0}, {0, 3, 2, 0}, {0, 1, 0, 0}};
-
     CountSet expected(boost::extents[n_pixels][n_pixels]);
-    PixelSize y = 0;
-    for (const auto& row : count_set) {
-        copy_array(row, expected, y);
-        ++y;
-    }
+    copy_2drray(count_set, expected);
 
     const auto actual = scan_points(0.25, 0.75, 3, n_pixels);
     EXPECT_EQ(actual, expected);
@@ -321,24 +352,14 @@ TEST_F(TestScanPoints, Capped) {
 TEST_F(TestScanPoints, Unlimited) {
     constexpr PixelSize n_pixels = 4;
     const Count2dVector count_set{{0, 0, 1, 0}, {0, 2, 5, 0}, {0, 5, 2, 0}, {0, 1, 0, 0}};
-
     CountSet expected(boost::extents[n_pixels][n_pixels]);
-    PixelSize y = 0;
-    for (const auto& row : count_set) {
-        copy_array(row, expected, y);
-        ++y;
-    }
+    copy_2drray(count_set, expected);
 
     const auto actual = scan_points(0.25, 0.75, 100, n_pixels);
     EXPECT_EQ(actual, expected);
 }
 
 class TestMakeGradientColors : public ::testing::Test {};
-
-TEST_F(TestMakeGradientColors, Zero) {
-    const auto table = make_gradient_colors(0);
-    ASSERT_EQ(1, table.size());
-}
 
 TEST_F(TestMakeGradientColors, One) {
     const auto table = make_gradient_colors(0);
@@ -350,30 +371,34 @@ TEST_F(TestMakeGradientColors, One) {
     EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
 }
 
-TEST_F(TestMakeGradientColors, Three) {
-    const auto table = make_gradient_colors(2);
-    ASSERT_EQ(3, table.size());
+TEST_F(TestMakeGradientColors, TwoThree) {
+    for(Count max_count {1}; max_count <= 2; ++max_count) {
+        const auto table = make_gradient_colors(max_count);
+        ASSERT_EQ(max_count + 1, table.size());
 
-    const auto pixel_low = table.at(0);
-    EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel_low));
-    EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel_low));
-    EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel_low));
+        const auto pixel_low = table.at(0);
+        EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel_low));
+        EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel_low));
+        EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel_low));
 
-    const auto pixel_high = table.at(2);
-    EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel_high));
-    EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel_high));
-    EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel_high));
+        const auto pixel_high = table.at(max_count);
+        EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel_high));
+        EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel_high));
+        EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel_high));
 
-    const auto pixel_mid = table.at(1);
-    auto mid_point = [](ColorElement low, ColorElement high) {
-        using ColorValue = double;
-        return static_cast<ColorElement>(
-            (static_cast<ColorValue>(low) + static_cast<ColorValue>(high)) / 2.0);
-    };
+        if (max_count > 1) {
+            const auto pixel_mid = table.at(1);
+            auto mid_point = [](ColorElement low, ColorElement high) {
+                using ColorValue = double;
+                return static_cast<ColorElement>(
+                    (static_cast<ColorValue>(low) + static_cast<ColorValue>(high)) / 2.0);
+            };
 
-    EXPECT_EQ(mid_point(LOW_COLOR_R, HIGH_COLOR_R), boost::gil::at_c<0>(pixel_mid));
-    EXPECT_EQ(mid_point(LOW_COLOR_G, HIGH_COLOR_G), boost::gil::at_c<1>(pixel_mid));
-    EXPECT_EQ(mid_point(LOW_COLOR_B, HIGH_COLOR_B), boost::gil::at_c<2>(pixel_mid));
+            EXPECT_EQ(mid_point(LOW_COLOR_R, HIGH_COLOR_R), boost::gil::at_c<0>(pixel_mid));
+            EXPECT_EQ(mid_point(LOW_COLOR_G, HIGH_COLOR_G), boost::gil::at_c<1>(pixel_mid));
+            EXPECT_EQ(mid_point(LOW_COLOR_B, HIGH_COLOR_B), boost::gil::at_c<2>(pixel_mid));
+        }
+    }
 }
 
 class TestDrawImage : public ::testing::Test {};
@@ -394,7 +419,8 @@ TEST_F(TestDrawImage, Monotone) {
         auto view = boost::gil::const_view(img);
         ASSERT_EQ(n_xs, view.width());
         ASSERT_EQ(n_ys, view.height());
-        auto pixel = *view.row_begin(0);
+
+        const auto pixel = *(view.row_begin(0));
         EXPECT_EQ(HIGH_COLOR_R, boost::gil::at_c<0>(pixel));
         EXPECT_EQ(HIGH_COLOR_G, boost::gil::at_c<1>(pixel));
         EXPECT_EQ(HIGH_COLOR_B, boost::gil::at_c<2>(pixel));
@@ -525,6 +551,65 @@ TEST_F(TestDraw, All) {
     EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
     EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
 }
+
+class TestCheckedCast : public ::testing::Test {};
+
+TEST_F(TestCheckedCast, Numbers) {
+    using IntType = int;
+    using FloatType = float;
+    constexpr IntType expected_int = 2;
+    constexpr FloatType expected_float = 2;
+
+    IntType from_int = 2;
+    double from_double = 2.0;
+    double from_double_frac = 2.125;
+    float from_float = 2.0;
+    float from_float_frac = 2.125f;
+
+    EXPECT_EQ(expected_int, checked_cast<IntType>(from_int));
+    EXPECT_EQ(expected_int, checked_cast<IntType>(from_double));
+    EXPECT_EQ(expected_int, checked_cast<IntType>(from_double_frac));
+    EXPECT_EQ(expected_int, checked_cast<IntType>(from_float));
+    EXPECT_EQ(expected_int, checked_cast<IntType>(from_float_frac));
+
+    EXPECT_FLOAT_EQ(expected_float, checked_cast<FloatType>(from_int));
+    EXPECT_FLOAT_EQ(expected_float, checked_cast<FloatType>(from_float));
+    EXPECT_FLOAT_EQ(expected_float, checked_cast<FloatType>(from_double));
+}
+
+TEST_F(TestCheckedCast, ConstRef) {
+    using IntType = int;
+    constexpr IntType expected = 2;
+
+    double from = 2.125;
+    double from_ref = from;
+    const double from_const = 2.25;
+    const double& from_const_ref = from_const;
+
+    EXPECT_EQ(expected, checked_cast<IntType>(from));
+    EXPECT_EQ(expected, checked_cast<IntType>(from_ref));
+    EXPECT_EQ(expected, checked_cast<IntType>(from_const));
+    EXPECT_EQ(expected, checked_cast<IntType>(from_const_ref));
+    EXPECT_EQ(expected, checked_cast<IntType>(2.125));
+    EXPECT_EQ(expected, checked_cast<IntType>(from_const - 0.125));
+
+    double will_be_moved = 2.125;
+    EXPECT_EQ(expected, checked_cast<IntType>(std::move(will_be_moved)));
+}
+
+#if __cplusplus >= 202002L
+TEST_F(TestCheckedCast, Cpp20) {
+    using IntType = int;
+    using FloatType = float;
+    constexpr IntType expected_int = 2;
+    constexpr FloatType expected_float = 2;
+    IntType from_int = 2;
+    float from_float = 2.125f;
+
+    EXPECT_EQ(expected_int, checked_cast_cpp20<IntType>(from_float));
+    EXPECT_FLOAT_EQ(expected_float, checked_cast_cpp20<FloatType>(from_int));
+}
+#endif // C++20
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
