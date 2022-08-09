@@ -215,8 +215,8 @@ ToType checked_cast(FromType&& from) {
  * @return The converted value
  */
 template <typename ToType, typename FromType>
-requires std::integral<std::decay_t<FromType>> || std::floating_point<std::decay_t<FromType>>
-ToType checked_cast_cpp20(FromType&& from) {
+    requires std::integral<std::decay_t<FromType>> ||
+    std::floating_point<std::decay_t<FromType>> ToType checked_cast_cpp20(FromType&& from) {
 #ifdef UNIT_TEST
     return boost::numeric_cast<ToType>(from);
 #else

@@ -120,7 +120,7 @@ class TempFile {
 class TestTempFile : public ::testing::Test {};
 
 TEST_F(TestTempFile, All) {
-    const std::string extension {".csv"};
+    const std::string extension{".csv"};
     std::filesystem::path csv_filepath;
     {
         TempFile csv(extension);
@@ -314,7 +314,7 @@ TEST_F(TestMapCoordinates, Two) {
     const std::vector<CoordinateSet::value_type> expected_vec{-3.0, 3.0};
     CoordinateSetRef expected{expected_vec.data(), boost::extents[expected_vec.size()]};
     ASSERT_EQ(n_pixels, expected.size());
-    ASSERT_EQ(expected, actual);
+    ASSERT_TRUE(expected == actual);
 }
 
 TEST_F(TestMapCoordinates, Many) {
@@ -372,7 +372,7 @@ TEST_F(TestMakeGradientColors, One) {
 }
 
 TEST_F(TestMakeGradientColors, TwoThree) {
-    for(Count max_count {1}; max_count <= 2; ++max_count) {
+    for (Count max_count{1}; max_count <= 2; ++max_count) {
         const auto table = make_gradient_colors(max_count);
         ASSERT_EQ(max_count + 1, table.size());
 
@@ -493,7 +493,7 @@ class TestWriteCsv : public ::testing::Test {};
 
 TEST_F(TestWriteCsv, All) {
     const TempFile csv(".csv");
-    const auto csv_filepath = csv.Get();
+    const auto& csv_filepath = csv.Get();
     ASSERT_TRUE(csv_filepath.has_value());
 
     CountSet count_set(boost::extents[2][3]);
@@ -519,11 +519,11 @@ class TestDraw : public ::testing::Test {};
 
 TEST_F(TestDraw, All) {
     const TempFile csv(".csv");
-    const auto csv_filepath = csv.Get();
+    const auto& csv_filepath = csv.Get();
     ASSERT_TRUE(csv_filepath.has_value());
 
     const TempFile png(".png");
-    const auto png_filepath = png.Get();
+    const auto& png_filepath = png.Get();
     ASSERT_TRUE(png_filepath.has_value());
 
     constexpr PixelSize n_pixels = 16;

@@ -1,7 +1,7 @@
 #include "juliaset.h"
+#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/cast.hpp>
-#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -9,9 +9,7 @@
 #include <type_traits>
 
 namespace juliaset {
-Point transform_point(const Point& from, const Point& offset) {
-    return from * from + offset;
-}
+Point transform_point(const Point& from, const Point& offset) { return from * from + offset; }
 
 Count converge_point(Coordinate point_x, Coordinate point_y, const Point& point_offset,
                      Count max_iter, Coordinate eps) {
@@ -36,8 +34,8 @@ Count converge_point(Coordinate point_x, Coordinate point_y, const Point& point_
     return count;
 }
 
-CountSet converge_point_set(CoordinateSetView& xs, CoordinateSetView& ys,
-                            const Point& point_offset, Count max_iter, Coordinate eps) {
+CountSet converge_point_set(CoordinateSetView& xs, CoordinateSetView& ys, const Point& point_offset,
+                            Count max_iter, Coordinate eps) {
     auto xs_size = xs.shape()[0];
     auto ys_size = ys.shape()[0];
     CountSet mat_counts(boost::extents[ys_size][xs_size]);
@@ -115,7 +113,8 @@ RgbPixelTable make_gradient_colors(Count max_count) {
         for (decltype(max_count) i{0}; i <= max_count; ++i) {
             auto inner_point = [i, max_count](ColorElement left, ColorElement right) {
                 using ColorValue = double;
-                const auto weight = checked_cast<ColorValue>(i) / checked_cast<ColorValue>(max_count);
+                const auto weight =
+                    checked_cast<ColorValue>(i) / checked_cast<ColorValue>(max_count);
                 auto value = checked_cast<ColorValue>(left) * (1.0 - weight) +
                              checked_cast<ColorValue>(right) * weight;
 
