@@ -33,36 +33,46 @@ using Coordinate = float;
 /// A number of pixels
 using PixelSize = size_t;
 
-/// A point as two coordinates in screens
+/// A point as a set of two coordinates in screens
 using Point = std::complex<Coordinate>;
 
 /// A set of coordinates
 using CoordinateSet = boost::multi_array<Coordinate, 1>;
 
-/// A view for set of coordinates
+/// A view for a set of coordinates
 using CoordinateSetView = CoordinateSet::const_array_view<1>::type;
 
-/// An indexed RGB color table
+/// An RGB color table
 using RgbPixelTable = std::vector<boost::gil::rgb8_pixel_t>;
 
 /// RGB colors at pixels in a screen
 using Bitmap = boost::gil::rgb8_image_t;
 
-/// All counts in a screen
+/// Julia set counts in a screen
 using CountSet = boost::multi_array<Count, 2>;
 
 /// Red, green, or blue brightness
 using ColorElement = uint8_t;
 
 /// Default eps
-inline constexpr auto DefaultEps = static_cast<Coordinate>(1e-5f);
+inline constexpr Coordinate DefaultEps = static_cast<Coordinate>(1e-5f);
 
-// Cividis color gradation from blue to yellow
+/// The red brightness at the left end of the Cividis color gradation
 constexpr ColorElement LOW_COLOR_R = 0;
+
+/// The green brightness at the left end of the Cividis color gradation
 constexpr ColorElement LOW_COLOR_G = 32;
+
+/// The blue brightness at the left end of the Cividis color gradation
 constexpr ColorElement LOW_COLOR_B = 81;
+
+/// The red brightness at the right end of the Cividis color gradation
 constexpr ColorElement HIGH_COLOR_R = 253;
+
+/// The green brightness at the right end of the Cividis color gradation
 constexpr ColorElement HIGH_COLOR_G = 233;
+
+/// The blue brightness at the right end of the Cividis color gradation
 constexpr ColorElement HIGH_COLOR_B = 69;
 
 /// A parameter set to draw
@@ -79,6 +89,13 @@ struct ParamSet final {
     std::optional<std::filesystem::path> csv_filepath;
     /// A path to save counts as an image
     std::optional<std::filesystem::path> image_filepath;
+
+    // The default value of x offset that is added in iterations
+    static inline constexpr Coordinate default_x_offset {0.375};
+    static inline constexpr Coordinate default_y_offset {0.375};
+    static inline constexpr Count default_max_iter {100};
+    static inline constexpr PixelSize default_n_pixels {256};
+    static inline const std::string default_image_filename {"cpp_juliaset.png"};
 
     /**
      * @param[in] arg_x_offset An x offset that is added in iterations
@@ -108,14 +125,14 @@ struct ParamSet final {
  * @param[in] point A point
  * @return The squared modulus (2-norm) of the point
  */
-inline auto norm2_sqr(const Point& point) {
+inline Point::value_type norm2_sqr(const Point& point) {
     const auto real = point.real();
     const auto imag = point.imag();
     return real * real + imag * imag;
 }
 
 /**
- * @brief Returns a transformed point under the rule of Julia sets
+ * @brief Transforms a point under the rule of Julia sets
  * @param[in] from An original point
  * @param[in] offset An offset to be added
  * @return A transformed point under the rule of Julia sets
@@ -193,9 +210,17 @@ extern void write_csv(const CountSet& count_set, const std::filesystem::path& cs
 extern void draw(const ParamSet& params);
 
 /**
+ * @brief Parse command line arguments
+ * @param[in] argc The number of arguments
+ * @param[in] argv Command line arguments including an executable's name
+ * @return A parameter set to draw
+ */
+extern ParamSet parse_args(int argc, char* argv[]);
+
+/**
  * @brief Convert a number and check if convertible
- * @tparam[in] ToType The type of a target value
- * @tparam[in] FromType The type of a source value
+ * @tparam ToType The type of a target value
+ * @tparam FromType The type of a source value
  * @param[in] from A source value
  * @return The converted value
  */
@@ -209,11 +234,11 @@ ToType checked_cast(FromType&& from) {
 #endif // UNIT_TEST
 }
 
-#if __cplusplus >= 202002L
+#if (__cplusplus >= 202002L) || defined(DOXYGEN_ENABLED)
 /**
  * @brief Convert a number and check if convertible
- * @tparam[in] ToType The type of a target value
- * @tparam[in] FromType The type of a source value
+ * @tparam ToType The type of a target value
+ * @tparam FromType The type of a source value
  * @param[in] from A source value
  * @return The converted value
  */

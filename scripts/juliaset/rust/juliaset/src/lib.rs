@@ -28,19 +28,19 @@ pub type Coordinate = f32;
 /// A number of pixels
 pub type PixelSize = isize;
 
-/// A point as two coordinates in screens
+/// A point as a set of two coordinates in screens
 type Point = num::complex::Complex<Coordinate>;
 
 /// A set of coordinates
 type CoordinateSet = ndarray::Array1<Coordinate>;
 
-/// A view for set of coordinates
+/// A view for a set of coordinates
 type CoordinateSetView<'a> = ndarray::ArrayView1<'a, Coordinate>;
 
 /// RGB colors at pixels in a screen
 type Bitmap = ndarray::Array3<u8>;
 
-/// All counts in a screen
+/// Julia set counts in a screen
 type CountSet = ndarray::Array2<Count>;
 
 #[cfg(test)]

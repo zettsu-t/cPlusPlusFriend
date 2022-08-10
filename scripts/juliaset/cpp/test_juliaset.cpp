@@ -5,9 +5,15 @@
 
 using namespace juliaset;
 
-namespace {
+namespace juliaset {
+namespace testing {
+/// A immutable array view for a 1-D coordinate set
 using CoordinateSetRef = boost::const_multi_array_ref<Coordinate, 1>;
+
+/// A vector of counts that works with initializer lists
 using CountVector = std::vector<Count>;
+
+/// A vector of vectors that works with initializer lists
 using Count2dVector = std::vector<std::vector<Count>>;
 
 /**
@@ -37,9 +43,11 @@ void copy_2drray(const Count2dVector& src, CountSet& dst) {
     return;
 }
 
-/// A temporary file that only lives in a testing process.
-/// Each instance of TempFile creates a temporary directory
-/// and a temporary filename in the directory.
+/**
+ * A temporary file that only lives in a testing process.
+ * Each instance of TempFile creates a temporary directory
+ * and a temporary filename in the directory.
+ */
 class TempFile {
   public:
     /**
@@ -115,7 +123,9 @@ class TempFile {
     /// A temporary filename
     std::optional<std::filesystem::path> filepath_;
 };
-} // namespace
+}} // namespace
+
+using namespace juliaset::testing;
 
 class TestTempFile : public ::testing::Test {};
 
@@ -550,6 +560,94 @@ TEST_F(TestDraw, All) {
     EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
     EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
     EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
+}
+
+class TestParseArgs : public ::testing::Test {};
+
+TEST_F(TestParseArgs, Empty) {
+    std::string proc_name {"command"};
+    int argc = 1;
+    std::vector<char*> argv(argc + 1, nullptr);
+    argv[0] = const_cast<char*>(proc_name.c_str());
+
+    const auto actual = parse_args(argc, argv.data());
+    std::filesystem::path expected {ParamSet::default_image_filename};
+
+    EXPECT_EQ(ParamSet::default_x_offset, actual.x_offset);
+    EXPECT_EQ(ParamSet::default_y_offset, actual.y_offset);
+    EXPECT_EQ(ParamSet::default_max_iter, actual.max_iter);
+    EXPECT_EQ(ParamSet::default_n_pixels, actual.n_pixels);
+    ASSERT_FALSE(actual.csv_filepath.has_value());
+    ASSERT_TRUE(actual.image_filepath.has_value());
+    EXPECT_EQ(expected, actual.image_filepath.value());
+}
+
+TEST_F(TestParseArgs, Long) {
+    std::vector<std::string> arg_set {
+        "command",
+        "--x_offset", "0.12",
+        "--y_offset", "0.34",
+        "--max_iter", "56",
+        "--size", "78",
+        "--csv", "_test.csv",
+        "--image", "_test.png"
+    };
+
+    std::vector<char*> argv;
+    for (const auto& arg : arg_set) {
+        argv.push_back(const_cast<char*>(arg.c_str()));
+    }
+
+    const int argc = checked_cast<int>(argv.size());
+    argv.push_back(nullptr);
+    const auto actual = parse_args(argc, argv.data());
+    std::filesystem::path expected {ParamSet::default_image_filename};
+
+    std::filesystem::path expected_csv {"_test.csv"};
+    std::filesystem::path expected_image {"_test.png"};
+
+    EXPECT_FLOAT_EQ(0.12f, actual.x_offset);
+    EXPECT_FLOAT_EQ(0.34f, actual.y_offset);
+    EXPECT_EQ(56, actual.max_iter);
+    EXPECT_EQ(78, actual.n_pixels);
+    ASSERT_TRUE(actual.csv_filepath.has_value());
+    EXPECT_EQ(expected_csv, actual.csv_filepath.value());
+    ASSERT_TRUE(actual.image_filepath.has_value());
+    EXPECT_EQ(expected_image, actual.image_filepath.value());
+}
+
+TEST_F(TestParseArgs, Short) {
+    std::vector<std::string> arg_set {
+        "command",
+        "-x", "0.056",
+        "-y", "0.078",
+        "-m", "21",
+        "-s", "43",
+        "-c", "_short.csv",
+        "-o", "_short.png"
+    };
+
+    std::vector<char*> argv;
+    for (const auto& arg : arg_set) {
+        argv.push_back(const_cast<char*>(arg.c_str()));
+    }
+
+    const int argc = checked_cast<int>(argv.size());
+    argv.push_back(nullptr);
+    const auto actual = parse_args(argc, argv.data());
+    std::filesystem::path expected {ParamSet::default_image_filename};
+
+    std::filesystem::path expected_csv {"_short.csv"};
+    std::filesystem::path expected_image {"_short.png"};
+
+    EXPECT_FLOAT_EQ(0.056f, actual.x_offset);
+    EXPECT_FLOAT_EQ(0.078f, actual.y_offset);
+    EXPECT_EQ(21, actual.max_iter);
+    EXPECT_EQ(43, actual.n_pixels);
+    ASSERT_TRUE(actual.csv_filepath.has_value());
+    EXPECT_EQ(expected_csv, actual.csv_filepath.value());
+    ASSERT_TRUE(actual.image_filepath.has_value());
+    EXPECT_EQ(expected_image, actual.image_filepath.value());
 }
 
 class TestCheckedCast : public ::testing::Test {};
