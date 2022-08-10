@@ -215,7 +215,7 @@ extern void draw(const ParamSet& params);
  * @param[in] argv Command line arguments including an executable's name
  * @return A parameter set to draw
  */
-extern ParamSet parse_args(int argc, char* argv[]);
+extern ParamSet parse_args(int argc, const char* const argv[]);
 
 /**
  * @brief Convert a number and check if convertible

@@ -207,7 +207,7 @@ void draw(const ParamSet& params) {
         } \
     } while(0) \
 
-ParamSet parse_args(int argc, char* argv[]) {
+ParamSet parse_args(int argc, const char* const argv[]) {
     const std::string long_opt_x_offset {"x_offset"};
     const std::string long_opt_y_offset {"y_offset"};
     const std::string long_opt_max_iter {"max_iter"};

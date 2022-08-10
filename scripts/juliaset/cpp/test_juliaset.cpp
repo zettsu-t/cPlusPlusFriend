@@ -2,6 +2,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <random>
+#include <tuple>
 
 using namespace juliaset;
 
@@ -41,6 +42,22 @@ void copy_2drray(const Count2dVector& src, CountSet& dst) {
         ++i;
     }
     return;
+}
+
+/**
+ * @brief Makes arguments for parse_command_line()
+ * @param[in] arg_set An array of command line arguments
+ * @return The argc and argv
+ */
+auto make_argc_argv(const std::vector<std::string>& arg_set) {
+    std::vector<const char*> argv;
+    for (const auto& arg : arg_set) {
+        argv.push_back(arg.c_str());
+    }
+
+    auto argc = checked_cast<int>(argv.size());
+    argv.push_back(nullptr);
+    return std::make_tuple(argc, argv);
 }
 
 /**
@@ -565,10 +582,12 @@ TEST_F(TestDraw, All) {
 class TestParseArgs : public ::testing::Test {};
 
 TEST_F(TestParseArgs, Empty) {
-    std::string proc_name {"command"};
-    int argc = 1;
-    std::vector<char*> argv(argc + 1, nullptr);
-    argv[0] = const_cast<char*>(proc_name.c_str());
+    const std::vector<std::string> arg_set {"command"};
+    const auto [argc, argv] = make_argc_argv(arg_set);
+    ASSERT_EQ(1, argc);
+    ASSERT_EQ(2, argv.size());
+    ASSERT_TRUE(argv.at(0));
+    ASSERT_FALSE(argv.at(1));
 
     const auto actual = parse_args(argc, argv.data());
     std::filesystem::path expected {ParamSet::default_image_filename};
@@ -583,7 +602,7 @@ TEST_F(TestParseArgs, Empty) {
 }
 
 TEST_F(TestParseArgs, Long) {
-    std::vector<std::string> arg_set {
+    const std::vector<std::string> arg_set {
         "command",
         "--x_offset", "0.12",
         "--y_offset", "0.34",
@@ -593,13 +612,7 @@ TEST_F(TestParseArgs, Long) {
         "--image", "_test.png"
     };
 
-    std::vector<char*> argv;
-    for (const auto& arg : arg_set) {
-        argv.push_back(const_cast<char*>(arg.c_str()));
-    }
-
-    const int argc = checked_cast<int>(argv.size());
-    argv.push_back(nullptr);
+    const auto [argc, argv] = make_argc_argv(arg_set);
     const auto actual = parse_args(argc, argv.data());
     std::filesystem::path expected {ParamSet::default_image_filename};
 
@@ -617,7 +630,7 @@ TEST_F(TestParseArgs, Long) {
 }
 
 TEST_F(TestParseArgs, Short) {
-    std::vector<std::string> arg_set {
+    const std::vector<std::string> arg_set {
         "command",
         "-x", "0.056",
         "-y", "0.078",
@@ -627,13 +640,7 @@ TEST_F(TestParseArgs, Short) {
         "-o", "_short.png"
     };
 
-    std::vector<char*> argv;
-    for (const auto& arg : arg_set) {
-        argv.push_back(const_cast<char*>(arg.c_str()));
-    }
-
-    const int argc = checked_cast<int>(argv.size());
-    argv.push_back(nullptr);
+    const auto [argc, argv] = make_argc_argv(arg_set);
     const auto actual = parse_args(argc, argv.data());
     std::filesystem::path expected {ParamSet::default_image_filename};
 
