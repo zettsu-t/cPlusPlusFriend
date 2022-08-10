@@ -613,6 +613,10 @@ TEST_F(TestParseArgs, Long) {
     };
 
     const auto [argc, argv] = make_argc_argv(arg_set);
+    ASSERT_EQ(arg_set.size(), argc);
+    ASSERT_EQ(argc + 1, argv.size());
+    ASSERT_FALSE(argv.at(argc));
+
     const auto actual = parse_args(argc, argv.data());
     std::filesystem::path expected {ParamSet::default_image_filename};
 

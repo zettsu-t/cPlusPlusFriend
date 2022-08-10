@@ -67,6 +67,17 @@ fn parse_args(args: &[String]) -> ParamSet {
 }
 
 #[test]
+fn test_default_arguments() {
+    let args: Vec<String> = vec!["command"].iter().map(|&s| s.into()).collect();
+    let actual = parse_args(&args);
+    let n_pixels: PixelSize = 256;
+    let csv_filename = None;
+    let image_filename = Some("rust_juliaset.png".to_string());
+    let expected = ParamSet::new(0.375, 0.375, 100, n_pixels, &csv_filename, &image_filename);
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn test_full_arguments() {
     let args: Vec<String> = vec![
         "command",
@@ -91,17 +102,6 @@ fn test_full_arguments() {
     let csv_filename = Some("input.csv".to_string());
     let image_filename = Some("input.png".to_string());
     let expected = ParamSet::new(0.5, 0.25, 31, n_pixels, &csv_filename, &image_filename);
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn test_default_arguments() {
-    let args: Vec<String> = vec!["command"].iter().map(|&s| s.into()).collect();
-    let actual = parse_args(&args);
-    let n_pixels: PixelSize = 256;
-    let csv_filename = None;
-    let image_filename = Some("rust_juliaset.png".to_string());
-    let expected = ParamSet::new(0.375, 0.375, 100, n_pixels, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
 }
 
