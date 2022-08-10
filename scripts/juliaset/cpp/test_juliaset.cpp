@@ -49,7 +49,7 @@ void copy_2drray(const Count2dVector& src, CountSet& dst) {
  * @param[in] arg_set An array of command line arguments
  * @return The argc and argv
  */
-auto make_argc_argv(const std::vector<std::string>& arg_set) {
+std::tuple<int, std::vector<const char*>> make_argc_argv(const std::vector<std::string>& arg_set) {
     std::vector<const char*> argv;
     for (const auto& arg : arg_set) {
         argv.push_back(arg.c_str());
