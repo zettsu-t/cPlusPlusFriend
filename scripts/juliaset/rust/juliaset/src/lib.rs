@@ -10,6 +10,8 @@ use csv::ReaderBuilder;
 use image::io::Reader as ImageReader;
 #[cfg(test)]
 use tempfile::Builder;
+#[cfg(test)]
+use tempfile::TempDir;
 
 use csv::WriterBuilder;
 use image::RgbImage;
@@ -635,35 +637,45 @@ fn test_draw_image_many_colors() {
     }
 }
 
-#[test]
-pub fn test_draw() {
-    let temp_dir = Builder::new()
+#[cfg(test)]
+fn make_temp_dir() -> TempDir {
+    Builder::new()
         .prefix("test-dir")
         .rand_bytes(10)
         .tempdir()
-        .unwrap();
-    let temp_csv_filename = temp_dir.path().join("_test_.csv");
-    let temp_png_filename = temp_dir.path().join("_test_.png");
-    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
-    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+        .unwrap()
+}
 
+#[cfg(test)]
+fn make_default_params(csv_filename: &Option<String>,
+                       image_filename: &Option<String>) -> ParamSet {
     let x_offset: Coordinate = 0.5;
     let y_offset: Coordinate = 0.125;
     let max_iter: Count = 20;
     let n_pixels: PixelSize = 16;
-    let params = ParamSet::new(
+    ParamSet::new(
         x_offset,
         y_offset,
         max_iter,
         n_pixels,
         &csv_filename,
         &image_filename,
-    );
+    )
+}
+
+#[test]
+pub fn test_draw() {
+    let temp_dir = make_temp_dir();
+    let temp_csv_filename = temp_dir.path().join("_test_.csv");
+    let temp_png_filename = temp_dir.path().join("_test_.png");
+    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
+    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+    let params = make_default_params(&csv_filename, &image_filename);
     draw(&params);
 
     let csv_path = Some(PathBuf::from(csv_filename.unwrap()));
     let image_path = Some(PathBuf::from(image_filename.unwrap()));
-    let pixel_size = u32::try_from(n_pixels).unwrap();
+    let pixel_size = u32::try_from(params.n_pixels).unwrap();
 
     let mut reader = ReaderBuilder::new()
         .has_headers(false)
@@ -693,4 +705,60 @@ pub fn test_draw() {
     assert_eq!(color[0], LOW_COLOR_R);
     assert_eq!(color[1], LOW_COLOR_G);
     assert_eq!(color[2], LOW_COLOR_B);
+}
+
+#[test]
+pub fn test_draw_no_writes() {
+    let csv_filename = None;
+    let image_filename = None;
+    let params = make_default_params(&csv_filename, &image_filename);
+    draw(&params);
+}
+
+#[test]
+#[should_panic]
+pub fn test_draw_csv_error() {
+    let temp_dir = make_temp_dir();
+    let temp_csv_filename = temp_dir.path().join("_test_.csv");
+    let image_filename = None;
+    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
+    let params = make_default_params(&csv_filename, &image_filename);
+    std::fs::remove_dir(temp_dir).unwrap();
+    draw(&params);
+}
+
+#[test]
+#[should_panic]
+pub fn test_draw_png_error() {
+    let temp_dir = make_temp_dir();
+    let csv_filename = None;
+    let temp_png_filename = temp_dir.path().join("_test_.png");
+    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+    let params = make_default_params(&csv_filename, &image_filename);
+    std::fs::remove_dir(temp_dir).unwrap();
+    draw(&params);
+}
+
+#[test]
+#[should_panic]
+pub fn test_draw_bad_csv_filename() {
+    let temp_dir = make_temp_dir();
+    let temp_csv_filename = temp_dir.path().join("..");
+    let temp_png_filename = temp_dir.path().join("_test_.png");
+    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
+    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+    let params = make_default_params(&csv_filename, &image_filename);
+    draw(&params);
+}
+
+#[test]
+#[should_panic]
+pub fn test_draw_bad_png_filename() {
+    let temp_dir = make_temp_dir();
+    let temp_csv_filename = temp_dir.path().join("_test_.csv");
+    let temp_png_filename = temp_dir.path().join("..");
+    let csv_filename = Some(temp_csv_filename.to_str().unwrap().to_owned());
+    let image_filename = Some(temp_png_filename.to_str().unwrap().to_owned());
+    let params = make_default_params(&csv_filename, &image_filename);
+    draw(&params);
 }
