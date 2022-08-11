@@ -118,14 +118,7 @@ class TempFile {
     }
 
     virtual ~TempFile() {
-        if (filepath_.has_value()) {
-            std::filesystem::remove(filepath_.value());
-        }
-
-        if (topdir_.has_value()) {
-            // Must be empty
-            std::filesystem::remove(topdir_.value());
-        }
+        clean();
     }
 
     /**
@@ -134,7 +127,30 @@ class TempFile {
      */
     const std::optional<std::filesystem::path>& Get() const { return filepath_; }
 
+    /**
+     * @brief Causes write errors in testing
+     */
+    virtual void CauseError() {
+        clean();
+    }
+
   private:
+    void clean() {
+        if (filepath_.has_value()) {
+            if (std::filesystem::exists(filepath_.value())) {
+                std::filesystem::remove(filepath_.value());
+            }
+            filepath_.reset();
+        }
+
+        if (topdir_.has_value()) {
+            if (std::filesystem::is_directory(topdir_.value())) {
+                std::filesystem::remove(topdir_.value());
+            }
+            topdir_.reset();
+        }
+    }
+
     /// A temporary directory that exists
     std::optional<std::filesystem::path> topdir_;
     /// A temporary filename
@@ -163,6 +179,34 @@ TEST_F(TestTempFile, All) {
     ASSERT_FALSE(std::filesystem::exists(csv_filepath));
     ASSERT_FALSE(std::filesystem::exists(csv_filepath.parent_path()));
     ASSERT_TRUE(std::filesystem::exists(csv_filepath.parent_path().parent_path()));
+}
+
+TEST_F(TestTempFile, RemoveDir) {
+    const std::string extension{".csv"};
+    TempFile csv(extension);
+    const auto actual = csv.Get();
+    ASSERT_TRUE(actual.has_value());
+    const auto csv_dir = actual.value().parent_path();
+
+    csv.CauseError();
+    ASSERT_FALSE(std::filesystem::is_directory(csv_dir));
+}
+
+TEST_F(TestTempFile, RemoveFile) {
+    const std::string extension{".csv"};
+    TempFile csv(extension);
+    const auto actual = csv.Get();
+    ASSERT_TRUE(actual.has_value());
+    const auto csv_filepath = actual.value();
+
+    {
+        std::ofstream os(csv_filepath);
+    }
+
+    ASSERT_TRUE(std::filesystem::exists(csv_filepath));
+    csv.CauseError();
+    ASSERT_FALSE(std::filesystem::exists(csv_filepath));
+    ASSERT_FALSE(std::filesystem::is_directory(csv_filepath.parent_path()));
 }
 
 class TestParamSet : public ::testing::Test {};
@@ -518,7 +562,7 @@ TEST_F(TestDrawImage, ManyColors) {
 
 class TestWriteCsv : public ::testing::Test {};
 
-TEST_F(TestWriteCsv, All) {
+TEST_F(TestWriteCsv, Success) {
     const TempFile csv(".csv");
     const auto& csv_filepath = csv.Get();
     ASSERT_TRUE(csv_filepath.has_value());
@@ -535,16 +579,22 @@ TEST_F(TestWriteCsv, All) {
         }
     }
 
-    write_csv(count_set, *csv_filepath);
+    ASSERT_EQ(ExitStatus::SUCCESS, write_csv(count_set, *csv_filepath));
     std::ifstream ifs(*csv_filepath);
     const std::string actual(std::istreambuf_iterator<char>(ifs), {});
     const std::string expected("0,4,8\n16,32,64\n");
     EXPECT_EQ(expected, actual);
 }
 
+TEST_F(TestWriteCsv, Failed) {
+    const std::filesystem::path empty_filename;
+    CountSet count_set(boost::extents[2][3]);
+    ASSERT_EQ(ExitStatus::FILE_ERROR, write_csv(count_set, empty_filename));
+}
+
 class TestDraw : public ::testing::Test {};
 
-TEST_F(TestDraw, All) {
+TEST_F(TestDraw, Success) {
     const TempFile csv(".csv");
     const auto& csv_filepath = csv.Get();
     ASSERT_TRUE(csv_filepath.has_value());
@@ -555,7 +605,7 @@ TEST_F(TestDraw, All) {
 
     constexpr PixelSize n_pixels = 16;
     const ParamSet params(0.5, 0.125, 20, n_pixels, csv_filepath, png_filepath);
-    draw(params);
+    ASSERT_EQ(ExitStatus::SUCCESS, draw(params));
 
     std::ifstream ifs(*csv_filepath);
     std::string line;
@@ -577,6 +627,61 @@ TEST_F(TestDraw, All) {
     EXPECT_EQ(LOW_COLOR_R, boost::gil::at_c<0>(pixel));
     EXPECT_EQ(LOW_COLOR_G, boost::gil::at_c<1>(pixel));
     EXPECT_EQ(LOW_COLOR_B, boost::gil::at_c<2>(pixel));
+}
+
+TEST_F(TestDraw, NoWrites) {
+    const std::optional<std::filesystem::path> csv_filepath;
+    const std::optional<std::filesystem::path> png_filepath;
+    const ParamSet params(0.5, 0.125, 20, 32, csv_filepath, png_filepath);
+    ASSERT_EQ(ExitStatus::SUCCESS, draw(params));
+}
+
+TEST_F(TestDraw, CsvError) {
+    TempFile csv(".csv");
+    const auto csv_filepath = csv.Get();
+    ASSERT_TRUE(csv_filepath.has_value());
+    csv.CauseError();
+
+    TempFile png(".png");
+    const auto png_filepath = png.Get();
+    ASSERT_TRUE(png_filepath.has_value());
+
+    const ParamSet params(0.5, 0.125, 20, 32, csv_filepath, png_filepath);
+    ASSERT_EQ(ExitStatus::FILE_ERROR, draw(params));
+}
+
+TEST_F(TestDraw, ImageError) {
+    TempFile csv(".csv");
+    const auto csv_filepath = csv.Get();
+    ASSERT_TRUE(csv_filepath.has_value());
+
+    TempFile png(".png");
+    const auto png_filepath = png.Get();
+    ASSERT_TRUE(png_filepath.has_value());
+    png.CauseError();
+
+    const ParamSet params(0.5, 0.125, 20, 32, csv_filepath, png_filepath);
+    ASSERT_EQ(ExitStatus::FILE_ERROR, draw(params));
+}
+
+TEST_F(TestDraw, BadCsvFilename) {
+    const std::filesystem::path csv_filepath {".."};
+    const TempFile png(".png");
+    const auto& png_filepath = png.Get();
+    ASSERT_TRUE(png_filepath.has_value());
+
+    const ParamSet params(0.5, 0.125, 20, 32, csv_filepath, png_filepath);
+    ASSERT_EQ(ExitStatus::FILE_ERROR, draw(params));
+}
+
+TEST_F(TestDraw, BadImageFilename) {
+    const TempFile csv(".csv");
+    const auto& csv_filepath = csv.Get();
+    ASSERT_TRUE(csv_filepath.has_value());
+    const std::filesystem::path png_filepath {".."};
+
+    const ParamSet params(0.5, 0.125, 20, 32, csv_filepath, png_filepath);
+    ASSERT_EQ(ExitStatus::FILE_ERROR, draw(params));
 }
 
 class TestParseArgs : public ::testing::Test {};

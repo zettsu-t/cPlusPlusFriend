@@ -2,10 +2,12 @@
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/cast.hpp>
+#include <exception>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 #include <type_traits>
 
 namespace juliaset {
@@ -159,37 +161,57 @@ Bitmap draw_image(const CountSet& count_set) {
     return img;
 }
 
-void write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename) {
-    auto n_rows = count_set.shape()[0];
-    std::ofstream os(csv_filename);
+[[nodiscard]] ExitStatus write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename) {
+    bool success = false;
+    try {
+        auto n_rows = count_set.shape()[0];
+        std::ofstream os(csv_filename);
 
-    for (decltype(n_rows) i_row{0}; i_row < n_rows; ++i_row) {
-        const auto column = count_set[boost::indices[i_row][CountSet::index_range()]];
-        std::vector<std::string> cells;
-        std::transform(column.begin(), column.end(), std::back_inserter(cells),
-                       [](auto i) { return std::to_string(i); });
-        // We can alloc the 'joined' buffer once and replace trailing , to LF.
-        std::string joined = boost::algorithm::join(cells, ",");
-        os << joined << "\n";
+        for (decltype(n_rows) i_row{0}; i_row < n_rows; ++i_row) {
+            const auto column = count_set[boost::indices[i_row][CountSet::index_range()]];
+            std::vector<std::string> cells;
+            std::transform(column.begin(), column.end(), std::back_inserter(cells),
+                           [](auto i) { return std::to_string(i); });
+            // We can alloc the 'joined' buffer once and replace trailing , to LF.
+            std::string joined = boost::algorithm::join(cells, ",");
+            os << joined << "\n";
+        }
+
+        os << std::flush;
+        success = os.good();
+        os.close();
+        success &= os.good();
+    } catch (std::exception& e) {
     }
-    os << std::flush;
+
+    return (success) ? ExitStatus::SUCCESS : ExitStatus::FILE_ERROR;
 }
 
-void draw(const ParamSet& params) {
+[[nodiscard]] ExitStatus draw(const ParamSet& params) {
     const auto count_set =
         scan_points(params.x_offset, params.y_offset, params.max_iter, params.n_pixels);
 
     if (params.csv_filepath.has_value()) {
-        write_csv(count_set, params.csv_filepath.value());
+        const auto status = write_csv(count_set, params.csv_filepath.value());
+        if (status != ExitStatus::SUCCESS) {
+            return status;
+        }
     }
 
+    ExitStatus status = ExitStatus::SUCCESS;
     if (params.image_filepath.has_value()) {
-        auto img = draw_image(count_set);
-        const auto img_filename = params.image_filepath.value().string();
-        boost::gil::write_view(img_filename, const_view(img), boost::gil::png_tag());
+        bool success = false;
+        try {
+            auto img = draw_image(count_set);
+            const auto img_filename = params.image_filepath.value().string();
+            boost::gil::write_view(img_filename, const_view(img), boost::gil::png_tag());
+            success = true;
+        } catch (std::exception& e) {
+        }
+        status = (success) ? ExitStatus::SUCCESS : ExitStatus::FILE_ERROR;
     }
 
-    return;
+    return status;
 }
 
 #define set_option_value(vmap, option_name, var_name) \

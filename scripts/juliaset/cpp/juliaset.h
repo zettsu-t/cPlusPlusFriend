@@ -75,6 +75,14 @@ constexpr ColorElement HIGH_COLOR_G = 233;
 /// The blue brightness at the right end of the Cividis color gradation
 constexpr ColorElement HIGH_COLOR_B = 69;
 
+/// A process exit status
+enum class ExitStatus {
+    /// The process exit status for successes
+    SUCCESS = 0,
+    /// The process exit status for file I/O errors
+    FILE_ERROR
+};
+
 /// A parameter set to draw
 struct ParamSet final {
     /// An x offset that is added in iterations
@@ -90,11 +98,15 @@ struct ParamSet final {
     /// A path to save counts as an image
     std::optional<std::filesystem::path> image_filepath;
 
-    // The default value of x offset that is added in iterations
+    /// The default x offset
     static inline constexpr Coordinate default_x_offset {0.375};
+    /// The default y offset
     static inline constexpr Coordinate default_y_offset {0.375};
+    /// The default maximum number of iterations
     static inline constexpr Count default_max_iter {100};
+    /// The default width and height in pixels
     static inline constexpr PixelSize default_n_pixels {256};
+    /// The default image filename
     static inline const std::string default_image_filename {"cpp_juliaset.png"};
 
     /**
@@ -200,14 +212,16 @@ extern Bitmap draw_image(const CountSet& count_set);
  * @brief Writes a count set table to a CSV file
  * @param[in] count_set Counts of a Julia set in a screen
  * @param[in] csv_filename A CSV filename to save the set
+ * @return 0 for success, others for failures
  */
-extern void write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename);
+[[nodiscard]] extern ExitStatus write_csv(const CountSet& count_set, const std::filesystem::path& csv_filename);
 
 /**
  * @brief Draws a Julia set
  * @param[in] params A parameter set to draw
+ * @return 0 for success, others for failures
  */
-extern void draw(const ParamSet& params);
+[[nodiscard]] extern ExitStatus draw(const ParamSet& params);
 
 /**
  * @brief Parse command line arguments
@@ -218,7 +232,7 @@ extern void draw(const ParamSet& params);
 extern ParamSet parse_args(int argc, const char* const argv[]);
 
 /**
- * @brief Convert a number and check if convertible
+ * @brief Converts a number and check if convertible
  * @tparam ToType The type of a target value
  * @tparam FromType The type of a source value
  * @param[in] from A source value
@@ -236,7 +250,7 @@ ToType checked_cast(FromType&& from) {
 
 #if (__cplusplus >= 202002L) || defined(DOXYGEN_ENABLED)
 /**
- * @brief Convert a number and check if convertible
+ * @brief Converts a number and check if convertible
  * @tparam ToType The type of a target value
  * @tparam FromType The type of a source value
  * @param[in] from A source value
