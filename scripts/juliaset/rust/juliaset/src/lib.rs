@@ -729,7 +729,7 @@ pub fn test_draw_csv_error() {
 
 #[test]
 #[should_panic]
-pub fn test_draw_png_error() {
+pub fn test_draw_image_error() {
     let temp_dir = make_temp_dir();
     let csv_filename = None;
     let temp_png_filename = temp_dir.path().join("_test_.png");

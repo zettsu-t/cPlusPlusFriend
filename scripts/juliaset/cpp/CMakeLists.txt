@@ -3,8 +3,12 @@ configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
 
 project(juliaset CXX)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -pthread")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage -pthread")
+
+set(CMAKE_THREAD_PREFER_PTHREAD ON)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # Use Boost C++ libraries
 set(Boost_USE_STATIC_LIBS ON)
@@ -37,6 +41,6 @@ set(BASEPATH "${CMAKE_SOURCE_DIR}")
 add_executable(juliaset juliaset_impl.cpp juliaset.cpp)
 add_executable(test_juliaset juliaset_impl.cpp test_juliaset.cpp)
 target_compile_options(test_juliaset PRIVATE -Wall -Wextra -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter -DUNIT_TEST)
-target_link_libraries(juliaset boost_program_options png)
-target_link_libraries(test_juliaset boost_program_options gtest_main png pthread)
+target_link_libraries(juliaset boost_program_options png Threads::Threads)
+target_link_libraries(test_juliaset boost_program_options gtest_main png Threads::Threads)
 gtest_add_tests(TARGET test_juliaset)

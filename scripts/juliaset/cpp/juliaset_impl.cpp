@@ -3,6 +3,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/cast.hpp>
 #include <exception>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -82,25 +83,38 @@ CountSet scan_points(Coordinate x_offset, Coordinate y_offset, Count max_iter, P
     auto n_xs = xs.shape()[0];
     auto n_ys = ys.shape()[0];
     CountSet mat_counts(boost::extents[n_ys][n_xs]);
-    auto n_cpus = std::thread::hardware_concurrency();
     CoordinateSetView x_view = xs[boost::indices[decltype(xs)::index_range()]];
 
+    auto n_cpus = std::thread::hardware_concurrency();
     using Index = decltype(n_ys);
     Index index_start = 0;
     Index index_span =
         checked_cast<Index>(std::ceil(checked_cast<double>(n_ys) / checked_cast<double>(n_cpus)));
+    {
+        std::vector<std::future<void>> futureSet;
+        auto run = [&](auto sub_start, auto sub_end) -> void {
+            CoordinateSetView y_view =
+                ys[boost::indices[decltype(ys)::index_range(sub_start, sub_end)]];
 
-    for (decltype(n_cpus) i{0}; i < n_cpus; ++i) {
-        Index index_end = index_start + index_span;
-        index_end = std::min(index_end, n_ys);
-        CoordinateSetView y_view =
-            ys[boost::indices[decltype(ys)::index_range(index_start, index_end)]];
+            const auto sub_counts = converge_point_set(x_view, y_view, point_offset, max_iter, eps);
+            mat_counts[boost::indices[decltype(mat_counts)::index_range(sub_start, sub_end)]
+                       [decltype(mat_counts)::index_range()]] = sub_counts;
+        };
 
-        const auto sub_counts = converge_point_set(x_view, y_view, point_offset, max_iter, eps);
-        mat_counts[boost::indices[decltype(mat_counts)::index_range(index_start, index_end)]
-                                 [decltype(mat_counts)::index_range()]] = sub_counts;
+        for (decltype(n_cpus) i{0}; i < n_cpus; ++i) {
+            Index index_end = index_start + index_span;
+            index_end = std::min(index_end, n_ys);
+            auto job = [=]() -> void {
+                run(index_start, index_end);
+            };
 
-        index_start = index_end;
+            futureSet.push_back(std::async(std::launch::async, job));
+            index_start = index_end;
+        }
+
+        for(auto& f : futureSet) {
+            f.get();
+        }
     }
 
     return mat_counts;
@@ -151,10 +165,38 @@ Bitmap draw_image(const CountSet& count_set) {
     }
 
     const auto color_table = make_gradient_colors(max_count);
-    for (decltype(n_ys) y{0}; y < n_ys; ++y) {
-        auto it = view(img).row_begin(y);
-        for (decltype(n_xs) x{0}; x < n_xs; ++x, ++it) {
-            *it = color_table.at(count_set[y][x]);
+    auto img_view = view(img);
+    auto height = img_view.height();
+
+    auto n_cpus = std::thread::hardware_concurrency();
+    using Index = decltype(height);
+    Index y_start = 0;
+    Index y_span =
+        checked_cast<Index>(std::ceil(checked_cast<double>(height) / checked_cast<double>(n_cpus)));
+    {
+        std::vector<std::future<void>> futureSet;
+        auto run = [&](auto sub_start, auto sub_end) -> void {
+            for (decltype(sub_start) y{sub_start}; y < sub_end; ++y) {
+                auto it = img_view.row_begin(y);
+                for (decltype(n_xs) x{0}; x < n_xs; ++x, ++it) {
+                    *it = color_table.at(count_set[y][x]);
+                }
+            }
+        };
+
+        for (decltype(n_cpus) i{0}; i < n_cpus; ++i) {
+            Index y_end = y_start + y_span;
+            y_end = std::min(y_end, height);
+            auto job = [=]() -> void {
+                run(y_start, y_end);
+            };
+
+            futureSet.push_back(std::async(std::launch::async, job));
+            y_start = y_end;
+        }
+
+        for(auto& f : futureSet) {
+            f.get();
         }
     }
 
