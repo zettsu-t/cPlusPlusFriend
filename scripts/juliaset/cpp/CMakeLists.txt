@@ -40,6 +40,7 @@ set(BASEPATH "${CMAKE_SOURCE_DIR}")
 # Executable unit tests
 add_executable(juliaset juliaset_impl.cpp juliaset.cpp)
 add_executable(test_juliaset juliaset_impl.cpp test_juliaset.cpp)
+add_custom_target(run COMMAND juliaset DEPENDS juliaset WORKING_DIRECTORY ${CMAKE_PROJECT_DIR})
 target_compile_options(test_juliaset PRIVATE -Wall -Wextra -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter -DUNIT_TEST)
 target_link_libraries(juliaset boost_program_options png Threads::Threads)
 target_link_libraries(test_juliaset boost_program_options gtest_main png Threads::Threads)
