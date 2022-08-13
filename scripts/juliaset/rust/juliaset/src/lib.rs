@@ -271,8 +271,6 @@ fn draw_image(count_set: CountSet) -> RgbImage {
         };
     }
 
-    println!("Drawing an image");
-
     type BitmapCoord = usize;
     let (height, width) = count_set.dim();
     let shape = [height, width, 3];
@@ -334,7 +332,6 @@ fn draw_image(count_set: CountSet) -> RgbImage {
     })
     .unwrap();
 
-    println!("Writing an image");
     let raw = bitmap.into_raw_vec();
     RgbImage::from_raw(
         u32::try_from(width).unwrap(),
@@ -350,7 +347,6 @@ fn draw_image(count_set: CountSet) -> RgbImage {
 ///
 /// * `params` A parameter set to draw
 pub fn draw(params: &ParamSet) {
-    println!("Scanning points");
     let count_set = scan_points(
         params.x_offset,
         params.y_offset,
@@ -360,7 +356,6 @@ pub fn draw(params: &ParamSet) {
 
     match &params.csv_filepath {
         Some(csv_filepath) => {
-            println!("Writing a CSV file");
             let file = File::create(csv_filepath).expect("Creating a CSV file failed");
             let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
             writer
