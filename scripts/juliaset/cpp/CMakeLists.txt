@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
+configure_file(CMakeLists2.txt.in benchmark-download/CMakeLists.txt)
 
 project(juliaset CXX)
 set(CMAKE_CXX_STANDARD 17)
@@ -34,14 +35,31 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src ${CMAKE_CURRENT_BINA
 enable_testing()
 include(GoogleTest)
 
+# Use Google Benchmark
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . RESULT_VARIABLE result WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/benchmark-download)
+
+if(result)
+  message(FATAL_ERROR "CMake step for google benchmark failed: ${result}")
+endif()
+
+execute_process(COMMAND ${CMAKE_COMMAND} --build . RESULT_VARIABLE result WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/benchmark-download)
+
+if(result)
+  message(FATAL_ERROR "Build step for google benchmark failed: ${result}")
+endif()
+
+add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/benchmark-src ${CMAKE_CURRENT_BINARY_DIR}/benchmark-build EXCLUDE_FROM_ALL)
+
 # Include header files
 set(BASEPATH "${CMAKE_SOURCE_DIR}")
 
 # Executable unit tests
 add_executable(juliaset juliaset_impl.cpp juliaset.cpp)
 add_executable(test_juliaset juliaset_impl.cpp test_juliaset.cpp)
+add_executable(bench_juliaset juliaset_impl.cpp bench_juliaset.cpp)
 add_custom_target(run COMMAND juliaset DEPENDS juliaset WORKING_DIRECTORY ${CMAKE_PROJECT_DIR})
 target_compile_options(test_juliaset PRIVATE -Wall -Wextra -Wconversion -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter -DUNIT_TEST)
 target_link_libraries(juliaset boost_program_options png Threads::Threads)
 target_link_libraries(test_juliaset boost_program_options gtest_main png Threads::Threads)
+target_link_libraries(bench_juliaset boost_program_options gtest_main png Threads::Threads benchmark::benchmark)
 gtest_add_tests(TARGET test_juliaset)
