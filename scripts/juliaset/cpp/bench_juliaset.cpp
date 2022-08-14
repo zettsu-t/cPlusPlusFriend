@@ -10,7 +10,7 @@ static void BM_sample(benchmark::State& state) {
     constexpr PixelSize n_pixels = 256;
     const ParamSet params(0.5, 0.125, 75, n_pixels, csv_filepath, png_filepath);
     if (draw(params) != ExitStatus::SUCCESS) {
-        std::cerr << "!";
+        std::cerr << "Failed\n";
         return;
     }
 }

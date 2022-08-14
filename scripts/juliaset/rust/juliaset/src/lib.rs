@@ -659,7 +659,7 @@ fn make_default_params(csv_filename: &Option<String>,
 }
 
 #[test]
-pub fn test_draw() {
+fn test_draw() {
     let temp_dir = make_temp_dir();
     let temp_csv_filename = temp_dir.path().join("_test_.csv");
     let temp_png_filename = temp_dir.path().join("_test_.png");
@@ -703,7 +703,7 @@ pub fn test_draw() {
 }
 
 #[test]
-pub fn test_draw_no_writes() {
+fn test_draw_no_writes() {
     let csv_filename = None;
     let image_filename = None;
     let params = make_default_params(&csv_filename, &image_filename);
@@ -712,7 +712,7 @@ pub fn test_draw_no_writes() {
 
 #[test]
 #[should_panic]
-pub fn test_draw_csv_error() {
+fn test_draw_csv_error() {
     let temp_dir = make_temp_dir();
     let temp_csv_filename = temp_dir.path().join("_test_.csv");
     let image_filename = None;
@@ -724,7 +724,7 @@ pub fn test_draw_csv_error() {
 
 #[test]
 #[should_panic]
-pub fn test_draw_image_error() {
+fn test_draw_image_error() {
     let temp_dir = make_temp_dir();
     let csv_filename = None;
     let temp_png_filename = temp_dir.path().join("_test_.png");
@@ -736,7 +736,7 @@ pub fn test_draw_image_error() {
 
 #[test]
 #[should_panic]
-pub fn test_draw_bad_csv_filename() {
+fn test_draw_bad_csv_filename() {
     let temp_dir = make_temp_dir();
     let temp_csv_filename = temp_dir.path().join("..");
     let temp_png_filename = temp_dir.path().join("_test_.png");
@@ -748,7 +748,7 @@ pub fn test_draw_bad_csv_filename() {
 
 #[test]
 #[should_panic]
-pub fn test_draw_bad_png_filename() {
+fn test_draw_bad_png_filename() {
     let temp_dir = make_temp_dir();
     let temp_csv_filename = temp_dir.path().join("_test_.csv");
     let temp_png_filename = temp_dir.path().join("..");

@@ -686,7 +686,7 @@ TEST_F(TestDraw, BadImageFilename) {
 
 class TestParseArgs : public ::testing::Test {};
 
-TEST_F(TestParseArgs, Empty) {
+TEST_F(TestParseArgs, DefaultArgs) {
     const std::vector<std::string> arg_set {"command"};
     const auto [argc, argv] = make_argc_argv(arg_set);
     ASSERT_EQ(1, argc);

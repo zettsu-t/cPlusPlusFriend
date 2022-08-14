@@ -78,7 +78,35 @@ fn test_default_arguments() {
 }
 
 #[test]
-fn test_full_arguments() {
+fn test_long_arguments() {
+    let args: Vec<String> = vec![
+        "command",
+        "--x_offset",
+        "0.25",
+        "--y_offset",
+        "0.5",
+        "--max_iter",
+        "16",
+        "--size",
+        "31",
+        "--csv",
+        "_test.csv",
+        "--image",
+        "_test.png",
+    ]
+    .iter()
+    .map(|&s| s.into())
+    .collect();
+    let actual = parse_args(&args);
+    let n_pixels: PixelSize = 31;
+    let csv_filename = Some("_test.csv".to_string());
+    let image_filename = Some("_test.png".to_string());
+    let expected = ParamSet::new(0.25, 0.5, 16, n_pixels, &csv_filename, &image_filename);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_short_arguments() {
     let args: Vec<String> = vec![
         "command",
         "-x",
@@ -90,17 +118,17 @@ fn test_full_arguments() {
         "-s",
         "16",
         "-c",
-        "input.csv",
+        "_short.csv",
         "-o",
-        "input.png",
+        "_short.png",
     ]
     .iter()
     .map(|&s| s.into())
     .collect();
     let actual = parse_args(&args);
     let n_pixels: PixelSize = 16;
-    let csv_filename = Some("input.csv".to_string());
-    let image_filename = Some("input.png".to_string());
+    let csv_filename = Some("_short.csv".to_string());
+    let image_filename = Some("_short.png".to_string());
     let expected = ParamSet::new(0.5, 0.25, 31, n_pixels, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
 }
