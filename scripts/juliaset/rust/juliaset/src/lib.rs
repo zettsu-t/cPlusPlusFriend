@@ -638,12 +638,11 @@ fn make_temp_dir() -> TempDir {
         .prefix("test-dir")
         .rand_bytes(10)
         .tempdir()
-        .unwrap()
+        .expect("Failed to create a tempdir")
 }
 
 #[cfg(test)]
-fn make_default_params(csv_filename: &Option<String>,
-                       image_filename: &Option<String>) -> ParamSet {
+fn make_default_params(csv_filename: &Option<String>, image_filename: &Option<String>) -> ParamSet {
     let x_offset: Coordinate = 0.5;
     let y_offset: Coordinate = 0.125;
     let max_iter: Count = 20;
