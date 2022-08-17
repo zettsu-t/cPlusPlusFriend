@@ -1,12 +1,12 @@
-SOURCE=recursion.cpp
-OBJ=recursion.o
-ASM=recursion.s
+SOURCE=cpp_sample.cpp
+OBJ=cpp_sample.o
+ASM=cpp_sample.s
 OBJS=$(OBJ)
-TARGET=recursion
+TARGET=cpp_sample
 TARGETS=$(TARGET)
 
 CXX=g++
-CPPFLAGS=-g -O3
+CPPFLAGS=-std=gnu++2a -g -O3
 LD=g++
 LIBPATH=
 LDFLAGS=
