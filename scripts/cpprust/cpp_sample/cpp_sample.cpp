@@ -1,8 +1,8 @@
 #include <cstdint>
 #include <iostream>
 
-template <typename T> requires std::integral<T> T succ(const T from) {
-  return from + static_cast<T>(1);
+template <typename T> requires std::integral<T> T succ(T x) {
+  return x + static_cast<T>(1);
 }
 
 int main(int argc, char *argv[]) {
