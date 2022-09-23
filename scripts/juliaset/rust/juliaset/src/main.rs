@@ -44,11 +44,13 @@ fn parse_args(args: &[String]) -> ParamSet {
         Some(value) => value.parse().unwrap(),
         None => 100,
     };
+    assert!(max_iter > 0);
 
     let n_pixels = match matches.opt_str("s") {
         Some(value) => value.parse().unwrap(),
         None => 256,
     };
+    assert!(n_pixels > 1);
 
     let csv_filename = matches.opt_str("c");
     let filename = matches
@@ -131,6 +133,69 @@ fn test_short_arguments() {
     let image_filename = Some("_short.png".to_string());
     let expected = ParamSet::new(0.5, 0.25, 31, n_pixels, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_x_offset() {
+    let args: Vec<String> = vec!["command", "--x_offset", "a.b",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_y_offset() {
+    let args: Vec<String> = vec!["command", "--y_offset", "a.b",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_max_iter_not_a_number() {
+    let args: Vec<String> = vec!["command", "--max_iter", "a",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_max_iter_negative() {
+    let args: Vec<String> = vec!["command", "--max_iter", "-1",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_max_iter_min() {
+    let args: Vec<String> = vec!["command", "--max_iter", "0",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_size_not_a_number() {
+    let args: Vec<String> = vec!["command", "--size", "a",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_size_negative() {
+    let args: Vec<String> = vec!["command", "--size", "-1",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_size_zero() {
+    let args: Vec<String> = vec!["command", "--size", "0",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_size_min() {
+    let args: Vec<String> = vec!["command", "--size", "1",].iter().map(|&s| s.into()).collect();
+    parse_args(&args);
 }
 
 // Takes the first command line argument as a pixel size if available
