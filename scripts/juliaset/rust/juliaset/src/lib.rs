@@ -1,9 +1,6 @@
 #[cfg_attr(test, macro_use)]
 extern crate assert_float_eq;
 
-extern crate crossbeam;
-extern crate getopts;
-
 #[cfg(test)]
 use csv::ReaderBuilder;
 #[cfg(test)]
@@ -275,8 +272,10 @@ fn draw_image(count_set: CountSet) -> RgbImage {
     let (height, width) = count_set.dim();
     let shape = [height, width, 3];
     let mut bitmap = Bitmap::zeros(shape);
+
+    type SizeOfColors = usize;
     let max_count_raw = *(count_set.iter().max().unwrap_or(&0));
-    let max_count = BitmapCoord::try_from(max_count_raw).unwrap();
+    let max_count = SizeOfColors::try_from(max_count_raw).unwrap();
     let gradient = colorous::CIVIDIS;
     let color_map: Vec<colorous::Color> = (0..=max_count)
         .map(|i| gradient.eval_rational(i, max_count + 1))

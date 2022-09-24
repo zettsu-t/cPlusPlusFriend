@@ -15,10 +15,10 @@ use tempfile::Builder;
 
 #[test]
 fn test_wrong_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd_size = Command::cargo_bin("juliaset")?;
+    let mut cmd_size = Command::cargo_bin("appjuliaset")?;
     cmd_size.arg("-s").arg("0x100").assert().failure();
 
-    let mut cmd_csv = Command::cargo_bin("juliaset")?;
+    let mut cmd_csv = Command::cargo_bin("appjuliaset")?;
     cmd_csv
         .arg("-s")
         .arg("4")
@@ -27,7 +27,7 @@ fn test_wrong_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
         .assert()
         .failure();
 
-    let mut cmd_image = Command::cargo_bin("juliaset")?;
+    let mut cmd_image = Command::cargo_bin("appjuliaset")?;
     cmd_image
         .arg("-s")
         .arg("4")
@@ -46,7 +46,7 @@ fn test_correct_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
     let temp_png_filename = temp_dir.path().join("_test_.png");
     let png_filename = temp_png_filename.to_str().unwrap();
 
-    let mut cmd_success = Command::cargo_bin("juliaset")?;
+    let mut cmd_success = Command::cargo_bin("appjuliaset")?;
     let pixel_size: u32 = 16;
     let pixel_size_str = format!("{}", pixel_size);
     cmd_success
@@ -70,7 +70,7 @@ fn test_correct_xy_arguments() -> Result<(), Box<dyn std::error::Error>> {
     let temp_csv_filename = temp_dir.path().join("_test_.csv");
     let csv_filename = temp_csv_filename.to_str().unwrap();
 
-    let mut cmd_success = Command::cargo_bin("juliaset")?;
+    let mut cmd_success = Command::cargo_bin("appjuliaset")?;
     let pixel_size: u32 = 8;
     let pixel_size_str = format!("{}", pixel_size);
     cmd_success

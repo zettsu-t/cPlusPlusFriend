@@ -3,14 +3,13 @@ use juliaset::PixelSize;
 
 use juliaset::draw;
 use juliaset::ParamSet;
-use std::env;
 
 /// Parses command line arguments and returns their values
 ///
 /// # Arguments
 ///
 /// * `args` Command line arguments that includes the name-of-executable
-fn parse_args(args: &[String]) -> ParamSet {
+fn parse_args(args: Vec<String>) -> ParamSet {
     let mut opts = getopts::Options::new();
     opts.optopt(
         "x",
@@ -71,7 +70,7 @@ fn parse_args(args: &[String]) -> ParamSet {
 #[test]
 fn test_default_arguments() {
     let args: Vec<String> = vec!["command"].iter().map(|&s| s.into()).collect();
-    let actual = parse_args(&args);
+    let actual = parse_args(args);
     let n_pixels: PixelSize = 256;
     let csv_filename = None;
     let image_filename = Some("rust_juliaset.png".to_string());
@@ -99,7 +98,7 @@ fn test_long_arguments() {
     .iter()
     .map(|&s| s.into())
     .collect();
-    let actual = parse_args(&args);
+    let actual = parse_args(args);
     let n_pixels: PixelSize = 31;
     let csv_filename = Some("_test.csv".to_string());
     let image_filename = Some("_test.png".to_string());
@@ -127,7 +126,7 @@ fn test_short_arguments() {
     .iter()
     .map(|&s| s.into())
     .collect();
-    let actual = parse_args(&args);
+    let actual = parse_args(args);
     let n_pixels: PixelSize = 16;
     let csv_filename = Some("_short.csv".to_string());
     let image_filename = Some("_short.png".to_string());
@@ -139,68 +138,68 @@ fn test_short_arguments() {
 #[should_panic]
 fn test_invalid_x_offset() {
     let args: Vec<String> = vec!["command", "--x_offset", "a.b",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_y_offset() {
     let args: Vec<String> = vec!["command", "--y_offset", "a.b",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_not_a_number() {
     let args: Vec<String> = vec!["command", "--max_iter", "a",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_negative() {
     let args: Vec<String> = vec!["command", "--max_iter", "-1",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_min() {
     let args: Vec<String> = vec!["command", "--max_iter", "0",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_not_a_number() {
     let args: Vec<String> = vec!["command", "--size", "a",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_negative() {
     let args: Vec<String> = vec!["command", "--size", "-1",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_zero() {
     let args: Vec<String> = vec!["command", "--size", "0",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_min() {
     let args: Vec<String> = vec!["command", "--size", "1",].iter().map(|&s| s.into()).collect();
-    parse_args(&args);
+    parse_args(args);
 }
 
 // Takes the first command line argument as a pixel size if available
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let params = parse_args(&args);
+    let args: Vec<String> = std::env::args().collect();
+    let params = parse_args(args);
     draw(&params);
 }
