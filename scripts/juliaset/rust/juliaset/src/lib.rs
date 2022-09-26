@@ -258,7 +258,7 @@ fn scan_points(
 /// # Arguments
 ///
 /// * `count_set` Counts of a Julia set in a screen
-fn draw_image(count_set: CountSet) -> RgbImage {
+fn draw_image(count_set: &CountSet) -> RgbImage {
     macro_rules! set_color {
         (  $bitmap:expr, $count_set:expr, $color_map:expr, $rgb:tt, $index_t:ty ) => {
             let count_bitmap =
@@ -344,6 +344,20 @@ fn draw_image(count_set: CountSet) -> RgbImage {
 ///
 /// # Arguments
 ///
+/// * `count_set` Julia set counts in a screen
+/// * `csv_filepath` A path to save counts as a table
+fn write_count(count_set: &CountSet, csv_filepath: &PathBuf) {
+    let file = File::create(csv_filepath).expect("Creating a CSV file failed");
+    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+    writer
+        .serialize_array2(&count_set)
+        .expect("Writing a CSV file failed");
+}
+
+/// Draws a Julia set
+///
+/// # Arguments
+///
 /// * `params` A parameter set to draw
 pub fn draw(params: &ParamSet) {
     let count_set = scan_points(
@@ -355,18 +369,14 @@ pub fn draw(params: &ParamSet) {
 
     match &params.csv_filepath {
         Some(csv_filepath) => {
-            let file = File::create(csv_filepath).expect("Creating a CSV file failed");
-            let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-            writer
-                .serialize_array2(&count_set)
-                .expect("Writing a CSV file failed");
+            write_count(&count_set, &csv_filepath);
         }
         None => (),
     };
 
     match &params.image_filepath {
         Some(image_filepath) => {
-            let image = draw_image(count_set);
+            let image = draw_image(&count_set);
             image.save(image_filepath).expect("Saving an image failed");
         }
         None => (),
@@ -572,7 +582,7 @@ fn test_draw_image_monotone() {
         let shape = &count_set.shape();
         let width = u32::try_from(shape[1]).unwrap();
         let height = u32::try_from(shape[0]).unwrap();
-        let image = draw_image(count_set);
+        let image = draw_image(&count_set);
 
         for y in 0..height {
             for x in 0..width {
@@ -591,7 +601,7 @@ fn test_draw_image_two_colors() {
     let shape = &count_set.shape();
     let width = u32::try_from(shape[1]).unwrap();
     let height = u32::try_from(shape[0]).unwrap();
-    let image = draw_image(count_set);
+    let image = draw_image(&count_set);
 
     for y in 0..height {
         for x in 0..width {
@@ -615,7 +625,7 @@ fn test_draw_image_many_colors() {
     let shape = &count_set.shape();
     let width = u32::try_from(shape[1]).unwrap();
     let height = u32::try_from(shape[0]).unwrap();
-    let image = draw_image(count_set);
+    let image = draw_image(&count_set);
 
     let mut prev = 0;
     for y in 0..height {
@@ -638,6 +648,61 @@ fn make_temp_dir() -> TempDir {
         .rand_bytes(10)
         .tempdir()
         .expect("Failed to create a tempdir")
+}
+
+#[test]
+fn test_write_count() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("_test_count_.csv");
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let expeced_n_rows: usize = 2;
+    let expeced_n_columns: usize = 3;
+    let mut count_set = CountSet::zeros([expeced_n_rows, expeced_n_columns]);
+    count_set[[0, 0]] = 1;
+    count_set[[0, 1]] = 3;
+    count_set[[0, 2]] = 5;
+    count_set[[1, 0]] = 20;
+    count_set[[1, 1]] = 30;
+    count_set[[1, 2]] = 40;
+
+    write_count(&count_set, &csv_path);
+
+    let mut reader = ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(csv_path)
+        .unwrap();
+    let mut n_rows: usize = 0;
+
+    for (i, row) in reader.records().enumerate() {
+        let cells = row.as_ref().unwrap();
+        assert_eq!(cells.len(), expeced_n_columns);
+        for (j, cell) in cells.iter().enumerate() {
+            assert_eq!(cell, count_set[[i, j]].to_string());
+        }
+        n_rows = i + 1;
+    }
+    assert_eq!(n_rows, expeced_n_rows);
+}
+
+#[test]
+#[should_panic]
+fn test_write_count_error() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("_test_count_.csv");
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    std::fs::remove_dir(temp_dir).unwrap();
+    let count_set = CountSet::zeros([3, 4]);
+    write_count(&count_set, &csv_path);
+}
+
+#[test]
+#[should_panic]
+fn test_write_count_bad_filename() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("..");
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let count_set = CountSet::zeros([3, 4]);
+    write_count(&count_set, &csv_path);
 }
 
 #[cfg(test)]
@@ -674,7 +739,7 @@ fn test_draw() {
         .has_headers(false)
         .from_path(csv_path.unwrap())
         .unwrap();
-    let mut n_columns: usize = 0;
+    let mut n_rows: usize = 0;
 
     for (i, row) in reader.records().enumerate() {
         assert_eq!(row.as_ref().unwrap().len(), pixel_size as usize);
@@ -683,9 +748,9 @@ fn test_draw() {
             assert_eq!(cell, "0");
         }
         // 1-based indexing
-        n_columns = i + 1;
+        n_rows = i + 1;
     }
-    assert_eq!(n_columns, pixel_size as usize);
+    assert_eq!(n_rows, pixel_size as usize);
 
     let image = ImageReader::open(image_path.unwrap())
         .unwrap()
