@@ -1,6 +1,8 @@
 library(tidyverse)
 library(viridis)
 
+source("juliaset.R")
+
 converge <- function(init, offset, max_iter, limit) {
   f <- function(from) {
     from * from + offset
@@ -73,3 +75,39 @@ g <- g + geom_tile(aes(x = x, y = y, fill = value))
 g <- g + scale_fill_manual(values = colors)
 g <- g + theme(legend.position = "none", aspect.ratio = 1.0)
 plot(g)
+
+machine_eps <- 1.19e-7
+sqrt_eps <- sqrt(machine_eps)
+sprintf("%.20f", machine_eps)
+
+converge_point(23.0, 0.0, complex(re=0.0, im=0.0), 100, sqrt_eps)
+converge_point(1.0 + machine_eps, 0.0, complex(re=0.0, im=0.0), 100, sqrt_eps)
+
+converge_point(0.0, 0.0, complex(re=0.5, im=0.375), 100, sqrt_eps)
+converge_point(0.0, 0.0, complex(re=0.375, im=0.5), 100, sqrt_eps)
+converge_point(0.5, 0.375, complex(re=0.375, im=0.5), 100, sqrt_eps)
+converge_point(0.375, 0.5, complex(re=0.5, im=0.375), 100, sqrt_eps)
+converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 100, 0.1)
+converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 11, 0.1)
+
+to_table <- function(base_n) {
+  purrr::reduce(.x = seq(99), .init = list(df = NULL, n = base_n), .f = function(acc, i) {
+    n <- acc$n
+    mod_n <- sprintf("%.20f", Mod(n))
+
+    next_n <- n * n
+    diff_n <- Mod(next_n - n)
+    mod_diff <- sprintf("%.20f", diff_n)
+    mod_diff_sqr <- sprintf("%.20f", diff_n ** 2)
+
+    df <- tibble::tibble(i = i, mod = mod_n, diff = mod_diff, diff_sqr = mod_diff_sqr)
+    next_df <- if (is.null(acc$df)) {
+      df
+    } else {
+      dplyr::bind_rows(acc$df, df)
+    }
+    list(df = next_df, n = next_n)
+  })$df
+}
+
+df_eps <- to_table(base_n = complex(re = 0.9, im = 0.0))

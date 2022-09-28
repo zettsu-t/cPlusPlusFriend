@@ -42,6 +42,9 @@ type Bitmap = ndarray::Array3<u8>;
 /// Julia set counts in a screen
 type CountSet = ndarray::Array2<Count>;
 
+/// The default half width and height of images
+const DEFAULT_HALF_RESOLUTION: Coordinate = 2.0;
+
 #[cfg(test)]
 type ColorElement = u8;
 #[cfg(test)]
@@ -135,19 +138,21 @@ fn converge_point(
     let mut z = Point::new(point_x, point_y);
     let mut count: Count = 0;
     let limit_modulus: Coordinate = 4.0;
-    let mut previous_modulus: Coordinate = limit_modulus * limit_modulus;
 
     for _ in 0..max_iter {
-        z = transform_point(z, point_offset);
-        let z_modulus = z.norm_sqr();
+        let next_z = transform_point(z, point_offset);
+        let z_modulus = next_z.norm_sqr();
         if z_modulus > limit_modulus {
             break;
         }
-        if (previous_modulus - z_modulus).abs() < eps {
+
+        let delta = (next_z - z).norm_sqr();
+        if delta < eps {
             break;
         }
+
         count += 1;
-        previous_modulus = z_modulus;
+        z = next_z;
     }
 
     count
@@ -194,7 +199,7 @@ fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSe
         _ => {
             let span = (n_pixels - 1) as Coordinate;
             (0..n_pixels)
-                .map(|i| ((i as Coordinate) * 2.0 * half_length / span) - half_length)
+                .map(|i| ((i as Coordinate) * DEFAULT_HALF_RESOLUTION * half_length / span) - half_length)
                 .collect()
         }
     }
@@ -214,7 +219,7 @@ fn scan_points(
     max_iter: Count,
     n_pixels: PixelSize,
 ) -> CountSet {
-    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
+    let half_length = DEFAULT_HALF_RESOLUTION.sqrt() + 0.1;
     let xs = map_coordinates(half_length, n_pixels);
     let ys = map_coordinates(half_length, n_pixels);
     let point_offset = Point::new(x_offset, y_offset);
@@ -449,14 +454,14 @@ fn test_transform_point() {
 fn test_converge_point() {
     let eps: Coordinate = Coordinate::EPSILON;
     let zero = Point::new(0.0, 0.0);
+
+    // Min count
     let actual = converge_point(23.0, 0.0, zero, 100, eps);
     assert_eq!(actual, 0 as Count);
 
-    let actual = converge_point(1.0 + 1e-7, 0.0, zero, 100, eps);
-    assert_eq!(actual, 22 as Count);
-
-    let actual = converge_point(0.0, 1.0 + 1e-7, zero, 11, eps);
-    assert_eq!(actual, 11 as Count);
+    // The machine epsion of f32
+    let actual = converge_point(1.0 + eps, 0.0, zero, 100, eps);
+    assert_eq!(actual, 0 as Count);
 
     let offset_a = Point::new(0.5, 0.375);
     let actual = converge_point(0.0, 0.0, offset_a, 100, eps);
@@ -473,8 +478,16 @@ fn test_converge_point() {
     assert_eq!(actual, 7 as Count);
 
     let offset_c = Point::new(0.375, 0.375);
-    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.1);
-    assert_eq!(actual, 9 as Count);
+    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.01);
+    assert_eq!(actual, 15 as Count);
+
+    // Max count
+    let actual = converge_point(0.375, 0.375, offset_c, 11, 0.01);
+    assert_eq!(actual, 11 as Count);
+
+    // Eps
+    let actual = converge_point(0.9, 0.0, zero, 100, 1e-3);
+    assert_eq!(actual, 6 as Count);
 }
 
 #[test]

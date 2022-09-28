@@ -25,17 +25,18 @@ converge_point <- function(point_x, point_y, offset, max_iter, eps) {
   previous_modulus <- Inf
 
   while (count < max_iter) {
-    z <- transform_point(z, offset)
-    z_modulus <- Mod(z)
+    next_z <- transform_point(z, offset)
+    z_modulus <- Mod(next_z)
     if (z_modulus > 2.0) {
       break
     }
-    if (abs(previous_modulus - z_modulus) < eps) {
+
+    if (Mod(next_z - z) < eps) {
       break
     }
 
     count <- count + 1
-    previous_modulus <- z_modulus
+    z <- next_z
   }
   count
 }
@@ -83,7 +84,7 @@ scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
   xs <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
   ys <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
   offset <- complex(real = x_offset, imaginary = y_offset)
-  eps <- 1e-5
+  eps <- sqrt(1.19e-7)
   converge_point_set(xs = xs, ys = ys, offset = offset, max_iter = max_iter, eps = eps)
 }
 
@@ -112,6 +113,7 @@ draw_image <- function(count_set, color_func, png_filename = NA) {
 
   if (!is.na(png_filename)) {
     png(png_filename, height = shape[1], width = shape[2])
+    par(mar=c(0,0,0,0))
     plot(img)
     dev.off()
   }
