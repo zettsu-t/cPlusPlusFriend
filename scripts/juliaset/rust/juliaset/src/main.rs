@@ -4,7 +4,9 @@ use juliaset::PixelSize;
 use juliaset::draw;
 use juliaset::ParamSet;
 
-/// Parses command line arguments and returns their values
+/// Parses command line arguments and returns their values.
+/// Note that opts.parse() can take iterators and we have more
+/// generic implementations instead of passing Vec<String> as args.
 ///
 /// # Arguments
 ///
@@ -25,8 +27,8 @@ fn parse_args(args: Vec<String>) -> ParamSet {
     )
     .optopt("m", "max_iter", "maximum # of iterations", "Max iterations")
     .optopt("s", "size", "# of pixels in the output image", "Pixel size")
-    .optopt("c", "csv", "set output CSV filename", "CSV filename")
-    .optopt("o", "image", "set output PNG filename", "PNG filename");
+    .optopt("c", "csv", "output CSV filename", "CSV filename")
+    .optopt("o", "image", "output PNG filename", "PNG filename");
     let matches = opts.parse(&args[1..]).unwrap();
 
     let x_offset = match matches.opt_str("x") {
@@ -197,7 +199,6 @@ fn test_invalid_size_min() {
     parse_args(args);
 }
 
-// Takes the first command line argument as a pixel size if available
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let params = parse_args(args);

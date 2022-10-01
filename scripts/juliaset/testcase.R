@@ -81,14 +81,22 @@ sqrt_eps <- sqrt(machine_eps)
 sprintf("%.20f", machine_eps)
 
 converge_point(23.0, 0.0, complex(re=0.0, im=0.0), 100, sqrt_eps)
-converge_point(1.0 + machine_eps, 0.0, complex(re=0.0, im=0.0), 100, sqrt_eps)
+converge_point(0.9, 0.0, complex(re=0.0, im=0.0), 100, sqrt(1e-3))
+converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 100, 0.1)
+converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 11, 0.1)
 
+converge_point(1.0 + machine_eps, 0.0, complex(re=0.0, im=0.0), 100, sqrt_eps)
 converge_point(0.0, 0.0, complex(re=0.5, im=0.375), 100, sqrt_eps)
 converge_point(0.0, 0.0, complex(re=0.375, im=0.5), 100, sqrt_eps)
 converge_point(0.5, 0.375, complex(re=0.375, im=0.5), 100, sqrt_eps)
 converge_point(0.375, 0.5, complex(re=0.5, im=0.375), 100, sqrt_eps)
+
 converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 100, 0.1)
-converge_point(0.375, 0.375, complex(re=0.375, im=0.375), 11, 0.1)
+converge_point(0.5, 0.375, complex(re=0.375, im=0.375), 100, 0.1)
+converge_point(0.375, 0.5, complex(re=0.375, im=0.375), 100, 0.1)
+
+converge_point(0.375, 0.375, complex(re=0.5, im=0.375), 100, 0.1)
+converge_point(0.5, 0.375, complex(re=0.5, im=0.375), 100, 0.1)
 
 to_table <- function(base_n) {
   purrr::reduce(.x = seq(99), .init = list(df = NULL, n = base_n), .f = function(acc, i) {

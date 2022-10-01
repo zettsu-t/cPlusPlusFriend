@@ -27,6 +27,7 @@ ndarray-csv = "0.5.1"
 num = "0.4.0"
 num_cpus = "1.13.1"
 predicates = "2.1.1"
+static_assertions = "1.1.0"
 tempfile = "3.3.0"
 
 [profile.dev]

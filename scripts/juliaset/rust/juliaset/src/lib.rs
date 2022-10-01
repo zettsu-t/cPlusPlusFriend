@@ -10,6 +10,10 @@ use tempfile::Builder;
 #[cfg(test)]
 use tempfile::TempDir;
 
+// Tests alternative implementations
+// #[cfg(test)]
+include!("alt.rs");
+
 use csv::WriterBuilder;
 use image::RgbImage;
 use ndarray::prelude::*;
@@ -44,6 +48,10 @@ type CountSet = ndarray::Array2<Count>;
 
 /// The default half width and height of images
 const DEFAULT_HALF_RESOLUTION: Coordinate = 2.0;
+
+/// The default tolerance to check if transformations are converged
+const DEFAULT_TOLERANCE: Coordinate = 1e-6;
+static_assertions::const_assert!(DEFAULT_TOLERANCE > Coordinate::EPSILON);
 
 #[cfg(test)]
 type ColorElement = u8;
@@ -198,8 +206,9 @@ fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSe
         n if n < 1 => CoordinateSet::zeros([0]),
         _ => {
             let span = (n_pixels - 1) as Coordinate;
+            // Twice the half_length
             (0..n_pixels)
-                .map(|i| ((i as Coordinate) * DEFAULT_HALF_RESOLUTION * half_length / span) - half_length)
+                .map(|i| ((i as Coordinate) * 2.0 * half_length / span) - half_length)
                 .collect()
         }
     }
@@ -223,7 +232,7 @@ fn scan_points(
     let xs = map_coordinates(half_length, n_pixels);
     let ys = map_coordinates(half_length, n_pixels);
     let point_offset = Point::new(x_offset, y_offset);
-    let eps = 1e-5;
+    let eps = DEFAULT_TOLERANCE;
 
     let n_ys = ys.shape()[0];
     crossbeam::scope(|scope| {
@@ -459,10 +468,24 @@ fn test_converge_point() {
     let actual = converge_point(23.0, 0.0, zero, 100, eps);
     assert_eq!(actual, 0 as Count);
 
-    // The machine epsion of f32
+    // Eps
+    let actual = converge_point(0.9, 0.0, zero, 100, 1e-3);
+    assert_eq!(actual, 6 as Count);
+
+    // Converged
+    let offset_c = Point::new(0.375, 0.375);
+    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.01);
+    assert_eq!(actual, 15 as Count);
+
+    // Max count
+    let actual = converge_point(0.375, 0.375, offset_c, 11, 0.01);
+    assert_eq!(actual, 11 as Count);
+
+    // The machine epsion
     let actual = converge_point(1.0 + eps, 0.0, zero, 100, eps);
     assert_eq!(actual, 0 as Count);
 
+    // Some converged cases
     let offset_a = Point::new(0.5, 0.375);
     let actual = converge_point(0.0, 0.0, offset_a, 100, eps);
     assert_eq!(actual, 4 as Count);
@@ -476,18 +499,6 @@ fn test_converge_point() {
 
     let actual = converge_point(0.375, 0.5, offset_a, 100, eps);
     assert_eq!(actual, 7 as Count);
-
-    let offset_c = Point::new(0.375, 0.375);
-    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.01);
-    assert_eq!(actual, 15 as Count);
-
-    // Max count
-    let actual = converge_point(0.375, 0.375, offset_c, 11, 0.01);
-    assert_eq!(actual, 11 as Count);
-
-    // Eps
-    let actual = converge_point(0.9, 0.0, zero, 100, 1e-3);
-    assert_eq!(actual, 6 as Count);
 }
 
 #[test]
@@ -542,11 +553,11 @@ fn test_map_coordinates_zero() {
 
 #[test]
 fn test_map_coordinates_one() {
-    let half_length: Coordinate = 0.0;
+    let half_length: Coordinate = 1.0;
     let n_pixels: PixelSize = 1;
     let actual = map_coordinates(half_length, n_pixels);
     assert_eq!(actual.shape()[0], n_pixels as usize);
-    assert_float_eq::assert_float_absolute_eq!(actual[0], -half_length, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual[0], 0.0, Coordinate::EPSILON);
 }
 
 #[test]
@@ -571,6 +582,15 @@ fn test_map_coordinates_many() {
     let actual_even = map_coordinates(half_length_even, n_pixels_even);
     let expected_even = CoordinateSet::from_vec(vec![-6.0, -2.0, 2.0, 6.0]);
     assert_eq!(actual_even, expected_even);
+}
+
+#[test]
+fn test_map_coordinates_negative() {
+    let half_length_odd: Coordinate = -2.0;
+    let n_pixels_odd: PixelSize = 5;
+    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
+    let expected_odd = CoordinateSet::from_vec(vec![2.0, 1.0, 0.0, -1.0, -2.0]);
+    assert_eq!(actual_odd, expected_odd);
 }
 
 #[test]
