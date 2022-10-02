@@ -46,9 +46,6 @@ type Bitmap = ndarray::Array3<u8>;
 /// Julia set counts in a screen
 type CountSet = ndarray::Array2<Count>;
 
-/// The default half width and height of images
-const DEFAULT_HALF_RESOLUTION: Coordinate = 2.0;
-
 /// The default tolerance to check if transformations are converged
 const DEFAULT_TOLERANCE: Coordinate = 1e-6;
 static_assertions::const_assert!(DEFAULT_TOLERANCE > Coordinate::EPSILON);
@@ -117,6 +114,58 @@ impl ParamSet {
     }
 }
 
+#[test]
+fn test_full_param_set() {
+    let x_offset: Coordinate = 0.5;
+    let y_offset: Coordinate = 0.125;
+    let max_iter: Count = 20;
+    let n_pixels: PixelSize = 16;
+    let csv_filename = Some("input.csv".to_string());
+    let image_filename = Some("input.png".to_string());
+    let csv_path = Some(PathBuf::from("input.csv".to_string()));
+    let image_path = Some(PathBuf::from("input.png".to_string()));
+
+    let actual = ParamSet::new(
+        x_offset,
+        y_offset,
+        max_iter,
+        n_pixels,
+        &csv_filename,
+        &image_filename,
+    );
+    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
+    assert_eq!(actual.max_iter, max_iter);
+    assert_eq!(actual.n_pixels, n_pixels);
+    assert_eq!(actual.csv_filepath, csv_path);
+    assert_eq!(actual.image_filepath, image_path);
+}
+
+#[test]
+fn test_partial_param_set() {
+    let x_offset: Coordinate = 0.25;
+    let y_offset: Coordinate = 0.375;
+    let max_iter: Count = 10;
+    let n_pixels: PixelSize = 32;
+    let csv_filename = None;
+    let image_filename = None;
+
+    let actual = ParamSet::new(
+        x_offset,
+        y_offset,
+        max_iter,
+        n_pixels,
+        &csv_filename,
+        &image_filename,
+    );
+    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
+    assert_eq!(actual.max_iter, max_iter);
+    assert_eq!(actual.n_pixels, n_pixels);
+    assert!(actual.csv_filepath.is_none());
+    assert!(actual.image_filepath.is_none());
+}
+
 /// Returns a transformed point under the rule of Julia sets
 ///
 /// # Arguments
@@ -125,6 +174,16 @@ impl ParamSet {
 /// * `offset` An offset to be added
 fn transform_point(from: Point, offset: Point) -> Point {
     from * from + offset
+}
+
+#[test]
+fn test_transform_point() {
+    let from = Point::new(2.0, 4.0);
+    let offset = Point::new(3.0, 5.0);
+    let expected = Point::new(-9.0, 21.0);
+    let actual = transform_point(from, offset);
+    assert_float_eq::assert_float_absolute_eq!(actual.re, expected.re, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual.im, expected.im, Coordinate::EPSILON);
 }
 
 /// Returns how many times a point is transformed
@@ -166,6 +225,48 @@ fn converge_point(
     count
 }
 
+#[test]
+fn test_converge_point() {
+    let eps: Coordinate = Coordinate::EPSILON;
+    let zero = Point::new(0.0, 0.0);
+
+    // Min count
+    let actual = converge_point(23.0, 0.0, zero, 100, eps);
+    assert_eq!(actual, 0 as Count);
+
+    // Eps
+    let actual = converge_point(0.9, 0.0, zero, 100, 1e-3);
+    assert_eq!(actual, 6 as Count);
+
+    // Converged
+    let offset_c = Point::new(0.375, 0.375);
+    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.01);
+    assert_eq!(actual, 15 as Count);
+
+    // Max count
+    let actual = converge_point(0.375, 0.375, offset_c, 11, 0.01);
+    assert_eq!(actual, 11 as Count);
+
+    // The machine epsion
+    let actual = converge_point(1.0 + eps, 0.0, zero, 100, eps);
+    assert_eq!(actual, 0 as Count);
+
+    // Some converged cases
+    let offset_a = Point::new(0.5, 0.375);
+    let actual = converge_point(0.0, 0.0, offset_a, 100, eps);
+    assert_eq!(actual, 4 as Count);
+
+    let offset_b = Point::new(0.375, 0.5);
+    let actual = converge_point(0.0, 0.0, offset_b, 100, eps);
+    assert_eq!(actual, 8 as Count);
+
+    let actual = converge_point(0.5, 0.375, offset_b, 100, eps);
+    assert_eq!(actual, 3 as Count);
+
+    let actual = converge_point(0.375, 0.5, offset_a, 100, eps);
+    assert_eq!(actual, 7 as Count);
+}
+
 /// Returns how many times each point in a screen is transformed
 ///
 /// # Arguments
@@ -194,6 +295,51 @@ fn converge_point_set(
     mat_counts
 }
 
+#[test]
+fn test_converge_point_set_row() {
+    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let ys = CoordinateSet::from_vec(vec![0.375]);
+    let offset = Point::new(0.375, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let eps: Coordinate = Coordinate::EPSILON;
+    let actual = converge_point_set(x_view, y_view, offset, 100, eps);
+    assert_eq!(actual.shape()[0], 1);
+    assert_eq!(actual.shape()[1], 2);
+    assert_eq!(actual[[0, 0]], 15);
+    assert_eq!(actual[[0, 1]], 7);
+}
+
+#[test]
+fn test_converge_point_set_column() {
+    let xs = CoordinateSet::from_vec(vec![0.375]);
+    let ys = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let offset = Point::new(0.375, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let eps: Coordinate = Coordinate::EPSILON;
+    let actual = converge_point_set(x_view, y_view, offset, 100, eps);
+    assert_eq!(actual.shape()[0], 2);
+    assert_eq!(actual.shape()[1], 1);
+    assert_eq!(actual[[0, 0]], 15);
+    assert_eq!(actual[[1, 0]], 24);
+}
+
+#[test]
+fn test_converge_point_set_limit() {
+    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
+    let ys = CoordinateSet::from_vec(vec![0.375]);
+    let offset = Point::new(0.5, 0.375);
+    let x_view = xs.view();
+    let y_view = ys.view();
+    let eps: Coordinate = Coordinate::EPSILON;
+    let actual = converge_point_set(x_view, y_view, offset, 5, eps);
+    assert_eq!(actual.shape()[0], 1);
+    assert_eq!(actual.shape()[1], 2);
+    assert_eq!(actual[[0, 0]], 5);
+    assert_eq!(actual[[0, 1]], 3);
+}
+
 /// Returns pixel coordinates on an axis in a screen
 ///
 /// # Arguments
@@ -214,6 +360,56 @@ fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSe
     }
 }
 
+#[test]
+fn test_map_coordinates_zero() {
+    let half_length: Coordinate = 1.0;
+    let n_pixels: PixelSize = 0;
+    let actual = map_coordinates(half_length, n_pixels);
+    assert_eq!(actual.shape()[0], n_pixels as usize);
+}
+
+#[test]
+fn test_map_coordinates_one() {
+    let half_length: Coordinate = 1.0;
+    let n_pixels: PixelSize = 1;
+    let actual = map_coordinates(half_length, n_pixels);
+    assert_eq!(actual.shape()[0], n_pixels as usize);
+    assert_float_eq::assert_float_absolute_eq!(actual[0], 0.0, Coordinate::EPSILON);
+}
+
+#[test]
+fn test_map_coordinates_two() {
+    let half_length: Coordinate = 3.0;
+    let n_pixels: PixelSize = 2;
+    let actual = map_coordinates(half_length, n_pixels);
+    let expected = CoordinateSet::from_vec(vec![-3.0, 3.0]);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_map_coordinates_many() {
+    let half_length_odd: Coordinate = 2.0;
+    let n_pixels_odd: PixelSize = 5;
+    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
+    let expected_odd = CoordinateSet::from_vec(vec![-2.0, -1.0, 0.0, 1.0, 2.0]);
+    assert_eq!(actual_odd, expected_odd);
+
+    let half_length_even: Coordinate = 6.0;
+    let n_pixels_even: PixelSize = 4;
+    let actual_even = map_coordinates(half_length_even, n_pixels_even);
+    let expected_even = CoordinateSet::from_vec(vec![-6.0, -2.0, 2.0, 6.0]);
+    assert_eq!(actual_even, expected_even);
+}
+
+#[test]
+fn test_map_coordinates_negative() {
+    let half_length_odd: Coordinate = -2.0;
+    let n_pixels_odd: PixelSize = 5;
+    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
+    let expected_odd = CoordinateSet::from_vec(vec![2.0, 1.0, 0.0, -1.0, -2.0]);
+    assert_eq!(actual_odd, expected_odd);
+}
+
 /// Returns how many times each point in a screen is transformed
 ///
 /// # Arguments
@@ -228,7 +424,8 @@ fn scan_points(
     max_iter: Count,
     n_pixels: PixelSize,
 ) -> CountSet {
-    let half_length = DEFAULT_HALF_RESOLUTION.sqrt() + 0.1;
+    // The default half width and height of images
+    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
     let xs = map_coordinates(half_length, n_pixels);
     let ys = map_coordinates(half_length, n_pixels);
     let point_offset = Point::new(x_offset, y_offset);
@@ -265,6 +462,20 @@ fn scan_points(
         mat_counts
     })
     .unwrap()
+}
+
+#[test]
+fn test_map_scan_points_capped() {
+    let actual_capped = scan_points(0.25, 0.75, 3, 4);
+    let expected_capped: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 3, 0], [0, 3, 2, 0], [0, 1, 0, 0]]);
+    assert_eq!(actual_capped, expected_capped);
+}
+
+#[test]
+fn test_map_scan_points_unlimited() {
+    let actual = scan_points(0.25, 0.75, 100, 4);
+    let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
+    assert_eq!(actual, expected);
 }
 
 /// Draws a PNG image from an input screen
@@ -354,259 +565,6 @@ fn draw_image(count_set: &CountSet) -> RgbImage {
     .expect("Creating an image failed")
 }
 
-/// Draws a Julia set
-///
-/// # Arguments
-///
-/// * `count_set` Julia set counts in a screen
-/// * `csv_filepath` A path to save counts as a table
-fn write_count(count_set: &CountSet, csv_filepath: &PathBuf) {
-    let file = File::create(csv_filepath).expect("Creating a CSV file failed");
-    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-    writer
-        .serialize_array2(&count_set)
-        .expect("Writing a CSV file failed");
-}
-
-/// Draws a Julia set
-///
-/// # Arguments
-///
-/// * `params` A parameter set to draw
-pub fn draw(params: &ParamSet) {
-    let count_set = scan_points(
-        params.x_offset,
-        params.y_offset,
-        params.max_iter,
-        params.n_pixels,
-    );
-
-    match &params.csv_filepath {
-        Some(csv_filepath) => {
-            write_count(&count_set, &csv_filepath);
-        }
-        None => (),
-    };
-
-    match &params.image_filepath {
-        Some(image_filepath) => {
-            let image = draw_image(&count_set);
-            image.save(image_filepath).expect("Saving an image failed");
-        }
-        None => (),
-    };
-}
-
-#[test]
-fn test_full_param_set() {
-    let x_offset: Coordinate = 0.5;
-    let y_offset: Coordinate = 0.125;
-    let max_iter: Count = 20;
-    let n_pixels: PixelSize = 16;
-    let csv_filename = Some("input.csv".to_string());
-    let image_filename = Some("input.png".to_string());
-    let csv_path = Some(PathBuf::from("input.csv".to_string()));
-    let image_path = Some(PathBuf::from("input.png".to_string()));
-
-    let actual = ParamSet::new(
-        x_offset,
-        y_offset,
-        max_iter,
-        n_pixels,
-        &csv_filename,
-        &image_filename,
-    );
-    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
-    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
-    assert_eq!(actual.max_iter, max_iter);
-    assert_eq!(actual.n_pixels, n_pixels);
-    assert_eq!(actual.csv_filepath, csv_path);
-    assert_eq!(actual.image_filepath, image_path);
-}
-
-#[test]
-fn test_partial_param_set() {
-    let x_offset: Coordinate = 0.25;
-    let y_offset: Coordinate = 0.375;
-    let max_iter: Count = 10;
-    let n_pixels: PixelSize = 32;
-    let csv_filename = None;
-    let image_filename = None;
-
-    let actual = ParamSet::new(
-        x_offset,
-        y_offset,
-        max_iter,
-        n_pixels,
-        &csv_filename,
-        &image_filename,
-    );
-    assert_float_eq::assert_float_absolute_eq!(actual.x_offset, x_offset, Coordinate::EPSILON);
-    assert_float_eq::assert_float_absolute_eq!(actual.y_offset, y_offset, Coordinate::EPSILON);
-    assert_eq!(actual.max_iter, max_iter);
-    assert_eq!(actual.n_pixels, n_pixels);
-    assert!(actual.csv_filepath.is_none());
-    assert!(actual.image_filepath.is_none());
-}
-
-#[test]
-fn test_transform_point() {
-    let from = Point::new(2.0, 4.0);
-    let offset = Point::new(3.0, 5.0);
-    let expected = Point::new(-9.0, 21.0);
-    let actual = transform_point(from, offset);
-    assert_float_eq::assert_float_absolute_eq!(actual.re, expected.re, Coordinate::EPSILON);
-    assert_float_eq::assert_float_absolute_eq!(actual.im, expected.im, Coordinate::EPSILON);
-}
-
-#[test]
-fn test_converge_point() {
-    let eps: Coordinate = Coordinate::EPSILON;
-    let zero = Point::new(0.0, 0.0);
-
-    // Min count
-    let actual = converge_point(23.0, 0.0, zero, 100, eps);
-    assert_eq!(actual, 0 as Count);
-
-    // Eps
-    let actual = converge_point(0.9, 0.0, zero, 100, 1e-3);
-    assert_eq!(actual, 6 as Count);
-
-    // Converged
-    let offset_c = Point::new(0.375, 0.375);
-    let actual = converge_point(0.375, 0.375, offset_c, 100, 0.01);
-    assert_eq!(actual, 15 as Count);
-
-    // Max count
-    let actual = converge_point(0.375, 0.375, offset_c, 11, 0.01);
-    assert_eq!(actual, 11 as Count);
-
-    // The machine epsion
-    let actual = converge_point(1.0 + eps, 0.0, zero, 100, eps);
-    assert_eq!(actual, 0 as Count);
-
-    // Some converged cases
-    let offset_a = Point::new(0.5, 0.375);
-    let actual = converge_point(0.0, 0.0, offset_a, 100, eps);
-    assert_eq!(actual, 4 as Count);
-
-    let offset_b = Point::new(0.375, 0.5);
-    let actual = converge_point(0.0, 0.0, offset_b, 100, eps);
-    assert_eq!(actual, 8 as Count);
-
-    let actual = converge_point(0.5, 0.375, offset_b, 100, eps);
-    assert_eq!(actual, 3 as Count);
-
-    let actual = converge_point(0.375, 0.5, offset_a, 100, eps);
-    assert_eq!(actual, 7 as Count);
-}
-
-#[test]
-fn test_converge_point_set_row() {
-    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
-    let ys = CoordinateSet::from_vec(vec![0.375]);
-    let offset = Point::new(0.375, 0.375);
-    let x_view = xs.view();
-    let y_view = ys.view();
-    let actual = converge_point_set(x_view, y_view, offset, 100, 1e-5);
-    assert_eq!(actual.shape()[0], 1);
-    assert_eq!(actual.shape()[1], 2);
-    assert_eq!(actual[[0, 0]], 15);
-    assert_eq!(actual[[0, 1]], 7);
-}
-
-#[test]
-fn test_converge_point_set_column() {
-    let xs = CoordinateSet::from_vec(vec![0.375]);
-    let ys = CoordinateSet::from_vec(vec![0.375, 0.5]);
-    let offset = Point::new(0.375, 0.375);
-    let x_view = xs.view();
-    let y_view = ys.view();
-    let actual = converge_point_set(x_view, y_view, offset, 100, 1e-5);
-    assert_eq!(actual.shape()[0], 2);
-    assert_eq!(actual.shape()[1], 1);
-    assert_eq!(actual[[0, 0]], 15);
-    assert_eq!(actual[[1, 0]], 24);
-}
-
-#[test]
-fn test_converge_point_set_limit() {
-    let xs = CoordinateSet::from_vec(vec![0.375, 0.5]);
-    let ys = CoordinateSet::from_vec(vec![0.375]);
-    let offset = Point::new(0.5, 0.375);
-    let x_view = xs.view();
-    let y_view = ys.view();
-    let actual = converge_point_set(x_view, y_view, offset, 5, 1e-5);
-    assert_eq!(actual.shape()[0], 1);
-    assert_eq!(actual.shape()[1], 2);
-    assert_eq!(actual[[0, 0]], 5);
-    assert_eq!(actual[[0, 1]], 3);
-}
-
-#[test]
-fn test_map_coordinates_zero() {
-    let half_length: Coordinate = 1.0;
-    let n_pixels: PixelSize = 0;
-    let actual = map_coordinates(half_length, n_pixels);
-    assert_eq!(actual.shape()[0], n_pixels as usize);
-}
-
-#[test]
-fn test_map_coordinates_one() {
-    let half_length: Coordinate = 1.0;
-    let n_pixels: PixelSize = 1;
-    let actual = map_coordinates(half_length, n_pixels);
-    assert_eq!(actual.shape()[0], n_pixels as usize);
-    assert_float_eq::assert_float_absolute_eq!(actual[0], 0.0, Coordinate::EPSILON);
-}
-
-#[test]
-fn test_map_coordinates_two() {
-    let half_length: Coordinate = 3.0;
-    let n_pixels: PixelSize = 2;
-    let actual = map_coordinates(half_length, n_pixels);
-    let expected = CoordinateSet::from_vec(vec![-3.0, 3.0]);
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn test_map_coordinates_many() {
-    let half_length_odd: Coordinate = 2.0;
-    let n_pixels_odd: PixelSize = 5;
-    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
-    let expected_odd = CoordinateSet::from_vec(vec![-2.0, -1.0, 0.0, 1.0, 2.0]);
-    assert_eq!(actual_odd, expected_odd);
-
-    let half_length_even: Coordinate = 6.0;
-    let n_pixels_even: PixelSize = 4;
-    let actual_even = map_coordinates(half_length_even, n_pixels_even);
-    let expected_even = CoordinateSet::from_vec(vec![-6.0, -2.0, 2.0, 6.0]);
-    assert_eq!(actual_even, expected_even);
-}
-
-#[test]
-fn test_map_coordinates_negative() {
-    let half_length_odd: Coordinate = -2.0;
-    let n_pixels_odd: PixelSize = 5;
-    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
-    let expected_odd = CoordinateSet::from_vec(vec![2.0, 1.0, 0.0, -1.0, -2.0]);
-    assert_eq!(actual_odd, expected_odd);
-}
-
-#[test]
-fn test_map_scan_points_capped() {
-    let actual_capped = scan_points(0.25, 0.75, 3, 4);
-    let expected_capped: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 3, 0], [0, 3, 2, 0], [0, 1, 0, 0]]);
-    assert_eq!(actual_capped, expected_capped);
-}
-
-#[test]
-fn test_map_scan_points_unlimited() {
-    let actual = scan_points(0.25, 0.75, 100, 4);
-    let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
-    assert_eq!(actual, expected);
-}
-
 #[test]
 fn test_draw_image_monotone() {
     for count in 0..3 {
@@ -674,6 +632,20 @@ fn test_draw_image_many_colors() {
     }
 }
 
+/// Draws a Julia set
+///
+/// # Arguments
+///
+/// * `count_set` Julia set counts in a screen
+/// * `csv_filepath` A path to save counts as a table
+fn write_count(count_set: &CountSet, csv_filepath: &PathBuf) {
+    let file = File::create(csv_filepath).expect("Creating a CSV file failed");
+    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+    writer
+        .serialize_array2(&count_set)
+        .expect("Writing a CSV file failed");
+}
+
 #[cfg(test)]
 fn make_temp_dir() -> TempDir {
     Builder::new()
@@ -736,6 +708,35 @@ fn test_write_count_bad_filename() {
     let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
     let count_set = CountSet::zeros([3, 4]);
     write_count(&count_set, &csv_path);
+}
+
+/// Draws a Julia set
+///
+/// # Arguments
+///
+/// * `params` A parameter set to draw
+pub fn draw(params: &ParamSet) {
+    let count_set = scan_points(
+        params.x_offset,
+        params.y_offset,
+        params.max_iter,
+        params.n_pixels,
+    );
+
+    match &params.csv_filepath {
+        Some(csv_filepath) => {
+            write_count(&count_set, &csv_filepath);
+        }
+        None => (),
+    };
+
+    match &params.image_filepath {
+        Some(image_filepath) => {
+            let image = draw_image(&count_set);
+            image.save(image_filepath).expect("Saving an image failed");
+        }
+        None => (),
+    };
 }
 
 #[cfg(test)]

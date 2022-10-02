@@ -139,63 +139,90 @@ fn test_short_arguments() {
 #[test]
 #[should_panic]
 fn test_invalid_x_offset() {
-    let args: Vec<String> = vec!["command", "--x_offset", "a.b",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--x_offset", "a.b"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_y_offset() {
-    let args: Vec<String> = vec!["command", "--y_offset", "a.b",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--y_offset", "a.b"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_not_a_number() {
-    let args: Vec<String> = vec!["command", "--max_iter", "a",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--max_iter", "a"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_negative() {
-    let args: Vec<String> = vec!["command", "--max_iter", "-1",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--max_iter", "-1"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_max_iter_min() {
-    let args: Vec<String> = vec!["command", "--max_iter", "0",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--max_iter", "0"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_not_a_number() {
-    let args: Vec<String> = vec!["command", "--size", "a",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--size", "a"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_negative() {
-    let args: Vec<String> = vec!["command", "--size", "-1",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--size", "-1"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_zero() {
-    let args: Vec<String> = vec!["command", "--size", "0",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--size", "0"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_size_min() {
-    let args: Vec<String> = vec!["command", "--size", "1",].iter().map(|&s| s.into()).collect();
+    let args: Vec<String> = vec!["command", "--size", "1"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
     parse_args(args);
 }
 

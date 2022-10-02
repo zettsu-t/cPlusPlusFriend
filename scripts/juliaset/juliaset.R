@@ -113,7 +113,7 @@ draw_image <- function(count_set, color_func, png_filename = NA) {
 
   if (!is.na(png_filename)) {
     png(png_filename, height = shape[1], width = shape[2])
-    par(mar=c(0,0,0,0))
+    par(mar = c(0, 0, 0, 0))
     plot(img)
     dev.off()
   }
