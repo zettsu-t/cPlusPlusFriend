@@ -646,6 +646,7 @@ fn write_count(count_set: &CountSet, csv_filepath: &PathBuf) {
         .expect("Writing a CSV file failed");
 }
 
+/// Makes a temp dir
 #[cfg(test)]
 fn make_temp_dir() -> TempDir {
     Builder::new()
@@ -739,6 +740,12 @@ pub fn draw(params: &ParamSet) {
     };
 }
 
+/// Returns a default parameter set
+///
+/// # Arguments
+///
+/// * `csv_filename` A CSV filename to write
+/// * `image_filename` A PNG filename to draw
 #[cfg(test)]
 fn make_default_params(csv_filename: &Option<String>, image_filename: &Option<String>) -> ParamSet {
     let x_offset: Coordinate = 0.5;

@@ -9,6 +9,8 @@ use image::io::Reader as ImageReader;
 #[cfg(test)]
 use predicates::prelude::*;
 #[cfg(test)]
+use std::path::Path;
+#[cfg(test)]
 use std::process::Command;
 #[cfg(test)]
 use tempfile::Builder;
@@ -40,6 +42,19 @@ fn test_wrong_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Counts how many files exist that matches a glob
+///
+/// # Arguments
+///
+/// * `dir` A target directory glob
+/// * `file_pattern` A filename glob
+#[cfg(test)]
+fn count_temp_dir(dir: &Path, file_pattern: &str) -> usize {
+    let file_glob = dir.join(file_pattern);
+    let pattern = file_glob.into_os_string().into_string().unwrap();
+    glob::glob(&pattern).unwrap().filter(|x| x.is_ok()).count()
+}
+
 #[test]
 fn test_correct_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = Builder::new().prefix("test-dir").rand_bytes(10).tempdir()?;
@@ -56,6 +71,11 @@ fn test_correct_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
         .arg(png_filename)
         .assert()
         .success();
+
+    let n_csvfiles = count_temp_dir(temp_dir.path(), "*.csv");
+    assert_eq!(n_csvfiles, 0 as usize);
+    let n_pngfiles = count_temp_dir(temp_dir.path(), "*.png");
+    assert_eq!(n_pngfiles, 1 as usize);
 
     let actual_image = ImageReader::open(png_filename)?.decode()?;
     assert_eq!(actual_image.width(), pixel_size);
@@ -86,6 +106,11 @@ fn test_correct_xy_arguments() -> Result<(), Box<dyn std::error::Error>> {
         .arg(csv_filename)
         .assert()
         .success();
+
+    let n_csvfiles = count_temp_dir(temp_dir.path(), "*.csv");
+    assert_eq!(n_csvfiles, 1 as usize);
+    let n_pngfiles = count_temp_dir(temp_dir.path(), "*.png");
+    assert_eq!(n_pngfiles, 0 as usize);
 
     let mut reader = ReaderBuilder::new()
         .has_headers(false)
