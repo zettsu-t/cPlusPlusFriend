@@ -113,9 +113,9 @@ fn test_short_arguments() {
     let args: Vec<String> = vec![
         "command",
         "-x",
-        "0.5",
+        "-5e-1",
         "-y",
-        "0.25",
+        "-0.25",
         "-m",
         "31",
         "-s",
@@ -132,7 +132,7 @@ fn test_short_arguments() {
     let n_pixels: PixelSize = 16;
     let csv_filename = Some("_short.csv".to_string());
     let image_filename = Some("_short.png".to_string());
-    let expected = ParamSet::new(0.5, 0.25, 31, n_pixels, &csv_filename, &image_filename);
+    let expected = ParamSet::new(-0.5, -0.25, 31, n_pixels, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
 }
 

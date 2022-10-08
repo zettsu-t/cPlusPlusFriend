@@ -65,6 +65,9 @@ const HIGH_COLOR_G: ColorElement = 233;
 #[cfg(test)]
 const HIGH_COLOR_B: ColorElement = 69;
 
+#[cfg(test)]
+type PixelUnit = u32;
+
 #[derive(Debug, PartialEq)]
 /// A parameter set to draw
 pub struct ParamSet {
@@ -417,17 +420,19 @@ fn test_map_coordinates_negative() {
 /// * `x_offset` An x offset that is added in iterations
 /// * `y_offset` A y offset that is added in iterations
 /// * `max_iter` The maximum number of iterations
-/// * `n_pixels` Numbers of pixels in X and Y axes
+/// * `width` The number of pixels in the X axes
+/// * `height` The number of pixels in the Y axes
 fn scan_points(
     x_offset: Coordinate,
     y_offset: Coordinate,
     max_iter: Count,
-    n_pixels: PixelSize,
+    width: PixelSize,
+    height: PixelSize,
 ) -> CountSet {
     // The default half width and height of images
     let half_length = (2.0 as Coordinate).sqrt() + 0.1;
-    let xs = map_coordinates(half_length, n_pixels);
-    let ys = map_coordinates(half_length, n_pixels);
+    let xs = map_coordinates(half_length, width);
+    let ys = map_coordinates(half_length, height);
     let point_offset = Point::new(x_offset, y_offset);
     let eps = DEFAULT_TOLERANCE;
 
@@ -466,15 +471,43 @@ fn scan_points(
 
 #[test]
 fn test_map_scan_points_capped() {
-    let actual_capped = scan_points(0.25, 0.75, 3, 4);
-    let expected_capped: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 3, 0], [0, 3, 2, 0], [0, 1, 0, 0]]);
+    let actual_capped = scan_points(0.25, -0.75, 3, 4, 5);
+    let expected_capped: CountSet = arr2(&[
+        [0, 1, 0, 0],
+        [0, 3, 1, 0],
+        [0, 2, 2, 0],
+        [0, 1, 3, 0],
+        [0, 0, 1, 0],
+    ]);
+    assert_eq!(actual_capped, expected_capped);
+
+    let actual_capped = scan_points(-0.25, 0.75, 5, 3, 4);
+    let expected_capped: CountSet = arr2(&[[0, 0, 0], [0, 5, 1], [1, 5, 0], [0, 0, 0]]);
+    assert_eq!(actual_capped, expected_capped);
+
+    let actual_capped = scan_points(-0.375, -0.75, 2, 5, 3);
+    let expected_capped: CountSet = arr2(&[[0, 0, 0, 0, 0], [0, 2, 2, 2, 0], [0, 0, 0, 0, 0]]);
     assert_eq!(actual_capped, expected_capped);
 }
 
 #[test]
 fn test_map_scan_points_unlimited() {
-    let actual = scan_points(0.25, 0.75, 100, 4);
-    let expected: CountSet = arr2(&[[0, 0, 1, 0], [0, 2, 5, 0], [0, 5, 2, 0], [0, 1, 0, 0]]);
+    let actual = scan_points(0.25, -0.75, 5, 4, 5);
+    let expected: CountSet = arr2(&[
+        [0, 1, 0, 0],
+        [0, 5, 1, 0],
+        [0, 2, 2, 0],
+        [0, 1, 5, 0],
+        [0, 0, 1, 0],
+    ]);
+    assert_eq!(actual, expected);
+
+    let actual = scan_points(-0.25, 0.75, 8, 3, 4);
+    let expected: CountSet = arr2(&[[0, 0, 0], [0, 7, 1], [1, 7, 0], [0, 0, 0]]);
+    assert_eq!(actual, expected);
+
+    let actual = scan_points(-0.375, -0.75, 100, 5, 3);
+    let expected: CountSet = arr2(&[[0, 0, 0, 0, 0], [0, 3, 6, 3, 0], [0, 0, 0, 0, 0]]);
     assert_eq!(actual, expected);
 }
 
@@ -711,6 +744,91 @@ fn test_write_count_bad_filename() {
     write_count(&count_set, &csv_path);
 }
 
+/// Saves a Julia set image
+///
+/// # Arguments
+///
+/// * `image` An image to save
+/// * `image_filepath` A path to save the image
+fn save_image(image: &RgbImage, image_filepath: &PathBuf) {
+    image.save(image_filepath).expect("Saving an image failed");
+}
+
+/// Makes an image for testing
+///
+/// # Arguments
+///
+/// * `width` The width of the image in pixels
+/// * `height` The height of the image in pixels
+#[cfg(test)]
+fn make_test_image(width: PixelUnit, height: PixelUnit) -> RgbImage {
+    assert!(width > 2);
+    assert!(height > 2);
+
+    let shape = [height as usize, width as usize, 3];
+    let mut bitmap = Bitmap::zeros(shape);
+    bitmap[[0, 0, 0]] = 1;
+    bitmap[[1, 1, 1]] = 2;
+    bitmap[[2, 2, 2]] = 3;
+
+    let raw = bitmap.into_raw_vec();
+    RgbImage::from_raw(width, height, raw).expect("Creating an image failed")
+}
+
+#[test]
+fn test_save_image() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("_test_image_.png");
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let height: PixelUnit = 3;
+    let width: PixelUnit = 4;
+    let expected = make_test_image(width, height);
+    save_image(&expected, &png_path);
+
+    let actual = ImageReader::open(&png_path)
+        .unwrap()
+        .decode()
+        .unwrap()
+        .to_rgb8();
+    assert_eq!(actual.width(), width);
+    assert_eq!(actual.height(), height);
+
+    for y in 0..height {
+        for x in 0..width {
+            let color = actual.get_pixel(x, y);
+            for rgb in 0..=(2 as PixelUnit) {
+                let value = if (x == y) & (x == rgb) {
+                    ColorElement::try_from(x).unwrap() + 1
+                } else {
+                    0
+                };
+                assert_eq!(color[rgb as usize], value);
+            }
+        }
+    }
+}
+
+#[test]
+#[should_panic]
+fn test_save_image_error() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("_test_image_.png");
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    std::fs::remove_dir(temp_dir).unwrap();
+    let image = make_test_image(3, 4);
+    save_image(&image, &png_path);
+}
+
+#[test]
+#[should_panic]
+fn test_save_image_bad_filename() {
+    let temp_dir = make_temp_dir();
+    let temp_filename = temp_dir.path().join("..");
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let image = make_test_image(3, 4);
+    save_image(&image, &png_path);
+}
+
 /// Draws a Julia set
 ///
 /// # Arguments
@@ -721,6 +839,7 @@ pub fn draw(params: &ParamSet) {
         params.x_offset,
         params.y_offset,
         params.max_iter,
+        params.n_pixels,
         params.n_pixels,
     );
 
@@ -734,7 +853,7 @@ pub fn draw(params: &ParamSet) {
     match &params.image_filepath {
         Some(image_filepath) => {
             let image = draw_image(&count_set);
-            image.save(image_filepath).expect("Saving an image failed");
+            save_image(&image, &image_filepath);
         }
         None => (),
     };

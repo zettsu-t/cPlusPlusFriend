@@ -77,12 +77,19 @@ map_coordinates <- function(half_length, n_pixels) {
 #' @param x_offset An x offset to be added
 #' @param y_offset A y offset to be added
 #' @param max_iter The maximum number of iterations
-#' @param n_pixels Numbers of pixels in X and Y axes
+#' @param width The number of pixels in the X axes
+#' @param height The number of pixels in the Y axes
 #' @return How many times each point in a screen is transformed
-scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
+scan_points <- function(x_offset, y_offset, max_iter, width, height = NA) {
+  n_pixels_y <- if (is.na(height)) {
+    width
+  } else {
+    height
+  }
+
   half_length <- sqrt(2.0) + 0.1
-  xs <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
-  ys <- map_coordinates(half_length = half_length, n_pixels = n_pixels)
+  xs <- map_coordinates(half_length = half_length, n_pixels = width)
+  ys <- map_coordinates(half_length = half_length, n_pixels = n_pixels_y)
   offset <- complex(real = x_offset, imaginary = y_offset)
   eps <- sqrt(1.19e-7)
   converge_point_set(xs = xs, ys = ys, offset = offset, max_iter = max_iter, eps = eps)
@@ -95,7 +102,7 @@ scan_points <- function(x_offset, y_offset, max_iter, n_pixels) {
 #' @param png_filename An output PNG filename
 #' @return A PNG image from an input screen
 draw_image <- function(count_set, color_func, png_filename = NA) {
-  shape <- c(NCOL(count_set), NROW(count_set))
+  shape <- c(NROW(count_set), NCOL(count_set))
   mat_color <- array(0.0, c(shape, 3))
 
   df_color <- tibble::tibble(color = color_func(n = diff(range(count_set)) + 1)) %>%
@@ -121,11 +128,31 @@ draw_image <- function(count_set, color_func, png_filename = NA) {
   img
 }
 
-count_set <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, n_pixels = 1000)
-plot(draw_image(
-  count_set = count_set, color_func = viridis::magma,
-  png_filename = "juliaset_r.png"
-))
+draw_samples <- function() {
+  count_set <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, width = 256)
+  plot(draw_image(
+    count_set = count_set, color_func = viridis::magma,
+    png_filename = "juliaset_r_square.png"
+  ))
+
+  count_set <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, width = 256, height = 128)
+  plot(draw_image(
+    count_set = count_set, color_func = viridis::magma,
+    png_filename = "juliaset_r_landscape.png"
+  ))
+
+  count_set <- scan_points(x_offset = 0.382, y_offset = 0.382, max_iter = 75, width = 128, height = 256)
+  plot(draw_image(
+    count_set = count_set, color_func = viridis::magma,
+    png_filename = "juliaset_r_portrait.png"
+  ))
+
+  count_set <- scan_points(x_offset = 0.25, y_offset = -0.75, max_iter = 1000, width = 4, height = 5)
+  count_set <- scan_points(x_offset = -0.25, y_offset = 0.75, max_iter = 1000, width = 3, height = 4)
+  count_set <- scan_points(x_offset = -0.375, y_offset = -0.75, max_iter = 1000, width = 5, height = 3)
+}
+
+count_set <- draw_samples()
 
 pixel_filename <- "rust/juliaset/rust_juliaset.csv"
 if (file.exists(pixel_filename)) {
