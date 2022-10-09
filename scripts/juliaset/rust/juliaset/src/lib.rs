@@ -46,6 +46,9 @@ type Bitmap = ndarray::Array3<u8>;
 /// Julia set counts in a screen
 type CountSet = ndarray::Array2<Count>;
 
+/// A color palette
+type ColorPalette = Vec<colorous::Color>;
+
 /// The default tolerance to check if transformations are converged
 const DEFAULT_TOLERANCE: Coordinate = 1e-6;
 static_assertions::const_assert!(DEFAULT_TOLERANCE > Coordinate::EPSILON);
@@ -511,6 +514,67 @@ fn test_map_scan_points_unlimited() {
     assert_eq!(actual, expected);
 }
 
+/// Makes a color palette that maps counts to colors
+///
+/// # Arguments
+///
+/// * `count_set` Counts of a Julia set in a screen
+fn make_color_map(count_set: &CountSet) -> ColorPalette {
+    type SizeOfColors = usize;
+    let max_count_raw = *(count_set.iter().max().unwrap_or(&0));
+    let max_count = SizeOfColors::try_from(max_count_raw).unwrap();
+    let gradient = colorous::CIVIDIS;
+    (0..=max_count)
+        .map(|i| gradient.eval_rational(i, max_count + 1))
+        .collect()
+}
+
+#[test]
+fn test_make_color_map_empty() {
+    let count_set: CountSet = arr2(&[[], []]);
+    let color_map = make_color_map(&count_set);
+    assert_eq!(color_map.len(), 1);
+    assert_eq!(color_map[0].r, HIGH_COLOR_R);
+    assert_eq!(color_map[0].g, HIGH_COLOR_G);
+    assert_eq!(color_map[0].b, HIGH_COLOR_B);
+}
+
+#[test]
+fn test_make_color_map_monotone() {
+    let count_set: CountSet = arr2(&[[0, 0], [0, 0]]);
+    let color_map = make_color_map(&count_set);
+    assert_eq!(color_map.len(), 1);
+    assert_eq!(color_map[0].r, HIGH_COLOR_R);
+    assert_eq!(color_map[0].g, HIGH_COLOR_G);
+    assert_eq!(color_map[0].b, HIGH_COLOR_B);
+}
+
+#[test]
+fn test_make_color_map_many_colors() {
+    for count in 1..=10 {
+        let count_set: CountSet = arr2(&[[0, 1, 1], [0, 1, count]]);
+        let color_map = make_color_map(&count_set);
+        let max_index = count as usize;
+        assert_eq!(color_map.len(), max_index + 1);
+        assert_eq!(color_map[0].r, LOW_COLOR_R);
+        assert_eq!(color_map[0].g, LOW_COLOR_G);
+        assert_eq!(color_map[0].b, LOW_COLOR_B);
+
+        for index in 1..max_index {
+            assert_ne!(color_map[index].r, LOW_COLOR_R);
+            assert_ne!(color_map[index].g, LOW_COLOR_G);
+            assert_ne!(color_map[index].b, LOW_COLOR_B);
+            assert_ne!(color_map[index].r, HIGH_COLOR_R);
+            assert_ne!(color_map[index].g, HIGH_COLOR_G);
+            assert_ne!(color_map[index].b, HIGH_COLOR_B);
+        }
+
+        assert_eq!(color_map[max_index].r, HIGH_COLOR_R);
+        assert_eq!(color_map[max_index].g, HIGH_COLOR_G);
+        assert_eq!(color_map[max_index].b, HIGH_COLOR_B);
+    }
+}
+
 /// Draws a PNG image from an input screen
 ///
 /// # Arguments
@@ -529,15 +593,8 @@ fn draw_image(count_set: &CountSet) -> RgbImage {
     type BitmapCoord = usize;
     let (height, width) = count_set.dim();
     let shape = [height, width, 3];
+    let color_map = make_color_map(&count_set);
     let mut bitmap = Bitmap::zeros(shape);
-
-    type SizeOfColors = usize;
-    let max_count_raw = *(count_set.iter().max().unwrap_or(&0));
-    let max_count = SizeOfColors::try_from(max_count_raw).unwrap();
-    let gradient = colorous::CIVIDIS;
-    let color_map: Vec<colorous::Color> = (0..=max_count)
-        .map(|i| gradient.eval_rational(i, max_count + 1))
-        .collect();
 
     crossbeam::scope(|scope| {
         let mut children = vec![];
@@ -600,21 +657,18 @@ fn draw_image(count_set: &CountSet) -> RgbImage {
 
 #[test]
 fn test_draw_image_monotone() {
-    for count in 0..3 {
-        let mut count_set: CountSet = arr2(&[[1, 1, 1], [1, 1, 1]]);
-        count_set *= count;
-        let shape = &count_set.shape();
-        let width = u32::try_from(shape[1]).unwrap();
-        let height = u32::try_from(shape[0]).unwrap();
-        let image = draw_image(&count_set);
+    let count_set: CountSet = arr2(&[[1, 1, 1], [1, 1, 1]]);
+    let shape = &count_set.shape();
+    let width = u32::try_from(shape[1]).unwrap();
+    let height = u32::try_from(shape[0]).unwrap();
+    let image = draw_image(&count_set);
 
-        for y in 0..height {
-            for x in 0..width {
-                let color = image.get_pixel(x, y);
-                assert_eq!(color[0], HIGH_COLOR_R);
-                assert_eq!(color[1], HIGH_COLOR_G);
-                assert_eq!(color[2], HIGH_COLOR_B);
-            }
+    for y in 0..height {
+        for x in 0..width {
+            let color = image.get_pixel(x, y);
+            assert_eq!(color[0], HIGH_COLOR_R);
+            assert_eq!(color[1], HIGH_COLOR_G);
+            assert_eq!(color[2], HIGH_COLOR_B);
         }
     }
 }
