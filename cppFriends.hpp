@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 #include <type_traits>
+#include <variant>
 #include <boost/type_traits/function_traits.hpp>
 
 // int32を32回以上シフトする実験
@@ -106,6 +107,29 @@ struct IntHolderExplicit {
     int Get() const;
     int value_ {0};
 };
+
+class VarBase {
+public:
+    virtual ~VarBase() = default;
+    virtual void Print(std::ostream& os) const = 0;
+};
+
+class VarDerived1 : public VarBase {
+public:
+    virtual ~VarDerived1() = default;
+    virtual void Print(std::ostream& os) const;
+};
+
+class VarDerived2 : public VarBase {
+public:
+    virtual ~VarDerived2() = default;
+    virtual void Print(std::ostream& os) const;
+};
+
+using VarSample = std::variant<std::monostate, const VarDerived1, const VarDerived2>;
+extern VarSample GetVoid();
+extern VarSample GetDerived1();
+extern VarSample GetDerived2();
 
 #endif // CPPFRIENDS_CPPFRIENDS_HPP
 

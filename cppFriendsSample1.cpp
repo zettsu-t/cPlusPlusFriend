@@ -2063,6 +2063,26 @@ TEST_F(TestCppSpecifications, ArrayParameters) {
     EXPECT_EQ(19, Sum4(a));
 }
 
+class TestVariant : public ::testing::Test {};
+
+TEST_F(TestVariant, All) {
+    const auto e_void = GetVoid();
+    const auto e_1 = GetDerived1();
+    const auto e_2 = GetDerived2();
+
+    EXPECT_EQ(0, e_void.index());
+    EXPECT_EQ(1, e_1.index());
+    EXPECT_EQ(2, e_2.index());
+
+    std::ostringstream os_1;
+    std::get<1>(e_1).Print(os_1);
+    EXPECT_EQ("A", os_1.str());
+
+    std::ostringstream os_2;
+    std::get<2>(e_2).Print(os_2);
+    EXPECT_EQ("b", os_2.str());
+}
+
 /*
 Local Variables:
 mode: c++

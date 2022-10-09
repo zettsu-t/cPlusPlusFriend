@@ -2083,6 +2083,29 @@ TEST_F(TestZipIterator, Fusion) {
                                       boost::fusion::make_vector("2", 20)));
 }
 
+VarSample GetVoid() {
+    VarSample v = std::monostate{};
+    return v;
+}
+
+VarSample GetDerived1() {
+    VarSample v = VarDerived1{};
+    return v;
+}
+
+VarSample GetDerived2() {
+    VarSample v = VarDerived2{};
+    return v;
+}
+
+void VarDerived1::Print(std::ostream& os) const {
+    os << "A";
+}
+
+void VarDerived2::Print(std::ostream& os) const {
+    os << "b";
+}
+
 /*
 Local Variables:
 mode: c++
