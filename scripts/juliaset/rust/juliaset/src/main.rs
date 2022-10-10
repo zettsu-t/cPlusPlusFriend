@@ -184,10 +184,7 @@ fn test_missing_size_value() {
 #[test]
 #[should_panic]
 fn test_missing_csv_value() {
-    let args: Vec<String> = vec!["command", "--csv"]
-        .iter()
-        .map(|&s| s.into())
-        .collect();
+    let args: Vec<String> = vec!["command", "--csv"].iter().map(|&s| s.into()).collect();
     parse_args(args);
 }
 

@@ -94,7 +94,7 @@ fn test_correct_csv_arguments() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, row) in reader.records().enumerate() {
         let cells: Vec<Count> = row?.iter().map(|s| s.parse().unwrap()).collect();
-        assert_eq!(cells.len(), pixel_size as usize);
+        assert_eq!(cells.len(), usize::try_from(pixel_size).unwrap());
         let cell_sum = cells.iter().sum::<Count>();
         let cell_max = *(cells.iter().max().unwrap_or(&0));
         actual_max = std::cmp::max(actual_max, cell_max);
@@ -110,7 +110,7 @@ fn test_correct_csv_arguments() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     assert_eq!(actual_max, expected_max);
-    assert_eq!(n_columns, pixel_size as usize);
+    assert_eq!(n_columns, usize::try_from(pixel_size).unwrap());
     Ok(())
 }
 

@@ -277,8 +277,8 @@ fn test_converge_point() {
 ///
 /// # Arguments
 ///
-/// * `xs` A X-coordinates view of points in a screen
-/// * `ys` A Y-coordinates view of points in a screen
+/// * `xs` A x-coordinates view of points in a screen
+/// * `ys` A y-coordinates view of points in a screen
 /// * `point_offset` An offset to be added to points
 /// * `max_iter` The maximum number of iterations
 /// * `eps` Tolerance to check if transformations are converged
@@ -350,70 +350,148 @@ fn test_converge_point_set_limit() {
 ///
 /// # Arguments
 ///
-/// * `half_length` Maximum x and y coordinates relative to (0,0)
+/// * `lower` The lower bound of coordinates
+/// * `upper` The upper bound of coordinates
 /// * `n_pixels` Numbers of pixels in X and Y axes
-fn map_coordinates(half_length: Coordinate, n_pixels: PixelSize) -> CoordinateSet {
+fn map_coordinates(lower: Coordinate, upper: Coordinate, n_pixels: PixelSize) -> CoordinateSet {
     match n_pixels {
         1 => CoordinateSet::zeros([1]),
         n if n < 1 => CoordinateSet::zeros([0]),
         _ => {
-            let span = (n_pixels - 1) as Coordinate;
-            // Twice the half_length
-            (0..n_pixels)
-                .map(|i| ((i as Coordinate) * 2.0 * half_length / span) - half_length)
-                .collect()
+            let length = upper - lower;
+            let n_spans = (n_pixels - 1) as Coordinate;
+            let mut values: CoordinateSet = (0..n_pixels)
+                .map(|i| lower + ((i as Coordinate) / n_spans) * length)
+                .collect();
+
+            values[0] = lower;
+            values[usize::try_from(n_pixels).unwrap() - 1] = upper;
+            values
         }
     }
 }
 
 #[test]
+fn test_map_coordinates_negative() {
+    let n_pixels: PixelSize = -1;
+    let actual = map_coordinates(-1.0, 1.0, n_pixels);
+    assert_eq!(actual.shape()[0], 0);
+}
+
+#[test]
 fn test_map_coordinates_zero() {
-    let half_length: Coordinate = 1.0;
     let n_pixels: PixelSize = 0;
-    let actual = map_coordinates(half_length, n_pixels);
-    assert_eq!(actual.shape()[0], n_pixels as usize);
+    let actual = map_coordinates(-1.0, 0.0, n_pixels);
+    assert_eq!(actual.shape()[0], usize::try_from(n_pixels).unwrap());
 }
 
 #[test]
 fn test_map_coordinates_one() {
-    let half_length: Coordinate = 1.0;
     let n_pixels: PixelSize = 1;
-    let actual = map_coordinates(half_length, n_pixels);
-    assert_eq!(actual.shape()[0], n_pixels as usize);
+    let actual = map_coordinates(-1.0, 1.0, n_pixels);
+    assert_eq!(actual.shape()[0], usize::try_from(n_pixels).unwrap());
     assert_float_eq::assert_float_absolute_eq!(actual[0], 0.0, Coordinate::EPSILON);
 }
 
 #[test]
 fn test_map_coordinates_two() {
-    let half_length: Coordinate = 3.0;
     let n_pixels: PixelSize = 2;
-    let actual = map_coordinates(half_length, n_pixels);
-    let expected = CoordinateSet::from_vec(vec![-3.0, 3.0]);
+    let actual = map_coordinates(-2.0, 3.0, n_pixels);
+    let expected = CoordinateSet::from_vec(vec![-2.0, 3.0]);
     assert_eq!(actual, expected);
 }
 
 #[test]
 fn test_map_coordinates_many() {
-    let half_length_odd: Coordinate = 2.0;
     let n_pixels_odd: PixelSize = 5;
-    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
-    let expected_odd = CoordinateSet::from_vec(vec![-2.0, -1.0, 0.0, 1.0, 2.0]);
+    let actual_odd = map_coordinates(-3.0, 1.0, n_pixels_odd);
+    let expected_odd = CoordinateSet::from_vec(vec![-3.0, -2.0, -1.0, 0.0, 1.0]);
     assert_eq!(actual_odd, expected_odd);
 
-    let half_length_even: Coordinate = 6.0;
     let n_pixels_even: PixelSize = 4;
-    let actual_even = map_coordinates(half_length_even, n_pixels_even);
-    let expected_even = CoordinateSet::from_vec(vec![-6.0, -2.0, 2.0, 6.0]);
+    let actual_even = map_coordinates(-5.0, 7.0, n_pixels_even);
+    let expected_even = CoordinateSet::from_vec(vec![-5.0, -1.0, 3.0, 7.0]);
     assert_eq!(actual_even, expected_even);
 }
 
 #[test]
-fn test_map_coordinates_negative() {
-    let half_length_odd: Coordinate = -2.0;
-    let n_pixels_odd: PixelSize = 5;
-    let actual_odd = map_coordinates(half_length_odd, n_pixels_odd);
-    let expected_odd = CoordinateSet::from_vec(vec![2.0, 1.0, 0.0, -1.0, -2.0]);
-    assert_eq!(actual_odd, expected_odd);
+fn test_map_coordinates_reverse() {
+    let n_pixels: PixelSize = 5;
+    let actual = map_coordinates(2.0, -2.0, n_pixels);
+    let expected = CoordinateSet::from_vec(vec![2.0, 1.0, 0.0, -1.0, -2.0]);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_map_coordinates_frac() {
+    let lower = (2.0 as Coordinate).sqrt();
+    let upper = (3.0 as Coordinate).sqrt();
+    let n_pixels: PixelSize = 7;
+    let size = usize::try_from(n_pixels).unwrap();
+    let actual = map_coordinates(lower, upper, n_pixels);
+    assert_eq!(actual.shape()[0], size);
+    assert_float_eq::assert_float_absolute_eq!(actual[0], lower, Coordinate::EPSILON);
+    assert_float_eq::assert_float_absolute_eq!(actual[size - 1], upper, Coordinate::EPSILON);
+}
+
+/// Returns an X-Y coordinate set
+///
+/// # Arguments
+///
+/// * `half_width` The maximum x coordinate
+/// * `half_height` The maximum y coordinate
+/// * `n_pixels_x` The number of pixels in the x axes
+/// * `n_pixels_y` The number of pixels in the y axes
+fn make_xy_coordinate_pair(
+    half_width: Coordinate,
+    half_height: Coordinate,
+    n_pixels_x: PixelSize,
+    n_pixels_y: PixelSize,
+) -> (CoordinateSet, CoordinateSet) {
+    // The default half width and height of images
+    let xs = map_coordinates(-half_width, half_width, n_pixels_x);
+    let ys = map_coordinates(-half_height, half_height, n_pixels_y);
+    (xs, ys)
+}
+
+#[test]
+fn test_make_xy_coordinate_pair() {
+    let half_width: Coordinate = 2.0;
+    let half_height: Coordinate = 6.0;
+    let n_pixels_x: PixelSize = 5;
+    let n_pixels_y: PixelSize = 4;
+    let (xs, ys) = make_xy_coordinate_pair(half_width, half_height, n_pixels_x, n_pixels_y);
+    let expected_xs = CoordinateSet::from_vec(vec![-2.0, -1.0, 0.0, 1.0, 2.0]);
+    let expected_ys = CoordinateSet::from_vec(vec![-6.0, -2.0, 2.0, 6.0]);
+    assert_eq!(xs, expected_xs);
+    assert_eq!(ys, expected_ys);
+}
+
+/// Returns a square X-Y coordinate set
+///
+/// # Arguments
+///
+/// * `n_pixels` The width and height in pixels of an output image
+fn make_square_xy_pair(n_pixels: PixelSize) -> (CoordinateSet, CoordinateSet) {
+    // The default half width and height of images
+    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
+    make_xy_coordinate_pair(half_length, half_length, n_pixels, n_pixels)
+}
+
+#[test]
+fn test_make_square_xy_pair() {
+    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
+    let half2_length = half_length / 2.0;
+    let expected = CoordinateSet::from_vec(vec![
+        -half_length,
+        -half2_length,
+        0.0,
+        half2_length,
+        half_length,
+    ]);
+    let (xs, ys) = make_square_xy_pair(5);
+    assert_eq!(xs, expected);
+    assert_eq!(ys, expected);
 }
 
 /// Returns how many times each point in a screen is transformed
@@ -423,23 +501,19 @@ fn test_map_coordinates_negative() {
 /// * `x_offset` An x offset that is added in iterations
 /// * `y_offset` A y offset that is added in iterations
 /// * `max_iter` The maximum number of iterations
-/// * `width` The number of pixels in the X axes
-/// * `height` The number of pixels in the Y axes
+/// * `xs` An x coordinate set
+/// * `ys` A y coordinate set
 fn scan_points(
     x_offset: Coordinate,
     y_offset: Coordinate,
     max_iter: Count,
-    width: PixelSize,
-    height: PixelSize,
+    xs: CoordinateSet,
+    ys: CoordinateSet,
 ) -> CountSet {
-    // The default half width and height of images
-    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
-    let xs = map_coordinates(half_length, width);
-    let ys = map_coordinates(half_length, height);
     let point_offset = Point::new(x_offset, y_offset);
     let eps = DEFAULT_TOLERANCE;
-
     let n_ys = ys.shape()[0];
+
     crossbeam::scope(|scope| {
         let mut mat_counts = CountSet::zeros([n_ys, xs.shape()[0]]);
         let mut children = vec![];
@@ -473,29 +547,10 @@ fn scan_points(
 }
 
 #[test]
-fn test_map_scan_points_capped() {
-    let actual_capped = scan_points(0.25, -0.75, 3, 4, 5);
-    let expected_capped: CountSet = arr2(&[
-        [0, 1, 0, 0],
-        [0, 3, 1, 0],
-        [0, 2, 2, 0],
-        [0, 1, 3, 0],
-        [0, 0, 1, 0],
-    ]);
-    assert_eq!(actual_capped, expected_capped);
-
-    let actual_capped = scan_points(-0.25, 0.75, 5, 3, 4);
-    let expected_capped: CountSet = arr2(&[[0, 0, 0], [0, 5, 1], [1, 5, 0], [0, 0, 0]]);
-    assert_eq!(actual_capped, expected_capped);
-
-    let actual_capped = scan_points(-0.375, -0.75, 2, 5, 3);
-    let expected_capped: CountSet = arr2(&[[0, 0, 0, 0, 0], [0, 2, 2, 2, 0], [0, 0, 0, 0, 0]]);
-    assert_eq!(actual_capped, expected_capped);
-}
-
-#[test]
-fn test_map_scan_points_unlimited() {
-    let actual = scan_points(0.25, -0.75, 5, 4, 5);
+fn test_map_scan_points_square() {
+    let half_length = (2.0 as Coordinate).sqrt() + 0.1;
+    let (xs, ys) = make_xy_coordinate_pair(half_length, half_length, 4, 5);
+    let actual = scan_points(0.25, -0.75, 100, xs, ys);
     let expected: CountSet = arr2(&[
         [0, 1, 0, 0],
         [0, 5, 1, 0],
@@ -504,13 +559,23 @@ fn test_map_scan_points_unlimited() {
         [0, 0, 1, 0],
     ]);
     assert_eq!(actual, expected);
+}
 
-    let actual = scan_points(-0.25, 0.75, 8, 3, 4);
-    let expected: CountSet = arr2(&[[0, 0, 0], [0, 7, 1], [1, 7, 0], [0, 0, 0]]);
+#[test]
+fn test_map_scan_points_scattered() {
+    let xs = CoordinateSet::from_vec(vec![-0.25, -0.125, -0.0625]);
+    let ys = CoordinateSet::from_vec(vec![0.375, 0.5, 0.625, 0.75]);
+    let actual = scan_points(-0.625, 0.75, 100, xs, ys);
+    let expected: CountSet = arr2(&[[6, 5, 4], [6, 5, 4], [6, 6, 5], [8, 9, 6]]);
     assert_eq!(actual, expected);
+}
 
-    let actual = scan_points(-0.375, -0.75, 100, 5, 3);
-    let expected: CountSet = arr2(&[[0, 0, 0, 0, 0], [0, 3, 6, 3, 0], [0, 0, 0, 0, 0]]);
+#[test]
+fn test_map_scan_points_capped() {
+    let xs = CoordinateSet::from_vec(vec![-0.25, -0.125, -0.0625]);
+    let ys = CoordinateSet::from_vec(vec![0.375, 0.5, 0.625, 0.75]);
+    let actual = scan_points(-0.625, 0.75, 6, xs, ys);
+    let expected: CountSet = arr2(&[[6, 5, 4], [6, 5, 4], [6, 6, 5], [6, 6, 6]]);
     assert_eq!(actual, expected);
 }
 
@@ -554,7 +619,7 @@ fn test_make_color_map_many_colors() {
     for count in 1..=10 {
         let count_set: CountSet = arr2(&[[0, 1, 1], [0, 1, count]]);
         let color_map = make_color_map(&count_set);
-        let max_index = count as usize;
+        let max_index = usize::try_from(count).unwrap();
         assert_eq!(color_map.len(), max_index + 1);
         assert_eq!(color_map[0].r, LOW_COLOR_R);
         assert_eq!(color_map[0].g, LOW_COLOR_G);
@@ -708,9 +773,9 @@ fn test_draw_image_many_colors() {
     let mut prev = 0;
     for y in 0..height {
         for x in 0..width {
-            let current = image.get_pixel(x, y)[0];
+            let current = image.get_pixel(x, y)[1];
             if (x == 0) && (y == 0) {
-                assert_eq!(current, 0);
+                assert_eq!(current, LOW_COLOR_G);
             } else {
                 assert!(current > prev);
             }
@@ -819,7 +884,11 @@ fn make_test_image(width: PixelUnit, height: PixelUnit) -> RgbImage {
     assert!(width > 2);
     assert!(height > 2);
 
-    let shape = [height as usize, width as usize, 3];
+    let shape = [
+        usize::try_from(height).unwrap(),
+        usize::try_from(width).unwrap(),
+        3,
+    ];
     let mut bitmap = Bitmap::zeros(shape);
     bitmap[[0, 0, 0]] = 1;
     bitmap[[1, 1, 1]] = 2;
@@ -856,7 +925,7 @@ fn test_save_image() {
                 } else {
                     0
                 };
-                assert_eq!(color[rgb as usize], value);
+                assert_eq!(color[usize::try_from(rgb).unwrap()], value);
             }
         }
     }
@@ -889,13 +958,8 @@ fn test_save_image_bad_filename() {
 ///
 /// * `params` A parameter set to draw
 pub fn draw(params: &ParamSet) {
-    let count_set = scan_points(
-        params.x_offset,
-        params.y_offset,
-        params.max_iter,
-        params.n_pixels,
-        params.n_pixels,
-    );
+    let (xs, ys) = make_square_xy_pair(params.n_pixels);
+    let count_set = scan_points(params.x_offset, params.y_offset, params.max_iter, xs, ys);
 
     match &params.csv_filepath {
         Some(csv_filepath) => {
@@ -956,7 +1020,10 @@ fn test_draw() {
     let mut n_rows: usize = 0;
 
     for (i, row) in reader.records().enumerate() {
-        assert_eq!(row.as_ref().unwrap().len(), pixel_size as usize);
+        assert_eq!(
+            row.as_ref().unwrap().len(),
+            usize::try_from(pixel_size).unwrap()
+        );
         if i == 0 {
             let cell = &row.as_ref().unwrap()[0];
             assert_eq!(cell, "0");
@@ -964,7 +1031,7 @@ fn test_draw() {
         // 1-based indexing
         n_rows = i + 1;
     }
-    assert_eq!(n_rows, pixel_size as usize);
+    assert_eq!(n_rows, usize::try_from(pixel_size).unwrap());
 
     let image = ImageReader::open(image_path.unwrap())
         .unwrap()
@@ -973,6 +1040,7 @@ fn test_draw() {
         .to_rgb8();
     assert_eq!(image.width(), pixel_size);
     assert_eq!(image.height(), pixel_size);
+
     let color = image.get_pixel(0, 0);
     assert_eq!(color[0], LOW_COLOR_R);
     assert_eq!(color[1], LOW_COLOR_G);
