@@ -497,17 +497,17 @@ fn test_make_square_xy_pair() {
 ///
 /// # Arguments
 ///
+/// * `xs` An x coordinate set
+/// * `ys` A y coordinate set
 /// * `x_offset` An x offset that is added in iterations
 /// * `y_offset` A y offset that is added in iterations
 /// * `max_iter` The maximum number of iterations
-/// * `xs` An x coordinate set
-/// * `ys` A y coordinate set
 fn scan_points(
+    xs: CoordinateSet,
+    ys: CoordinateSet,
     x_offset: Coordinate,
     y_offset: Coordinate,
     max_iter: Count,
-    xs: CoordinateSet,
-    ys: CoordinateSet,
 ) -> CountSet {
     let point_offset = Point::new(x_offset, y_offset);
     let eps = DEFAULT_TOLERANCE;
@@ -549,7 +549,7 @@ fn scan_points(
 fn test_map_scan_points_square() {
     let half_length = (2.0 as Coordinate).sqrt() + 0.1;
     let (xs, ys) = make_xy_coordinate_pair(half_length, half_length, 4, 5);
-    let actual = scan_points(0.25, -0.75, 100, xs, ys);
+    let actual = scan_points(xs, ys, 0.25, -0.75, 100);
     let expected: CountSet = arr2(&[
         [0, 1, 0, 0],
         [0, 5, 1, 0],
@@ -564,7 +564,7 @@ fn test_map_scan_points_square() {
 fn test_map_scan_points_scattered() {
     let xs = CoordinateSet::from_vec(vec![-0.25, -0.125, -0.0625]);
     let ys = CoordinateSet::from_vec(vec![0.375, 0.5, 0.625, 0.75]);
-    let actual = scan_points(-0.625, 0.75, 100, xs, ys);
+    let actual = scan_points(xs, ys, -0.625, 0.75, 100);
     let expected: CountSet = arr2(&[[6, 5, 4], [6, 5, 4], [6, 6, 5], [8, 9, 6]]);
     assert_eq!(actual, expected);
 }
@@ -573,7 +573,7 @@ fn test_map_scan_points_scattered() {
 fn test_map_scan_points_capped() {
     let xs = CoordinateSet::from_vec(vec![-0.25, -0.125, -0.0625]);
     let ys = CoordinateSet::from_vec(vec![0.375, 0.5, 0.625, 0.75]);
-    let actual = scan_points(-0.625, 0.75, 6, xs, ys);
+    let actual = scan_points(xs, ys, -0.625, 0.75, 6);
     let expected: CountSet = arr2(&[[6, 5, 4], [6, 5, 4], [6, 6, 5], [6, 6, 6]]);
     assert_eq!(actual, expected);
 }
@@ -958,7 +958,7 @@ fn test_save_image_bad_filename() {
 /// * `params` A parameter set to draw
 pub fn draw(params: &ParamSet) {
     let (xs, ys) = make_square_xy_pair(params.n_pixels);
-    let count_set = scan_points(params.x_offset, params.y_offset, params.max_iter, xs, ys);
+    let count_set = scan_points(xs, ys, params.x_offset, params.y_offset, params.max_iter);
 
     match &params.csv_filepath {
         Some(csv_filepath) => {
