@@ -100,6 +100,7 @@ fn test_correct_csv_arguments() -> Result<(), Box<dyn std::error::Error>> {
         actual_max = std::cmp::max(actual_max, cell_max);
 
         if (i == 0) | ((i + 1) == pixel_size.try_into().unwrap()) {
+            // A row of all 0s
             assert_eq!(0, cell_sum);
         } else {
             assert!(cell_sum > 0);
@@ -139,6 +140,7 @@ fn test_correct_image_arguments() -> Result<(), Box<dyn std::error::Error>> {
     let actual_image = ImageReader::open(png_filename)?.decode()?;
     assert_eq!(actual_image.width(), pixel_size);
     assert_eq!(actual_image.height(), pixel_size);
+    // A non-zero color found
     assert!(!actual_image.to_rgb8().iter().find(|&x| x > &0).is_none());
 
     Ok(())

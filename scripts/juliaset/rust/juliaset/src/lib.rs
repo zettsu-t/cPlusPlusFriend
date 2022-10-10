@@ -352,7 +352,7 @@ fn test_converge_point_set_limit() {
 ///
 /// * `lower` The lower bound of coordinates
 /// * `upper` The upper bound of coordinates
-/// * `n_pixels` Numbers of pixels in X and Y axes
+/// * `n_pixels` Numbers of pixels in x and y axes
 fn map_coordinates(lower: Coordinate, upper: Coordinate, n_pixels: PixelSize) -> CoordinateSet {
     match n_pixels {
         1 => CoordinateSet::zeros([1]),
@@ -434,7 +434,7 @@ fn test_map_coordinates_frac() {
     assert_float_eq::assert_float_absolute_eq!(actual[size - 1], upper, Coordinate::EPSILON);
 }
 
-/// Returns an X-Y coordinate set
+/// Returns an x-y coordinate set
 ///
 /// # Arguments
 ///
@@ -448,7 +448,6 @@ fn make_xy_coordinate_pair(
     n_pixels_x: PixelSize,
     n_pixels_y: PixelSize,
 ) -> (CoordinateSet, CoordinateSet) {
-    // The default half width and height of images
     let xs = map_coordinates(-half_width, half_width, n_pixels_x);
     let ys = map_coordinates(-half_height, half_height, n_pixels_y);
     (xs, ys)
@@ -467,7 +466,7 @@ fn test_make_xy_coordinate_pair() {
     assert_eq!(ys, expected_ys);
 }
 
-/// Returns a square X-Y coordinate set
+/// Returns a square x-y coordinate set
 ///
 /// # Arguments
 ///
