@@ -1,6 +1,3 @@
-#[cfg(test)]
-use juliaset::PixelSize;
-
 use juliaset::draw;
 use juliaset::ParamSet;
 
@@ -25,10 +22,10 @@ fn parse_args(args: Vec<String>) -> ParamSet {
         "A y offset that is added in iterations",
         "Y offset",
     )
-    .optopt("m", "max_iter", "maximum # of iterations", "Max iterations")
+    .optopt("m", "max_iter", "Maximum # of iterations", "Max iterations")
     .optopt("s", "size", "# of pixels in the output image", "Pixel size")
-    .optopt("c", "csv", "output CSV filename", "CSV filename")
-    .optopt("o", "image", "output PNG filename", "PNG filename");
+    .optopt("c", "csv", "Output CSV filename", "CSV filename")
+    .optopt("o", "image", "Output PNG filename", "PNG filename");
     let matches = opts.parse(&args[1..]).unwrap();
 
     let x_offset = match matches.opt_str("x") {
@@ -54,6 +51,7 @@ fn parse_args(args: Vec<String>) -> ParamSet {
     assert!(n_pixels > 1);
 
     let csv_filename = matches.opt_str("c");
+
     let filename = matches
         .opt_str("o")
         .unwrap_or_else(|| "rust_juliaset.png".to_string());
@@ -73,10 +71,9 @@ fn parse_args(args: Vec<String>) -> ParamSet {
 fn test_default_arguments() {
     let args: Vec<String> = vec!["command"].iter().map(|&s| s.into()).collect();
     let actual = parse_args(args);
-    let n_pixels: PixelSize = 256;
     let csv_filename = None;
     let image_filename = Some("rust_juliaset.png".to_string());
-    let expected = ParamSet::new(0.375, 0.375, 100, n_pixels, &csv_filename, &image_filename);
+    let expected = ParamSet::new(0.375, 0.375, 100, 256, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
 }
 
@@ -101,10 +98,9 @@ fn test_long_arguments() {
     .map(|&s| s.into())
     .collect();
     let actual = parse_args(args);
-    let n_pixels: PixelSize = 31;
     let csv_filename = Some("_test.csv".to_string());
     let image_filename = Some("_test.png".to_string());
-    let expected = ParamSet::new(0.25, 0.5, 16, n_pixels, &csv_filename, &image_filename);
+    let expected = ParamSet::new(0.25, 0.5, 16, 31, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
 }
 
@@ -129,11 +125,80 @@ fn test_short_arguments() {
     .map(|&s| s.into())
     .collect();
     let actual = parse_args(args);
-    let n_pixels: PixelSize = 16;
     let csv_filename = Some("_short.csv".to_string());
     let image_filename = Some("_short.png".to_string());
-    let expected = ParamSet::new(-0.5, -0.25, 31, n_pixels, &csv_filename, &image_filename);
+    let expected = ParamSet::new(-0.5, -0.25, 31, 16, &csv_filename, &image_filename);
     assert_eq!(actual, expected);
+}
+
+#[test]
+#[should_panic]
+fn test_unknown_arg() {
+    let args: Vec<String> = vec!["command", "--unknown", "1"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_x_offset_value() {
+    let args: Vec<String> = vec!["command", "--x_offset"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_y_offset_value() {
+    let args: Vec<String> = vec!["command", "--y_offset"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_max_iter_value() {
+    let args: Vec<String> = vec!["command", "--max_iter"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_size_value() {
+    let args: Vec<String> = vec!["command", "--size"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_csv_value() {
+    let args: Vec<String> = vec!["command", "--csv"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
+}
+
+#[test]
+#[should_panic]
+fn test_missing_image_args() {
+    let args: Vec<String> = vec!["command", "--image"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    parse_args(args);
 }
 
 #[test]

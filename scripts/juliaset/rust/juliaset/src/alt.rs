@@ -21,10 +21,10 @@ where
         "A y offset that is added in iterations",
         "Y offset",
     )
-    .optopt("m", "max_iter", "maximum # of iterations", "Max iterations")
+    .optopt("m", "max_iter", "Maximum # of iterations", "Max iterations")
     .optopt("s", "size", "# of pixels in the output image", "Pixel size")
-    .optopt("c", "csv", "set output CSV filename", "CSV filename")
-    .optopt("o", "image", "set output PNG filename", "PNG filename");
+    .optopt("c", "csv", "Output CSV filename", "CSV filename")
+    .optopt("o", "image", "Output PNG filename", "PNG filename");
 
     // Using an iterator instead of a vector of values
     let matches = opts.parse(args.into_iter().skip(1)).unwrap();
