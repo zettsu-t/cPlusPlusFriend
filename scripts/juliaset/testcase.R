@@ -171,3 +171,24 @@ g <- g + geom_tile(aes(x = x, y = y, fill = value))
 g <- g + scale_fill_manual(values = colors)
 g <- g + theme(legend.position = "none", aspect.ratio = 1.0)
 plot(g)
+
+n_colors <- 65
+extract_rgb <- function(n_colors, offset) {
+  index <- 2 + offset * 2
+  viridis::cividis(n_colors) %>%
+    stringr::str_sub(index, index + 1) %>%
+    base::strtoi(16)
+}
+
+red_set <- extract_rgb(n_colors = n_colors, offset = 0)
+diff(red_set)
+green_set <- extract_rgb(n_colors = n_colors, offset = 1)
+diff(green_set)
+blue_set <- extract_rgb(n_colors = n_colors, offset = 2)
+diff(blue_set)
+
+half_length <- sqrt(2) + 0.1
+seq(from = -half_length, to = half_length, length.out = 5)
+
+scan_points(0.25, -0.75, 100, 4, 5)
+scan_points_xy(-0.625, 0.75, 1000, c(-0.25, -0.125, -0.0625), c(0.375, 0.5, 0.625, 0.75))

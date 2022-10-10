@@ -72,6 +72,20 @@ map_coordinates <- function(half_length, n_pixels) {
   seq(from = -half_length, to = half_length, length.out = n_pixels)
 }
 
+#' Scan how many times each point in a screen is transformed for Xs and Ys
+#'
+#' @param x_offset An x offset to be added
+#' @param y_offset A y offset to be added
+#' @param max_iter The maximum number of iterations
+#' @param xs An x coordinate set
+#' @param ys A y coordinate set
+#' @return How many times each point in a screen is transformed
+scan_points_xy <- function(x_offset, y_offset, max_iter, xs, ys) {
+  offset <- complex(real = x_offset, imaginary = y_offset)
+  eps <- sqrt(1.19e-7)
+  converge_point_set(xs = xs, ys = ys, offset = offset, max_iter = max_iter, eps = eps)
+}
+
 #' Scan how many times each point in a screen is transformed
 #'
 #' @param x_offset An x offset to be added
@@ -90,9 +104,7 @@ scan_points <- function(x_offset, y_offset, max_iter, width, height = NA) {
   half_length <- sqrt(2.0) + 0.1
   xs <- map_coordinates(half_length = half_length, n_pixels = width)
   ys <- map_coordinates(half_length = half_length, n_pixels = n_pixels_y)
-  offset <- complex(real = x_offset, imaginary = y_offset)
-  eps <- sqrt(1.19e-7)
-  converge_point_set(xs = xs, ys = ys, offset = offset, max_iter = max_iter, eps = eps)
+  scan_points_xy(x_offset, y_offset, max_iter, xs, ys)
 }
 
 #' Draw a PNG image from an input screen
