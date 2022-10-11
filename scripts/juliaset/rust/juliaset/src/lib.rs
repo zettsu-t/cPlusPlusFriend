@@ -811,7 +811,7 @@ fn make_temp_dir() -> TempDir {
 fn test_write_count() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("_test_count_.csv");
-    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap());
     let expeced_n_rows: usize = 2;
     let expeced_n_columns: usize = 3;
     let mut count_set = CountSet::zeros([expeced_n_rows, expeced_n_columns]);
@@ -846,7 +846,7 @@ fn test_write_count() {
 fn test_write_count_error() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("_test_count_.csv");
-    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap());
     std::fs::remove_dir(temp_dir).unwrap();
     let count_set = CountSet::zeros([3, 4]);
     write_count(&count_set, &csv_path);
@@ -857,7 +857,7 @@ fn test_write_count_error() {
 fn test_write_count_bad_filename() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("..");
-    let csv_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let csv_path = PathBuf::from(temp_filename.to_str().unwrap());
     let count_set = CountSet::zeros([3, 4]);
     write_count(&count_set, &csv_path);
 }
@@ -901,7 +901,7 @@ fn make_test_image(width: PixelUnit, height: PixelUnit) -> RgbImage {
 fn test_save_image() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("_test_image_.png");
-    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap());
     let height: PixelUnit = 3;
     let width: PixelUnit = 4;
     let expected = make_test_image(width, height);
@@ -935,7 +935,7 @@ fn test_save_image() {
 fn test_save_image_error() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("_test_image_.png");
-    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap());
     std::fs::remove_dir(temp_dir).unwrap();
     let image = make_test_image(3, 4);
     save_image(&image, &png_path);
@@ -946,7 +946,7 @@ fn test_save_image_error() {
 fn test_save_image_bad_filename() {
     let temp_dir = make_temp_dir();
     let temp_filename = temp_dir.path().join("..");
-    let png_path = PathBuf::from(temp_filename.to_str().unwrap().to_owned());
+    let png_path = PathBuf::from(temp_filename.to_str().unwrap());
     let image = make_test_image(3, 4);
     save_image(&image, &png_path);
 }
