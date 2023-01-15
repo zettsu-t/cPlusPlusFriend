@@ -1,0 +1,374 @@
+---
+title: "Sparkで多数の変数を処理する"
+author: "Zettsu Tatsuya"
+date: '`r format(Sys.time(), "%Y/%m/%d")`'
+output:
+  html_document:
+    toc: true
+  pdf_document:
+    latex_engine: xelatex
+  beamer_presentation:
+    pandoc_args:
+    - --latex-engine
+    - xelatex
+header-includes:
+  \usepackage{float}
+documentclass: bxjsarticle
+classoption: xelatex,ja=standard
+urlcolor: blue
+---
+
+Sparkは変数(説明変数)が多すぎると、いつまでたっても処理が終わらない。そこで long format (キー、変数名、値からなる列)にすると実用的な時間で処理できる。
+
+- Long formatでまとめられるのは、型が同じ列だけである。つまりschemaを調べて、DoubleTypeの列だけまとめる。
+- IntegerTypeの列をDoubleTypeに一括変換するには、VectorAssembler を使う。
+
+## RStudio上でSpark Connectionを張る
+
+RStudio Server の Console でsparklyrを実行してSpark Connectionを張る。コネクションを `sc` とする。
+
+```{r library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(sparklyr)
+library(dbplyr)
+library(assertthat)
+library(httr)
+library(jsonlite)
+library(kableExtra)
+library(lubridate)
+library(pryr)
+library(rlang)
+source("./spark_utils.R")
+```
+
+```{r disconnect_first, echo=FALSE}
+if (exists("sc") && !is.null(sc)) {
+  sparklyr::spark_disconnect(sc)
+  sc <- NULL
+}
+```
+
+```{r connect, message=FALSE, warning=FALSE}
+io_dirname <- "data"
+dir.create(path = io_dirname, showWarnings = FALSE)
+
+sc <- sparklyr::spark_connect("local")
+```
+
+## 入力するデータを用意する
+
+行数(標本数)、列数(変数の数)、乱数シードを指定して、DataFrameを作る。ここではtibbleで作って、後でSpark DataFrameにする。セルの値は、自由度3のStudent-t分布にして、外れ値が出やすくする。
+
+```{r make_df, message=FALSE}
+id_column_name <- "id"
+column_name_prefix <- "X"
+column_name_pattern <- paste0("^", column_name_prefix)
+
+make_df <- function(n_rows, n_cols, seed) {
+  set.seed(seed)
+  matrix(rt(n_rows * n_cols, df = 3), n_rows, n_cols) %>%
+    as_tibble(.name_repair = "unique") %>%
+    magrittr::set_colnames(paste0(column_name_prefix, seq_len(n_cols))) %>%
+    mutate(!!rlang::sym(id_column_name) := row_number()) %>%
+    relocate(!!rlang::sym(id_column_name))
+}
+
+df <- make_df(n_rows = 1000, n_cols = 4, seed = 7)
+```
+
+## 外れ値をNAにする
+
+列(変数)ごとの処理として、例えば以下の処理を行う。
+
+1. Standardize、つまり平均0, 標準偏差1にする
+1. 平均から一定標準偏差外れた値をNAにする。たとえば mean +/- stddev \* 3.0< をNAにする。
+
+```{r set_outliers_tibble}
+outlier_stddev <- 3.0
+
+set_outlier_na_tibble <- function(input_df) {
+  exclude_outliers <- function(xs) {
+    ifelse(abs(xs) > outlier_stddev, NA_real_, xs)
+  }
+
+  df_scaled <- input_df %>%
+    mutate_at(vars(starts_with(column_name_prefix)), ~ as.vector(scale(.x)))
+
+  df_filtered <- df_scaled %>%
+    mutate_at(vars(starts_with(column_name_prefix)), exclude_outliers)
+
+  list(base = input_df, scaled = df_scaled, filtered = df_filtered)
+}
+
+df_result <- set_outlier_na_tibble(df)
+
+df_result$base %>%
+  head(10) %>%
+  kable() %>%
+  kable_styling()
+
+df_result$scaled %>%
+  head(10) %>%
+  kable() %>%
+  kable_styling()
+
+df_result$filtered %>%
+  head(10) %>%
+  kable() %>%
+  kable_styling()
+```
+
+同じことをSparkで処理する。
+
+```{r set_outliers_spark}
+sdf <- copy_to(sc, df, overwrite = TRUE)
+
+extract_col_names <- function(input_df) {
+  colnames(input_df) %>%
+    purrr::keep(~ stringr::str_starts(.x, column_name_pattern))
+}
+
+scale_all_columns <- function(input_df) {
+  col_names <- extract_col_names(input_df)
+
+  input_df %>%
+    ft_vector_assembler(input_cols = col_names, output_col = "features") %>%
+    ft_standard_scaler(
+      input_col = "features", output_col = "features_std",
+      with_mean = TRUE, with_std = TRUE
+    ) %>%
+    select(all_of(c(id_column_name, "features_std"))) %>%
+    sdf_separate_column(column = c("features_std"), into = col_names) %>%
+    select(all_of(c(id_column_name, col_names)))
+}
+
+set_outlier_na_spark <- function(input_df) {
+  df_scaled <- scale_all_columns(input_df)
+  col_names <- extract_col_names(input_df)
+
+  # 行ごとに処理する
+  df_filtered <- purrr::reduce(
+    .x = col_names, .init = df_scaled,
+    .f = function(df_acc, col_name) {
+      df_acc %>%
+        mutate(!!rlang::sym(col_name) :=
+          ifelse(abs(!!rlang::sym(col_name)) > outlier_stddev,
+            NA_real_, !!rlang::sym(col_name)
+          ))
+    }
+  )
+
+  list(base = input_df, scaled = df_scaled, filtered = df_filtered)
+}
+
+sdf_result <- set_outlier_na_spark(sdf)
+```
+
+tibbleとSparkで結果が同じことを確認する(浮動小数なので許容誤差を設ける)。
+
+```{r compare}
+equality_tolerance <- 1e-5
+
+check_equal_possibly_na <- function(xs, ys) {
+  fill_nas <- function(zs) {
+    ifelse(is.na(zs), -1e+8, zs)
+  }
+
+  assertthat::assert_that(NROW(xs) == NROW(ys))
+  assertthat::assert_that(all(dplyr::near(is.na(xs), is.na(ys))))
+  assertthat::assert_that(
+    all(dplyr::near(fill_nas(xs), fill_nas(ys), tol = equality_tolerance))
+  )
+}
+
+is_df_sdf_equal <- function(left, right) {
+  expected <- as_tibble(left)
+  actual <- as_tibble(right)
+  assertthat::assert_that(NROW(colnames(expected)) == NROW(colnames(actual)))
+  assertthat::assert_that(all(colnames(expected) == colnames(actual)))
+  assertthat::assert_that(all(
+    purrr::map_lgl(
+      colnames(expected),
+      ~ all(check_equal_possibly_na(xs = expected[[.x]], ys = actual[[.x]]))
+    )
+  ))
+}
+
+is_df_sdf_equal(left = df_result$base, right = sdf_result$base)
+is_df_sdf_equal(left = df_result$scaled, right = sdf_result$scaled)
+is_df_sdf_equal(left = df_result$filtered, right = sdf_result$filtered)
+```
+
+## 実行時間を測る
+
+```{r measure_time, message=FALSE}
+common_n_rows <- 1000
+common_seed <- 7
+
+measure_time <- function(n_rows, n_col_set, seed, func_spark) {
+  purrr::map(.x = n_col_set, .f = function(n_cols) {
+    start_time_tibble <- proc.time()
+    df <- suppressMessages(make_df(n_rows = n_rows, n_cols = n_cols, seed = seed))
+    df_result <- set_outlier_na_tibble(df)
+    NROW(df_result$filtered)
+    elapsed_time_tibble <- (proc.time() - start_time_tibble)[["elapsed"]]
+
+    sdf <- copy_to(sc, df, overwrite = TRUE)
+    start_time_spark <- proc.time()
+    sdf_result <- func_spark(sdf)
+    sdf_nrow(sdf_result$filtered)
+    elapsed_time_spark <- (proc.time() - start_time_spark)[["elapsed"]]
+
+    tibble::tibble(
+      n_col = n_cols, time_tibble = elapsed_time_tibble,
+      time_spark = elapsed_time_spark
+    )
+  }) %>%
+    bind_rows()
+}
+
+df_time <- measure_time(
+  n_rows = common_n_rows,
+  n_col_set = c(1, 2, 4, 8, 16, 20, 24, 28, 32),
+  seed = common_seed,
+  func_spark = set_outlier_na_spark
+)
+```
+
+列が多すぎる(上記では33)と以下のエラーが出る。
+
+```{bash error_message, eval=FALSE}
+java.lang.RuntimeException: Max iterations (100) reached for batch Resolution, please set 'spark.sql.analyzer.maxIterations' to a larger value.
+```
+
+tibbleは列数に比例した時間だが、Sparkはさらに時間が掛かるので、多くの列を処理できない。
+
+```{r plot_time, message=FALSE}
+draw_time <- function(df, y_name, title, color_name) {
+  y_max <- max(df[[y_name]]) * 1.1
+  g <- ggplot(df, aes(x = n_col, y = .data[[y_name]]))
+  g <- g + geom_line(color = color_name)
+  g <- g + geom_point(color = color_name, size = 2)
+  g <- g + labs(title = title, x = "# of columns", y = "time [sec]")
+  g <- g + ylim(0, y_max)
+  g
+}
+
+plot(draw_time(
+  df = df_time, y_name = "time_tibble",
+  title = "tibble", color_name = "orchid"
+))
+plot(draw_time(
+  df = df_time, y_name = "time_spark",
+  title = "Spark (iterate)", color_name = "navy"
+))
+```
+
+## Longにして処理する
+
+Wideをlongにしてから処理すると、多数の変数を扱っても処理時間が延びない。しかしwide/long変換自体はそれなりに時間が掛かる。
+
+```{r set_outliers_spark_unpivot, message=FALSE}
+set_outlier_na_spark_unpivot <- function(input_df) {
+  df_scaled <- scale_all_columns(input_df)
+  col_names <- extract_col_names(input_df)
+
+  df_filtered <- df_scaled %>%
+    pivot_longer(all_of(col_names)) %>%
+    mutate(value = ifelse(abs(value) > outlier_stddev, NA_real_, value)) %>%
+    pivot_wider(id_cols = all_of(id_column_name)) %>%
+    arrange(!!rlang::sym(id_column_name))
+
+  list(base = input_df, scaled = df_scaled, filtered = df_filtered)
+}
+
+sdf_result_unpivot <- set_outlier_na_spark_unpivot(sdf)
+
+is_df_sdf_equal(left = df_result$base, right = sdf_result_unpivot$base)
+is_df_sdf_equal(left = df_result$scaled, right = sdf_result_unpivot$scaled)
+is_df_sdf_equal(left = df_result$filtered, right = sdf_result_unpivot$filtered)
+
+is_df_sdf_equal(left = sdf_result$base, right = sdf_result_unpivot$base)
+is_df_sdf_equal(left = sdf_result$scaled, right = sdf_result_unpivot$scaled)
+is_df_sdf_equal(left = sdf_result$filtered, right = sdf_result_unpivot$filtered)
+```
+
+```{r measure_time_unpivot, message=FALSE}
+df_time_unpivot <- measure_time(
+  n_rows = common_n_rows,
+  n_col_set = c(1, 2, 4, 8, 16, 32, 64, 128, 256),
+  seed = common_seed,
+  func_spark = set_outlier_na_spark_unpivot
+)
+
+plot(draw_time(
+  df = df_time_unpivot, y_name = "time_tibble",
+  title = "tibble (2nd)", color_name = "orchid"
+))
+plot(draw_time(
+  df = df_time_unpivot, y_name = "time_spark",
+  title = "Spark (unpivot)", color_name = "royalblue"
+))
+```
+
+```{r draw_all_stage_info, echo=FALSE, message=FALSE}
+draw_all_stage_info <- function(df_stages, filename_suffix) {
+  filename_peak_memory <- file.path(
+    io_dirname,
+    paste0("peak_memory", filename_suffix, ".png")
+  )
+  filename_executor_runtime <- file.path(
+    io_dirname,
+    paste0("executor_runTime", filename_suffix, ".png")
+  )
+
+  g_peak_memory <- plot_stage_info(
+    df = df_stages, name = "peakExecutionMemory",
+    y_label = "peakExecutionMemory [Mbyte]", unit = 1024 * 1024
+  )
+
+  g_executor_runtime <- plot_stage_info(
+    df = df_stages, name = "executorRunTime",
+    y_label = "executorRunTime [sec]", unit = 1000.0
+  )
+
+  plot(g_peak_memory)
+  plot(g_executor_runtime)
+  ggsave(filename = filename_peak_memory, plot = g_peak_memory)
+  ggsave(filename = filename_executor_runtime, plot = g_executor_runtime)
+}
+```
+
+```{r stage_info, echo=FALSE, message=FALSE}
+df_stages <- get_stage_info(sc)
+stage_id <- get_stage_id(sc)
+draw_all_stage_info(df_stages = df_stages, filename_suffix = "_all")
+
+df_time_all <- bind_rows(
+  df_time %>%
+    select(all_of(c("n_col", "time_spark"))) %>%
+    rename(spark_iterate = time_spark) %>%
+    pivot_longer(all_of(c("spark_iterate"))),
+  df_time_unpivot %>%
+    rename(spark_unpivot = time_spark, tibble = time_tibble) %>%
+    pivot_longer(all_of(c("tibble", "spark_unpivot")))
+) %>%
+  rename(time = value) %>%
+  mutate(name = factor(name)) %>%
+  mutate(name = forcats::fct_relevel(name, c("spark_iterate", "spark_unpivot", "tibble")))
+
+g <- ggplot(df_time_all)
+g <- g + geom_line(aes(x = n_col, y = time, color = name))
+g <- g + scale_color_manual(values = c("navy", "royalblue", "orchid"))
+plot(g)
+
+print(paste0("stage id: ", stage_id))
+print(get_r_mem(NULL))
+```
+
+## コネクションは使い終わったら閉じる
+
+```{r disconnect, eval=FALSE}
+sparklyr::spark_disconnect(sc)
+sc <- NULL
+```
