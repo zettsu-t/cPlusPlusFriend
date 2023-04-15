@@ -1,0 +1,7 @@
+version: '3'
+services:
+  kyopro-tessoku-answers:
+    build: .
+    image: kyopro-tessoku-answers
+    volumes:
+      - .:/home/work
