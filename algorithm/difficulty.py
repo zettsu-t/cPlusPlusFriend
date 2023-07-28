@@ -61,8 +61,8 @@ def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
             mark = result[index]
             result_str = "  "
             if difficulty == 0:
-                continue
-            if mark == "+":
+                pass
+            elif mark == "+":
                 wins[difficulty] = wins[difficulty] + 1
                 result_str = str(difficulty) + result[index]
             elif mark != " ":
