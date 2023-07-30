@@ -6,14 +6,16 @@ import re
 import argparse
 
 MAX_N_TASKS = 8
-MAX_DIFFICULTY = 7
+MAX_DIFFICULTY = 9
+colors = ["?", "灰", "茶", "緑", "水", "青", "黄", "橙", "赤", "赤<"]
+
+# 1行1コンテストに対応する。
+# コンテスト名(もしあれば)三桁のID, ':', A..H問題の結果または難易度
+re_contest_pattern = "^([\\D]*\\d{3}):(.{0," + str(MAX_N_TASKS) + "})"
+re_id_pattern = "^[\\D]*(\\d{3})"
 
 def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
     difficulty_map = {}
-    # 1行1コンテストに対応する。
-    # コンテスト名(もしあれば)三桁のID, ':', A..H問題の結果または難易度
-    re_contest_pattern = "^([\\D]*\\d{3}):(.{0," + str(MAX_N_TASKS) + "})"
-
     with open(difficulty_filename) as f:
         for line in f:
             s = line.strip()
@@ -45,11 +47,9 @@ def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
     result_table.sort(key=lambda x: x[0])
     wins = [0] * MAX_DIFFICULTY
     losts = [0] * MAX_DIFFICULTY
-    colors = ["?", "灰", "茶", "緑", "水", "青", "黄"]
 
     result_lines = ""
     for [key, result] in result_table:
-        re_id_pattern = "^[\\D]*(\\d{3})"
         m = re.match(re_id_pattern, key)
         id = int(m.groups()[0])
         if id < lower_id or id > upper_id:
@@ -103,7 +103,7 @@ def parse_command_line():
     ## "297: 112 5" はコンテストID 297の1..5問目の難易度が
     ## 1(灰),1(灰),2(茶),不明,5(青) という意味。6問目以降は問題が無いか難易度が不明。
     parser.add_argument("--difficulty_filename", dest="difficulty_filename", type=str,
-                        default="incoming_data/difficulty.txt", help="Textfile for difficulty of tasks")
+                        default="incoming_data/difficulty_auto_abc.csv", help="Textfile for difficulty of tasks")
     ## 問題を解いた結果
     ## "297:  ++ -" はコンテストID 297の1..5問目を
     ## 未回答、解けた、解けた、未回答、解けなかったという意味。6問目以降は未回答。

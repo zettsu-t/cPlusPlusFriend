@@ -8,10 +8,11 @@ rating_colors <- c(
   "#808080", "#804000", "#008000", "#00C0C0",
   "#0000FF", "#C0C000", "#FF8000", "#FF0000"
 )
+g_incoming_data_dir <- "incoming_data"
 
 ## 問題を読み込む
 read_task_difficulties <- function(path) {
-  contests <- jsonlite::read_json("incoming_data/problem-models.json")
+  contests <- jsonlite::read_json(path)
 
   purrr::reduce(.x = seq_len(NROW(contests)), .init = NULL, .f = function(acc, i) {
     tasks <- contests[i]
@@ -27,15 +28,41 @@ read_task_difficulties <- function(path) {
 }
 
 ## コンテストを限定する
-select_contests <- function(df_contest, contest_name) {
+select_contests <- function(df_contest, contest_name, out_dirname) {
   inner_name <- stringr::str_to_lower(contest_name)
   pattern <- paste0("^(", inner_name, ")(.*)")
 
-  df_contest %>%
+  df_target <- df_contest %>%
     tidyr::extract(col = contest, into = c("contest", "task"), regex = "(.*)_([^_]+$)") %>%
     dplyr::filter(stringr::str_starts(stringr::str_to_lower(contest), inner_name)) %>%
     tidyr::extract(col = contest, into = c("name", "id"), regex = pattern, remove = FALSE) %>%
     dplyr::mutate(name = stringr::str_to_lower(name))
+
+  tasks <- c("a", "b", "c", "d", "e", "f", "g", "h")
+  df_tasks <- df_target %>%
+    dplyr::select(all_of(c("contest", "task", "difficulty"))) %>%
+    na.omit() %>%
+    dplyr::filter(task %in% tasks) %>%
+    dplyr::arrange(contest, task) %>%
+    dplyr::mutate(contest = stringr::str_to_upper(contest)) %>%
+    dplyr::mutate(rating = 1 + pmax(0, floor(difficulty / 400))) %>%
+    dplyr::mutate(mark = ifelse(rating < 10, paste(rating), NA)) %>%
+    dplyr::select(-all_of(c("difficulty", "rating"))) %>%
+    tidyr::pivot_wider(id_cols = "contest", names_from = "task", values_from = "mark") %>%
+    dplyr::mutate(across(everything(), ~ replace_na(.x, " "))) %>%
+    dplyr::mutate(sep = ":", .after = contest) %>%
+    tidyr::unite("tasks", everything(), sep = "", remove = FALSE, na.rm = FALSE) %>%
+    dplyr::mutate(tasks = stringr::str_trim(tasks, side = "right"))
+
+  if (!is.na(out_dirname)) {
+    out_filename <- file.path(out_dirname, paste0("difficulty_auto_", contest_name, ".csv")) %>%
+      stringr::str_to_lower()
+    df_tasks %>%
+      dplyr::select(tasks) %>%
+      readr::write_csv(file = out_filename, col_names = FALSE)
+  }
+
+  df_target
 }
 
 ## 結果を読み込む
@@ -161,8 +188,11 @@ draw_histogram <- function(df_score, contest_name) {
 }
 
 ## コンテストを限定して結果を集計する
-execute_all <- function(result_filename, df_contests, contest_name) {
-  df_target <- select_contests(df_contest = df_contests, contest_name = contest_name)
+execute_all <- function(result_filename, df_contests, contest_name, out_dirname) {
+  df_target <- select_contests(
+    df_contest = df_contests, contest_name = contest_name,
+    out_dirname = out_dirname
+  )
   df_results <- read_results(result_filename, contest_name = contest_name)
   df_score <- merge_score(df_tasks = df_target, df_results = df_results)
 
@@ -171,8 +201,10 @@ execute_all <- function(result_filename, df_contests, contest_name) {
   g_histogram <- draw_histogram(df_score = df_score, contest_name = contest_name)
   ggsave("images/hist.png", plot = g_histogram, width = 6, height = 4)
 
-  list(df_target = df_target, df_results = df_results, df_score = df_score,
-       g_scatter = g_scatter, g_histogram = g_histogram)
+  list(
+    df_target = df_target, df_results = df_results, df_score = df_score,
+    g_scatter = g_scatter, g_histogram = g_histogram
+  )
 }
 
 # 難易度をAtCoder Problemsからダウンロードする
@@ -180,8 +212,11 @@ execute_all <- function(result_filename, df_contests, contest_name) {
 # からリンクされている
 # https://kenkoooo.com/atcoder/resources/problem-models.json
 # 何度もダウンロードしないように、解析はローカルのファイルを読む
-df_all_contests <- read_task_difficulties("incoming_data/problem-models.json")
+df_all_contests <- read_task_difficulties(file.path(g_incoming_data_dir, "problem-models.json"))
 
 # ABC (AtCoder Beginner Contest) に限る
-result <- execute_all(result_filename = "results.txt",
-                      df_contests = df_all_contests, contest_name = "ABC")
+result <- execute_all(
+  result_filename = "results.txt",
+  df_contests = df_all_contests, contest_name = "ABC",
+  out_dirname = g_incoming_data_dir
+)
