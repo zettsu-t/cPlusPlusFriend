@@ -10,12 +10,14 @@ MAX_DIFFICULTY = 7
 
 def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
     difficulty_map = {}
-    re_pattern = "^(\\d{3}): (.{0," + str(MAX_N_TASKS) + "})"
+    # 1行1コンテストに対応する。
+    # コンテスト名(もしあれば)三桁のID, ':', A..H問題の結果または難易度
+    re_contest_pattern = "^([\\D]*\\d{3}):(.{0," + str(MAX_N_TASKS) + "})"
 
     with open(difficulty_filename) as f:
         for line in f:
             s = line.strip()
-            m = re.match(re_pattern, s)
+            m = re.match(re_contest_pattern, s)
             if not m:
                 continue
             key = m.groups()[0]
@@ -30,7 +32,7 @@ def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
     with open(result_filename) as f:
         for line in f:
             s = line.strip()
-            m = re.match(re_pattern, s)
+            m = re.match(re_contest_pattern, s)
             if not m:
                 continue
             key = m.groups()[0]
@@ -47,14 +49,17 @@ def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
 
     result_lines = ""
     for [key, result] in result_table:
-        id = int(key)
+        re_id_pattern = "^[\\D]*(\\d{3})"
+        m = re.match(re_id_pattern, key)
+        id = int(m.groups()[0])
         if id < lower_id or id > upper_id:
             continue
 
-        difficulties = difficulty_map[key]
-        if not difficulties:
+        if not key in difficulty_map:
+            print("Warning: missing {}".format(key))
             continue
 
+        difficulties = difficulty_map[key]
         line = ""
         for index, difficulty in enumerate(difficulties):
             difficulty_str = str(difficulty)
@@ -98,12 +103,12 @@ def parse_command_line():
     ## "297: 112 5" はコンテストID 297の1..5問目の難易度が
     ## 1(灰),1(灰),2(茶),不明,5(青) という意味。6問目以降は問題が無いか難易度が不明。
     parser.add_argument("--difficulty_filename", dest="difficulty_filename", type=str,
-                        default="difficulty.txt", help="Textfile for difficulty of tasks")
+                        default="incoming_data/difficulty.txt", help="Textfile for difficulty of tasks")
     ## 問題を解いた結果
     ## "297:  ++ -" はコンテストID 297の1..5問目を
     ## 未回答、解けた、解けた、未回答、解けなかったという意味。6問目以降は未回答。
     parser.add_argument("--result_filename", dest="result_filename", type=str,
-                        default="memo.txt", help="Textfiles for result of tasks")
+                        default="results.txt", help="Textfiles for result of tasks")
     args = parser.parse_args()
     return args
 

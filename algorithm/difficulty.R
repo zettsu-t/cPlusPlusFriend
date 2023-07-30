@@ -9,6 +9,7 @@ rating_colors <- c(
   "#0000FF", "#C0C000", "#FF8000", "#FF0000"
 )
 
+## 問題を読み込む
 read_task_difficulties <- function(path) {
   contests <- jsonlite::read_json("incoming_data/problem-models.json")
 
@@ -25,6 +26,7 @@ read_task_difficulties <- function(path) {
   })
 }
 
+## コンテストを限定する
 select_contests <- function(df_contest, contest_name) {
   inner_name <- stringr::str_to_lower(contest_name)
   pattern <- paste0("^(", inner_name, ")(.*)")
@@ -36,6 +38,7 @@ select_contests <- function(df_contest, contest_name) {
     dplyr::mutate(name = stringr::str_to_lower(name))
 }
 
+## 結果を読み込む
 read_results <- function(path, contest_name) {
   name <- stringr::str_to_lower(contest_name)
   cin <- file(path, "r")
@@ -43,8 +46,13 @@ read_results <- function(path, contest_name) {
   close(cin)
 
   purrr::reduce(.x = lines, .init = NULL, .f = function(acc_all, line) {
-    ## コンテスト名無しで番号から始まる
-    matched <- stringr::str_match(line, "^[\\D]?(\\d{3}): (.{1,8})")
+    # 解けたかどうかを記したテキストファイルを読む
+    # 1行1コンテストに対応する。コンテスト名(もしあれば)三桁のID, ':', A..H問題の結果を一行に書く。例えば
+    # 277:   ++-
+    # はID=277のA,Bは解いていない、C,Dは解けた、Eは解けなかった、F以降は解いていない
+    # ことを示す。+は解けた、空白は解いていない、それ以外は解けなかったことを示す
+    # :の直後にA問題の結果を置く。:と結果の間には何も書かない。
+    matched <- stringr::str_match(line, "^[\\D]*(\\d{3}):(.{1,8})")
     if (is.na(matched[1, 1])) {
       acc_all
     } else {
@@ -76,6 +84,7 @@ read_results <- function(path, contest_name) {
   })
 }
 
+## 問題と結果を統合する
 merge_score <- function(df_tasks, df_results) {
   df_left <- df_tasks %>%
     dplyr::mutate(id = as.numeric(id))
@@ -91,6 +100,7 @@ merge_score <- function(df_tasks, df_results) {
     dplyr::mutate(rank = 1 + pmax(0, difficulty %/% 400), .after = difficulty)
 }
 
+## 解けたかどうかを散布図にする
 draw_scatter_plot <- function(df_score, contest_name) {
   id_minmax <- range(df_score$id)
   id_center <- (id_minmax[2] + id_minmax[1]) / 2.0
@@ -122,6 +132,7 @@ draw_scatter_plot <- function(df_score, contest_name) {
   g
 }
 
+## Ratingごとの正解率をヒストグラムにする
 draw_histogram <- function(df_score, contest_name) {
   labels <- c("解けた", "解けなかった")
   df_drawn <- df_score %>%
@@ -149,6 +160,21 @@ draw_histogram <- function(df_score, contest_name) {
   g
 }
 
+## コンテストを限定して結果を集計する
+execute_all <- function(result_filename, df_contests, contest_name) {
+  df_target <- select_contests(df_contest = df_contests, contest_name = contest_name)
+  df_results <- read_results(result_filename, contest_name = contest_name)
+  df_score <- merge_score(df_tasks = df_target, df_results = df_results)
+
+  g_scatter <- draw_scatter_plot(df_score = df_score, contest_name = contest_name)
+  ggsave("images/score.png", plot = g_scatter, width = 6, height = 4)
+  g_histogram <- draw_histogram(df_score = df_score, contest_name = contest_name)
+  ggsave("images/hist.png", plot = g_histogram, width = 6, height = 4)
+
+  list(df_target = df_target, df_results = df_results, df_score = df_score,
+       g_scatter = g_scatter, g_histogram = g_histogram)
+}
+
 # 難易度をAtCoder Problemsからダウンロードする
 # https://github.com/kenkoooo/AtCoderProblems/blob/master/doc/api.md
 # からリンクされている
@@ -157,19 +183,5 @@ draw_histogram <- function(df_score, contest_name) {
 df_all_contests <- read_task_difficulties("incoming_data/problem-models.json")
 
 # ABC (AtCoder Beginner Contest) に限る
-contest_name <- "ABC"
-df_abc <- select_contests(df_contest = df_all_contests, contest_name = contest_name)
-
-# 解けたかどうかを記したテキストファイルを読む
-# 1行1コンテストに対応する。三桁のID, ': ', A..H問題の結果を一行に書く。例えば
-# 277:   ++-
-# はID=277のA,Bは解いていない、C,Dは解けた、Eは解けなかった、F以降は解いていない
-# ことを示す。+は解けた、空白は解いていない、それ以外は解けなかったことを示す
-df_results <- read_results("memo.txt", contest_name = contest_name)
-
-df_score <- merge_score(df_tasks = df_abc, df_results = df_results)
-g <- draw_scatter_plot(df_score = df_score, contest_name = contest_name)
-ggsave("images/score.png", plot = g, width = 6, height = 4)
-
-g <- draw_histogram(df_score = df_score, contest_name = contest_name)
-ggsave("images/hist.png", plot = g, width = 6, height = 4)
+result <- execute_all(result_filename = "results.txt",
+                      df_contests = df_all_contests, contest_name = "ABC")
