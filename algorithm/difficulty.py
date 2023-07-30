@@ -93,20 +93,21 @@ def collect_results(lower_id, upper_id, difficulty_filename, result_filename):
 
 def parse_command_line():
     parser = argparse.ArgumentParser()
-    ## コンテスト番号の下限
+    # コンテスト番号の下限
     parser.add_argument("--lower_id", dest="lower_id", type=int,
                         default=0, help="Lowest contest ID")
-    ## コンテスト番号の上限
+    # コンテスト番号の上限
     parser.add_argument("--upper_id", dest="upper_id", type=int,
                         default=1000000, help="Hight contest ID")
-    ## 問題の難易度
-    ## "297: 112 5" はコンテストID 297の1..5問目の難易度が
-    ## 1(灰),1(灰),2(茶),不明,5(青) という意味。6問目以降は問題が無いか難易度が不明。
+    # 問題の難易度
+    # "ABC297:112 5" はコンテスト ABC297の1..5問目の難易度が
+    # 1(灰),1(灰),2(茶),不明,5(青) という意味。6問目以降は問題が無いか難易度が不明。
+    # :の直後にA問題の結果を置く。:と結果の間には何も書かない。
     parser.add_argument("--difficulty_filename", dest="difficulty_filename", type=str,
                         default="incoming_data/difficulty_auto_abc.csv", help="Textfile for difficulty of tasks")
-    ## 問題を解いた結果
-    ## "297:  ++ -" はコンテストID 297の1..5問目を
-    ## 未回答、解けた、解けた、未回答、解けなかったという意味。6問目以降は未回答。
+    # 問題を解いた結果
+    # "ABC297: ++ -" はコンテスト ABC297の1..5問目を
+    # 未回答、解けた、解けた、未回答、解けなかったという意味。6問目以降は未回答。
     parser.add_argument("--result_filename", dest="result_filename", type=str,
                         default="results.txt", help="Textfiles for result of tasks")
     args = parser.parse_args()
