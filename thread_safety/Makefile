@@ -6,15 +6,19 @@ GTEST_SOURCE=$(GTEST_TOP_DIR)/src/gtest-all.cc
 GMOCK_SOURCE=$(GMOCK_TOP_DIR)/src/gmock-all.cc
 GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
 
-SOURCE=thread_safety.cpp
-OBJ=thread_safety.o
-ASM=thread_safety.s
-OBJS=$(OBJ)
-TARGET=thread_safety
-TARGETS=$(TARGET)
+SOURCE_THREAD_SAFETY=thread_safety.cpp
+OBJ_THREAD_SAFETY=thread_safety.o
+ASM_THREAD_SAFETY=thread_safety.s
+SOURCE_STD_EXECUTION=std_execution.cpp
+OBJ_STD_EXECUTION=std_execution.o
+
+OBJS=$(OBJ_THREAD_SAFETY) $(OBJ_STD_EXECUTION)
+TARGET_THREAD_SAFETY=thread_safety
+TARGET_STD_EXECUTION=std_execution
+TARGETS=$(TARGET_THREAD_SAFETY) $(TARGET_STD_EXECUTION)
 
 CXX=g++
-CPPFLAGS=-std=gnu++17 -g -O0 $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS=-std=gnu++17 -O2 $(GTEST_GMOCK_INCLUDE)
 LD=g++
 LIBPATH=
 LDFLAGS=
@@ -24,11 +28,17 @@ LIBS=-lboost_program_options -pthread
 
 all: $(TARGETS)
 
-$(TARGET): $(OBJ) $(GTEST_OBJ)
+$(TARGET_THREAD_SAFETY): $(OBJ_THREAD_SAFETY) $(GTEST_OBJ)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
-	objdump -d -M intel --demangle $@ > $(ASM)
+	objdump -d -M intel --demangle $@ > $(ASM_THREAD_SAFETY)
 
-$(OBJ): $(SOURCE) Makefile
+$(TARGET_STD_EXECUTION): $(OBJ_STD_EXECUTION) $(GTEST_OBJ)
+	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+
+$(OBJ_THREAD_SAFETY): $(SOURCE_THREAD_SAFETY) Makefile
+	$(CXX) $(CPPFLAGS) -c -o $@ $<
+
+$(OBJ_STD_EXECUTION): $(SOURCE_STD_EXECUTION) Makefile
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
 $(GTEST_OBJ): $(GTEST_SOURCE)

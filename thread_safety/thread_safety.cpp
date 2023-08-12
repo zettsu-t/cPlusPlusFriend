@@ -1,5 +1,5 @@
-// マルチスレッドの競合は、一貫性のない変更、SEGV、無限ループなど
-// あらゆる未定義動作が起きることを試す
+// Race conditions in C++ multi-threading may occur data inconsistencies,
+// segmentation faults, or infinite loops. It is known as nasal demons.
 #include <atomic>
 #include <condition_variable>
 #include <iostream>
