@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <execution>
 #include <iostream>
@@ -6,8 +7,10 @@
 #include <vector>
 #include <gtest/gtest.h>
 
+namespace {
 using Number = int;
 using Numbers = std::vector<Number>;
+}
 
 void sort_sequential(Numbers& nums) {
     std::sort(nums.begin(), nums.end());
@@ -57,9 +60,12 @@ Numbers generate_numbers(size_t size, Number max_num) {
     return vec;
 }
 
-void print_duration_in_msec(const std::chrono::steady_clock::time_point& start, std::ostream& os) {
+void print_duration_in_msec(const std::chrono::steady_clock::time_point& start,
+                            std::ostream& os) {
     const auto timestamp = std::chrono::steady_clock::now();
-    os << std::chrono::duration_cast<std::chrono::milliseconds>(timestamp - start).count() << "msec\n";
+    const auto dur = std::chrono::duration_cast<std::chrono::milliseconds>
+        (timestamp - start).count();
+    os << dur << "msec\n";
 }
 
 class TestFunctions : public ::testing::Test {};
@@ -68,20 +74,20 @@ TEST_F(TestFunctions, SortFixed) {
     const Numbers input {1, 7, 6, 2, 3, 4, 5, 3};
     const Numbers expected {1, 2, 3, 3, 4, 5, 6, 7};
     const size_t size = input.size();
-    auto vec_sequential = input;
-    auto vec_vectorized = input;
-    auto vec_parallel = input;
-    auto vec_parallel_vectorized = input;
 
+    auto vec_sequential = input;
     const auto start_sequential = std::chrono::steady_clock::now();
     sort_sequential(vec_sequential);
 
+    auto vec_vectorized = input;
     const auto start_vectorized = std::chrono::steady_clock::now();
     sort_vectorized(vec_vectorized);
 
+    auto vec_parallel = input;
     const auto start_parallel = std::chrono::steady_clock::now();
     sort_parallel(vec_parallel);
 
+    auto vec_parallel_vectorized = input;
     const auto start_parallel_vectorized = std::chrono::steady_clock::now();
     sort_parallel_vectorized(vec_parallel_vectorized);
 
@@ -103,26 +109,25 @@ TEST_F(TestFunctions, SortFixed) {
 
 TEST_F(TestFunctions, SortRandom) {
     constexpr size_t size = 10000000;
-    constexpr Number max_num = std::numeric_limits<Number>::max();
+    constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
     const auto input = generate_numbers(size, max_num);
 
     auto vec_sequential = input;
-    auto vec_vectorized = input;
-    auto vec_parallel = input;
-    auto vec_parallel_vectorized = input;
-
     const auto start_sequential = std::chrono::steady_clock::now();
     sort_sequential(vec_sequential);
     print_duration_in_msec(start_sequential, std::cout);
 
+    auto vec_vectorized = input;
     const auto start_vectorized = std::chrono::steady_clock::now();
     sort_parallel(vec_vectorized);
     print_duration_in_msec(start_vectorized, std::cout);
 
+    auto vec_parallel = input;
     const auto start_parallel = std::chrono::steady_clock::now();
     sort_parallel(vec_parallel);
     print_duration_in_msec(start_parallel, std::cout);
 
+    auto vec_parallel_vectorized = input;
     const auto start_parallel_vectorized = std::chrono::steady_clock::now();
     sort_parallel_vectorized(vec_parallel_vectorized);
     print_duration_in_msec(start_parallel_vectorized, std::cout);
@@ -143,18 +148,17 @@ TEST_F(TestFunctions, SortRandom) {
 TEST_F(TestFunctions, ForEachFixed) {
     const Numbers input {1, 7, 6, 5};
     const Numbers expected {2, 14, 12, 10};
-    auto vec_sequential = input;
-    auto vec_vectorized = input;
-    auto vec_parallel = input;
-    auto vec_parallel_vectorized = input;
 
-    const auto start_sequential = std::chrono::steady_clock::now();
+    auto vec_sequential = input;
     for_each_sequential(vec_sequential);
-    const auto start_vectorized = std::chrono::steady_clock::now();
+
+    auto vec_vectorized = input;
     for_each_sequential(vec_vectorized);
-    const auto start_parallel = std::chrono::steady_clock::now();
+
+    auto vec_parallel = input;
     for_each_parallel(vec_parallel);
-    const auto start_parallel_vectorized = std::chrono::steady_clock::now();
+
+    auto vec_parallel_vectorized = input;
     for_each_parallel_vectorized(vec_parallel_vectorized);
 
     ASSERT_EQ(input.size(), vec_sequential.size());
@@ -174,25 +178,25 @@ TEST_F(TestFunctions, ForEachFixed) {
 
 TEST_F(TestFunctions, ForEachRandom) {
     constexpr size_t size = 80000000;
-    constexpr Number max_num = std::numeric_limits<Number>::max();
+    constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
     const auto input = generate_numbers(size, max_num);
-    auto vec_sequential = input;
-    auto vec_vectorized = input;
-    auto vec_parallel = input;
-    auto vec_parallel_vectorized = input;
 
+    auto vec_sequential = input;
     const auto start_sequential = std::chrono::steady_clock::now();
     for_each_sequential(vec_sequential);
     print_duration_in_msec(start_sequential, std::cout);
 
+    auto vec_vectorized = input;
     const auto start_vectorized = std::chrono::steady_clock::now();
     for_each_parallel(vec_vectorized);
     print_duration_in_msec(start_vectorized, std::cout);
 
+    auto vec_parallel = input;
     const auto start_parallel = std::chrono::steady_clock::now();
     for_each_parallel(vec_parallel);
     print_duration_in_msec(start_parallel, std::cout);
 
+    auto vec_parallel_vectorized = input;
     const auto start_parallel_vectorized = std::chrono::steady_clock::now();
     for_each_parallel_vectorized(vec_parallel_vectorized);
     print_duration_in_msec(start_parallel_vectorized, std::cout);

@@ -1,12 +1,15 @@
 // Race conditions in C++ multi-threading may occur data inconsistencies,
 // segmentation faults, or infinite loops. It is known as nasal demons.
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <exception>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <random>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -27,15 +30,14 @@ constexpr std::size_t SizeOfArray(T(&)[S]) {
 }
 
 using Size = size_t;
-using WordId = long long int;
-
 // A document as a sequence of words
 using Doc = std::vector<std::string>;
 // Words in a document
 using Words = std::vector<std::string>;
 
+// Strategies to avoid race conditions
 enum class CountingStrategy {
-    RELAXED,
+    RELAXED,  // do nothing
     FETCH_ADD,
     COMPARE_AND_SWAP,
 };
@@ -62,7 +64,7 @@ public:
     WordCount (const WordCount&) = delete;
     WordCount& operator=(const WordCount&) = delete;
     virtual ~WordCount() = default;
-    virtual void reset(const std::string& s) = 0;
+    virtual void preset_zero(const std::string& s) = 0;
     virtual void increment(const std::string& s) = 0;
     virtual Size get(const std::string& s) const = 0;
     virtual Size total() const = 0;
@@ -78,8 +80,8 @@ public:
     WordCountPlain() {}
     virtual ~WordCountPlain() = default;
 
-    void reset(const std::string& s) override {
-        counts_[s] = 0;
+    void preset_zero(const std::string& s) override {
+        // do nothing
     }
 
     void increment(const std::string& s) override {
@@ -114,7 +116,7 @@ public:
     WordCountFetchAdd() {}
     virtual ~WordCountFetchAdd() = default;
 
-    void reset(const std::string& s) override {
+    void preset_zero(const std::string& s) override {
         return counts_[s].store(0);
     }
 
@@ -150,7 +152,7 @@ public:
     WordCountCas() {}
     virtual ~WordCountCas() = default;
 
-    void reset(const std::string& s) override {
+    void preset_zero(const std::string& s) override {
         return counts_[s].store(0);
     }
 
@@ -205,13 +207,14 @@ std::unique_ptr<WordCount> WordCount::create(CountingStrategy strategy) {
 
 struct State {
     State() {
+        // Grantees word_count is non-NULL
         word_count = WordCount::create(CountingStrategy::RELAXED);
     }
 
     State (const State&) = delete;
     State& operator=(const State&) = delete;
 
-    // Notification from a producer to consumers
+    // A notification from a producer to consumers
     std::atomic<int> ready {0};
     std::mutex mtx;
     std::condition_variable cond;
@@ -246,11 +249,12 @@ Words generate_words(size_t dict_size) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
 
-    WordId seq_id {0};
     std::uniform_int_distribution<int> dist_generate_word(0, n_choice - 1);
     std::set<std::string> word_set;
     std::vector<std::string> words;
-    while(seq_id < dict_size) {
+
+    Size size {0};
+    while(size < dict_size) {
         std::string s;
         for(size_t j{0}; j<digits; ++j) {
             const char c = dist_generate_word(engine) + 'a';
@@ -263,7 +267,7 @@ Words generate_words(size_t dict_size) {
 
         word_set.insert(s);
         words.push_back(s);
-        ++seq_id;
+        ++size;
     }
 
     return words;
@@ -277,6 +281,7 @@ Doc generate_doc(const Words& words, Size doc_size) {
     std::mt19937 engine(seed_gen());
     const auto dict_size = words.size();
     std::uniform_int_distribution<Size> dist_choose_word(0, dict_size - 1);
+
     for(size_t i{0}; i<doc_size; ++i) {
         const auto& s = words.at(dist_choose_word(engine));
         doc.push_back(s);
@@ -304,10 +309,8 @@ void producer(size_t dict_size, size_t doc_size, CountingStrategy strategy) {
         const auto words = generate_words(dict_size);
         shared_state.doc = generate_doc(words, doc_size);
 
-        if (strategy != CountingStrategy::RELAXED) {
-            for(const auto& word : words) {
-                shared_state.word_count->reset(word);
-            }
+        for(const auto& word : words) {
+            shared_state.word_count->preset_zero(word);
         }
 
         shared_state.ready.store(1);
@@ -370,7 +373,11 @@ void parse_command_line(int argc, char* argv[], Setting& setting) {
 }
 
 Size execute_all(const Setting& setting) {
-    shared_state.ready.store(0);
+    {
+        std::unique_lock<std::mutex> l(shared_state.mtx);
+        shared_state.ready.store(0);
+    }
+
     Doc doc;
     auto word_count = WordCount::create(setting.strategy);
     std::swap(shared_state.doc, doc);
@@ -395,7 +402,11 @@ Size execute_all(const Setting& setting) {
 class TestFunctions : public ::testing::Test {
 protected:
     virtual void SetUp() override {
-        shared_state.ready.store(0);
+        {
+            std::unique_lock<std::mutex> l(shared_state.mtx);
+            shared_state.ready.store(0);
+        }
+
         Doc doc;
         auto word_count = WordCount::create(CountingStrategy::RELAXED);
         std::swap(shared_state.doc, doc);
@@ -410,17 +421,25 @@ TEST_F(TestFunctions, GenerateDoc) {
     ASSERT_EQ(doc_size, actual.size());
 
     for(const auto& word : words) {
-        EXPECT_TRUE(std::find(actual.begin(), actual.end(), word) != actual.end());
+        auto it = std::find(actual.begin(), actual.end(), word);
+        ASSERT_TRUE(it != actual.end());
+        EXPECT_TRUE(*it == word);
     }
 
     std::sort(actual.begin(), actual.end());
     auto it = std::unique(actual.begin(), actual.end());
     actual.erase(it, actual.end());
+
     ASSERT_EQ(words.size(), actual.size());
+    for(const auto& word : actual) {
+        auto it = std::find(words.begin(), words.end(), word);
+        ASSERT_TRUE(it != words.end());
+        EXPECT_TRUE(*it == word);
+    }
 }
 
 TEST_F(TestFunctions, EmptyArg) {
-    const Setting expected {123, 234, 345, 456, CountingStrategy::RELAXED};
+    const Setting expected {123, 234, 345, 456, CountingStrategy::COMPARE_AND_SWAP};
     Setting setting = expected;
 
     std::string arg0 {"command"};
@@ -431,6 +450,7 @@ TEST_F(TestFunctions, EmptyArg) {
     EXPECT_EQ(expected.n_trials, setting.n_trials);
     EXPECT_EQ(expected.dict_size, setting.dict_size);
     EXPECT_EQ(expected.doc_size, setting.doc_size);
+    EXPECT_EQ(expected.strategy, setting.strategy);
 }
 
 TEST_F(TestFunctions, ParseCommandLine) {
@@ -528,7 +548,10 @@ TEST_F(TestFunctions, SingleThread) {
 class TestStrategies : public ::testing::TestWithParam<CountingStrategy> {
 protected:
     virtual void SetUp() override {
-        shared_state.ready.store(0);
+        {
+            std::unique_lock<std::mutex> l(shared_state.mtx);
+            shared_state.ready.store(0);
+        }
         Doc doc;
         auto word_count = WordCount::create(GetParam());
         std::swap(shared_state.doc, doc);
@@ -536,7 +559,7 @@ protected:
     }
 };
 
-TEST_P(TestStrategies, WordCountClasses) {
+TEST_P(TestStrategies, CreateWordCount) {
     switch(GetParam()) {
     case CountingStrategy::RELAXED:
         EXPECT_TRUE(dynamic_cast<WordCountPlain*>(shared_state.word_count.get()));
@@ -592,22 +615,31 @@ TEST_P(TestStrategies, WordCountMethods) {
     EXPECT_EQ(3, word_count->total());
     EXPECT_EQ(2, word_count->size());
 
-    word_count->reset(key1);
-    EXPECT_EQ(0, word_count->get(key1));
+    word_count->preset_zero(key1);
+    if (GetParam() == CountingStrategy::RELAXED) {
+        EXPECT_EQ(2, word_count->get(key1));
+        EXPECT_EQ(3, word_count->total());
+    } else {
+        EXPECT_EQ(0, word_count->get(key1));
+        EXPECT_EQ(1, word_count->total());
+    }
     EXPECT_EQ(1, word_count->get(key2));
-    EXPECT_EQ(1, word_count->total());
     EXPECT_EQ(2, word_count->size());
 }
 
-TEST_P(TestStrategies, WordCountReset) {
+TEST_P(TestStrategies, WordCountPresetZero) {
     auto word_count = WordCount::create(GetParam());
     const std::string key ("key");
     EXPECT_FALSE(word_count->get(key));
 
-    word_count->reset(key);
+    word_count->preset_zero(key);
     EXPECT_EQ(0, word_count->get(key));
     EXPECT_EQ(0, word_count->total());
-    EXPECT_EQ(1, word_count->size());
+    if (GetParam() == CountingStrategy::RELAXED) {
+        EXPECT_EQ(0, word_count->size());
+    } else {
+        EXPECT_EQ(1, word_count->size());
+    }
 }
 
 TEST_P(TestStrategies, CountWords) {
@@ -687,17 +719,6 @@ TEST_P(TestStrategies, ConsumerPartial) {
     EXPECT_EQ(3, shared_state.word_count->get("b"));
 }
 
-TEST_P(TestStrategies, ProducerIncremental) {
-    constexpr decltype(Setting::doc_size) dict_size{20};
-    constexpr decltype(Setting::doc_size) doc_size{3000};
-    producer(dict_size, doc_size, GetParam());
-
-    ASSERT_TRUE(shared_state.ready.load());
-    EXPECT_EQ(doc_size, shared_state.doc.size());
-    const Size expected = (GetParam() == CountingStrategy::RELAXED) ? 0 : dict_size;
-    EXPECT_EQ(expected, shared_state.word_count->size());
-}
-
 TEST_P(TestStrategies, ProducerPrepare) {
     constexpr decltype(Setting::doc_size) dict_size{20};
     constexpr decltype(Setting::doc_size) doc_size{3000};
@@ -713,11 +734,17 @@ TEST_P(TestStrategies, MultiThread) {
     constexpr decltype(Setting::n_threads) n_threads {4};
     constexpr decltype(Setting::doc_size) doc_size{1000000};
     constexpr auto expected = n_threads * doc_size;
-    Setting setting {n_threads, 1, 2, doc_size};
+
+    const auto strategy = GetParam();
+    Setting setting {n_threads, 1, 2, doc_size, strategy};
 
     const auto acutal = execute_all(setting);
-    ASSERT_NE(expected, acutal);
-    ASSERT_GT(expected, acutal);
+    if (strategy == CountingStrategy::RELAXED) {
+        ASSERT_NE(expected, acutal);
+        ASSERT_GT(expected, acutal);
+    } else {
+        ASSERT_EQ(expected, acutal);
+    }
 }
 
 INSTANTIATE_TEST_CASE_P(AllStrategies, TestStrategies,
