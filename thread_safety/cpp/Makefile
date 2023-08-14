@@ -44,8 +44,9 @@ $(OBJ_STD_EXECUTION): $(SOURCE_STD_EXECUTION) Makefile
 $(GTEST_OBJ): $(GTEST_SOURCE)
 	$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-run:
-	./$(TARGET)
+run: $(TARGETS)
+	./$(TARGET_THREAD_SAFETY)
+	./$(TARGET_STD_EXECUTION)
 
 clean:
 	rm -f $(TARGETS) $(OBJS)

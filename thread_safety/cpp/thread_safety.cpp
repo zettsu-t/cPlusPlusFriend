@@ -24,8 +24,7 @@
 #define OPTION_STRATEGY "strategy"
 
 namespace {
-template<typename T, std::size_t S>
-constexpr std::size_t SizeOfArray(T(&)[S]) {
+template <typename T, std::size_t S> constexpr std::size_t SizeOfArray(T (&)[S]) {
     return S;
 }
 
@@ -37,31 +36,28 @@ using Words = std::vector<std::string>;
 
 // Strategies to avoid race conditions
 enum class CountingStrategy {
-    RELAXED,  // do nothing
+    RELAXED, // do nothing
     FETCH_ADD,
     COMPARE_AND_SWAP,
 };
 
 struct Setting {
-    Size n_threads {1};
-    Size n_trials  {1};
-    Size dict_size {1};
-    Size doc_size  {1};
-    CountingStrategy strategy {CountingStrategy::RELAXED};
+    Size n_threads{1};
+    Size n_trials{1};
+    Size dict_size{1};
+    Size doc_size{1};
+    CountingStrategy strategy{CountingStrategy::RELAXED};
 };
 
-std::ostream& operator<< (std::ostream &os, const Setting& setting) {
-    os <<
-        setting.n_threads << " threads, " <<
-        setting.n_trials << " trials, " <<
-        setting.dict_size << " # of dictionary entries, " <<
-        setting.doc_size << " # of words in a doc\n";
+std::ostream& operator<<(std::ostream& os, const Setting& setting) {
+    os << setting.n_threads << " threads, " << setting.n_trials << " trials, " << setting.dict_size
+       << " # of dictionary entries, " << setting.doc_size << " # of words in a doc\n";
     return os;
 }
 
 class WordCount {
-public:
-    WordCount (const WordCount&) = delete;
+  public:
+    WordCount(const WordCount&) = delete;
     WordCount& operator=(const WordCount&) = delete;
     virtual ~WordCount() = default;
     virtual void preset_zero(const std::string& s) = 0;
@@ -71,13 +67,14 @@ public:
     virtual Size size() const = 0;
     static std::unique_ptr<WordCount> create(CountingStrategy strategy);
 
-protected:
+  protected:
     WordCount() = default;
 };
 
 class WordCountPlain : public WordCount {
-public:
-    WordCountPlain() {}
+  public:
+    WordCountPlain() {
+    }
     virtual ~WordCountPlain() = default;
 
     void preset_zero(const std::string& s) override {
@@ -85,7 +82,7 @@ public:
     }
 
     void increment(const std::string& s) override {
-        counts_[s] +=1;
+        counts_[s] += 1;
     }
 
     Size get(const std::string& s) const override {
@@ -97,8 +94,8 @@ public:
     }
 
     Size total() const override {
-        Size total {0};
-        for(const auto& [k, v] : counts_) {
+        Size total{0};
+        for (const auto& [k, v] : counts_) {
             total += v;
         }
         return total;
@@ -112,8 +109,9 @@ public:
 };
 
 class WordCountFetchAdd : public WordCount {
-public:
-    WordCountFetchAdd() {}
+  public:
+    WordCountFetchAdd() {
+    }
     virtual ~WordCountFetchAdd() = default;
 
     void preset_zero(const std::string& s) override {
@@ -133,8 +131,8 @@ public:
     }
 
     Size total() const override {
-        Size total {0};
-        for(const auto& [k, v] : counts_) {
+        Size total{0};
+        for (const auto& [k, v] : counts_) {
             total += v.load();
         }
         return total;
@@ -148,8 +146,9 @@ public:
 };
 
 class WordCountCas : public WordCount {
-public:
-    WordCountCas() {}
+  public:
+    WordCountCas() {
+    }
     virtual ~WordCountCas() = default;
 
     void preset_zero(const std::string& s) override {
@@ -158,10 +157,10 @@ public:
 
     void increment(const std::string& s) override {
         Size expected = counts_[s].load();
-        Size desired = expected + 1;
+        Size desired;
         do {
             desired = expected + 1;
-        } while(!counts_[s].compare_exchange_weak(expected, desired));
+        } while (!counts_[s].compare_exchange_weak(expected, desired));
     }
 
     Size get(const std::string& s) const override {
@@ -173,8 +172,8 @@ public:
     }
 
     Size total() const override {
-        Size total {0};
-        for(const auto& [k, v] : counts_) {
+        Size total{0};
+        for (const auto& [k, v] : counts_) {
             total += v.load();
         }
         return total;
@@ -190,7 +189,7 @@ public:
 std::unique_ptr<WordCount> WordCount::create(CountingStrategy strategy) {
     std::unique_ptr<WordCount> obj;
 
-    switch(strategy) {
+    switch (strategy) {
     case CountingStrategy::FETCH_ADD:
         obj = std::make_unique<WordCountFetchAdd>();
         break;
@@ -211,11 +210,11 @@ struct State {
         word_count = WordCount::create(CountingStrategy::RELAXED);
     }
 
-    State (const State&) = delete;
+    State(const State&) = delete;
     State& operator=(const State&) = delete;
 
     // A notification from a producer to consumers
-    std::atomic<int> ready {0};
+    std::atomic<int> ready{0};
     std::mutex mtx;
     std::condition_variable cond;
     // Count words
@@ -225,12 +224,12 @@ struct State {
 
 // An shared instance
 State shared_state;
-}
+} // namespace
 
 void count_words(const Doc& doc, size_t left, size_t len, std::unique_ptr<WordCount>& word_count) {
     auto it_left = doc.begin() + left;
     auto it_right = it_left + len;
-    for(auto it = it_left; (it != doc.end()) && (it != it_right); ++it) {
+    for (auto it = it_left; (it != doc.end()) && (it != it_right); ++it) {
         const auto& word = *it;
         word_count->increment(word);
     }
@@ -239,12 +238,12 @@ void count_words(const Doc& doc, size_t left, size_t len, std::unique_ptr<WordCo
 
 Words generate_words(size_t dict_size) {
     constexpr Size n_choice = ('z' - 'a') + 1;
-    Size n {1};
-    Size digits {2};
+    Size n{1};
+    Size digits{2};
     do {
         n *= n_choice;
         ++digits;
-    } while(n < dict_size);
+    } while (n < dict_size);
 
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
@@ -253,10 +252,10 @@ Words generate_words(size_t dict_size) {
     std::set<std::string> word_set;
     std::vector<std::string> words;
 
-    Size size {0};
-    while(size < dict_size) {
+    Size size{0};
+    while (size < dict_size) {
         std::string s;
-        for(size_t j{0}; j<digits; ++j) {
+        for (size_t j{0}; j < digits; ++j) {
             const char c = dist_generate_word(engine) + 'a';
             s.push_back(c);
         }
@@ -282,7 +281,7 @@ Doc generate_doc(const Words& words, Size doc_size) {
     const auto dict_size = words.size();
     std::uniform_int_distribution<Size> dist_choose_word(0, dict_size - 1);
 
-    for(size_t i{0}; i<doc_size; ++i) {
+    for (size_t i{0}; i < doc_size; ++i) {
         const auto& s = words.at(dist_choose_word(engine));
         doc.push_back(s);
     }
@@ -309,7 +308,7 @@ void producer(size_t dict_size, size_t doc_size, CountingStrategy strategy) {
         const auto words = generate_words(dict_size);
         shared_state.doc = generate_doc(words, doc_size);
 
-        for(const auto& word : words) {
+        for (const auto& word : words) {
             shared_state.word_count->preset_zero(word);
         }
 
@@ -322,23 +321,17 @@ void parse_command_line(int argc, char* argv[], Setting& setting) {
     boost::program_options::options_description description("Options");
     std::string str_strategy;
 
-    description.add_options()
-        (OPTION_THREADS,
-         boost::program_options::value<decltype(setting.n_threads)>(),
-         "Number of trials")
-        (OPTION_TRIALS,
-         boost::program_options::value<decltype(setting.n_trials)>(),
-         "Number of trials")
-        (OPTION_DICT_SIZE,
-         boost::program_options::value<decltype(setting.dict_size)>(),
-         "Size of a dictionary")
-        (OPTION_DOC_SIZE,
-         boost::program_options::value<decltype(setting.doc_size)>(),
-         "Length of a document")
-        (OPTION_STRATEGY,
-         boost::program_options::value<decltype(str_strategy)>(),
-         "A strategy to avoid race conditions")
-        ;
+    description.add_options()(OPTION_THREADS,
+                              boost::program_options::value<decltype(setting.n_threads)>(),
+                              "Number of trials")(
+        OPTION_TRIALS, boost::program_options::value<decltype(setting.n_trials)>(),
+        "Number of trials")(OPTION_DICT_SIZE,
+                            boost::program_options::value<decltype(setting.dict_size)>(),
+                            "Size of a dictionary")(
+        OPTION_DOC_SIZE, boost::program_options::value<decltype(setting.doc_size)>(),
+        "Length of a document")(OPTION_STRATEGY,
+                                boost::program_options::value<decltype(str_strategy)>(),
+                                "A strategy to avoid race conditions");
 
     boost::program_options::variables_map var_map;
     boost::program_options::store(parse_command_line(argc, argv, description), var_map);
@@ -361,14 +354,14 @@ void parse_command_line(int argc, char* argv[], Setting& setting) {
     }
 
     if (var_map.count(OPTION_STRATEGY)) {
-       str_strategy = var_map[OPTION_STRATEGY].as<decltype(str_strategy)>();
-       if ((str_strategy == "") || (str_strategy == "relaxed")) {
-           setting.strategy = CountingStrategy::RELAXED;
-       } else if (str_strategy == "fetch_add") {
-           setting.strategy = CountingStrategy::FETCH_ADD;
-       } else if ((str_strategy == "cas") || (str_strategy == "compare_and_swap")) {
-           setting.strategy = CountingStrategy::COMPARE_AND_SWAP;
-       }
+        str_strategy = var_map[OPTION_STRATEGY].as<decltype(str_strategy)>();
+        if ((str_strategy == "") || (str_strategy == "relaxed")) {
+            setting.strategy = CountingStrategy::RELAXED;
+        } else if (str_strategy == "fetch_add") {
+            setting.strategy = CountingStrategy::FETCH_ADD;
+        } else if ((str_strategy == "cas") || (str_strategy == "compare_and_swap")) {
+            setting.strategy = CountingStrategy::COMPARE_AND_SWAP;
+        }
     }
 }
 
@@ -384,7 +377,7 @@ Size execute_all(const Setting& setting) {
     std::swap(shared_state.word_count, word_count);
 
     std::vector<std::thread> threads;
-    for(decltype(setting.n_threads) i{0}; i<setting.n_threads; ++i) {
+    for (decltype(setting.n_threads) i{0}; i < setting.n_threads; ++i) {
         const auto left = setting.doc_size * i;
         threads.emplace_back(consumer, left, setting.doc_size);
     }
@@ -392,7 +385,7 @@ Size execute_all(const Setting& setting) {
     const auto total_len = setting.doc_size * setting.n_threads;
     producer(setting.dict_size, total_len, setting.strategy);
 
-    for(auto& thr: threads) {
+    for (auto& thr : threads) {
         thr.join();
     }
 
@@ -400,7 +393,7 @@ Size execute_all(const Setting& setting) {
 }
 
 class TestFunctions : public ::testing::Test {
-protected:
+  protected:
     virtual void SetUp() override {
         {
             std::unique_lock<std::mutex> l(shared_state.mtx);
@@ -415,12 +408,12 @@ protected:
 };
 
 TEST_F(TestFunctions, GenerateDoc) {
-    const Words words {"a", "b", "c"};
-    constexpr Size doc_size {10000};
+    const Words words{"a", "b", "c"};
+    constexpr Size doc_size{10000};
     auto actual = generate_doc(words, doc_size);
     ASSERT_EQ(doc_size, actual.size());
 
-    for(const auto& word : words) {
+    for (const auto& word : words) {
         auto it = std::find(actual.begin(), actual.end(), word);
         ASSERT_TRUE(it != actual.end());
         EXPECT_TRUE(*it == word);
@@ -431,7 +424,7 @@ TEST_F(TestFunctions, GenerateDoc) {
     actual.erase(it, actual.end());
 
     ASSERT_EQ(words.size(), actual.size());
-    for(const auto& word : actual) {
+    for (const auto& word : actual) {
         auto it = std::find(words.begin(), words.end(), word);
         ASSERT_TRUE(it != words.end());
         EXPECT_TRUE(*it == word);
@@ -439,11 +432,11 @@ TEST_F(TestFunctions, GenerateDoc) {
 }
 
 TEST_F(TestFunctions, EmptyArg) {
-    const Setting expected {123, 234, 345, 456, CountingStrategy::COMPARE_AND_SWAP};
+    const Setting expected{123, 234, 345, 456, CountingStrategy::COMPARE_AND_SWAP};
     Setting setting = expected;
 
-    std::string arg0 {"command"};
-    char* argv[] {const_cast<char*>(arg0.c_str()), nullptr};
+    std::string arg0{"command"};
+    char* argv[]{const_cast<char*>(arg0.c_str()), nullptr};
     parse_command_line(1, argv, setting);
 
     EXPECT_EQ(expected.n_threads, setting.n_threads);
@@ -454,38 +447,30 @@ TEST_F(TestFunctions, EmptyArg) {
 }
 
 TEST_F(TestFunctions, ParseCommandLine) {
-    Setting setting {0, 0, 0, 0, CountingStrategy::RELAXED};
-    std::string arg0 {"command"};
-    std::string arg1 {"--"};
+    Setting setting{0, 0, 0, 0, CountingStrategy::RELAXED};
+    std::string arg0{"command"};
+    std::string arg1{"--"};
     arg1 += OPTION_THREADS;
-    std::string arg2 {"12"};
-    std::string arg3 {"--"};
+    std::string arg2{"12"};
+    std::string arg3{"--"};
     arg3 += OPTION_TRIALS;
-    std::string arg4 {"34"};
-    std::string arg5 {"--"};
+    std::string arg4{"34"};
+    std::string arg5{"--"};
     arg5 += OPTION_DICT_SIZE;
-    std::string arg6 {"56"};
-    std::string arg7 {"--"};
+    std::string arg6{"56"};
+    std::string arg7{"--"};
     arg7 += OPTION_DOC_SIZE;
-    std::string arg8 {"78"};
-    std::string arg9 {"--"};
+    std::string arg8{"78"};
+    std::string arg9{"--"};
     arg9 += OPTION_STRATEGY;
-    std::string arg10 {"fetch_add"};
+    std::string arg10{"fetch_add"};
 
-    char* argv[] {
-        const_cast<char*>(arg0.c_str()),
-        const_cast<char*>(arg1.c_str()),
-        const_cast<char*>(arg2.c_str()),
-        const_cast<char*>(arg3.c_str()),
-        const_cast<char*>(arg4.c_str()),
-        const_cast<char*>(arg5.c_str()),
-        const_cast<char*>(arg6.c_str()),
-        const_cast<char*>(arg7.c_str()),
-        const_cast<char*>(arg8.c_str()),
-        const_cast<char*>(arg9.c_str()),
-        const_cast<char*>(arg10.c_str()),
-        nullptr
-    };
+    char* argv[]{const_cast<char*>(arg0.c_str()),  const_cast<char*>(arg1.c_str()),
+                 const_cast<char*>(arg2.c_str()),  const_cast<char*>(arg3.c_str()),
+                 const_cast<char*>(arg4.c_str()),  const_cast<char*>(arg5.c_str()),
+                 const_cast<char*>(arg6.c_str()),  const_cast<char*>(arg7.c_str()),
+                 const_cast<char*>(arg8.c_str()),  const_cast<char*>(arg9.c_str()),
+                 const_cast<char*>(arg10.c_str()), nullptr};
 
     parse_command_line(SizeOfArray(argv) - 1, argv, setting);
     EXPECT_EQ(12, setting.n_threads);
@@ -501,32 +486,25 @@ TEST_F(TestFunctions, Strategies) {
         CountingStrategy expected;
     };
 
-    std::vector<Param> params {
-        {"", CountingStrategy::RELAXED},
-        {"relaxed", CountingStrategy::RELAXED},
-        {"fetch_add", CountingStrategy::FETCH_ADD},
-        {"cas", CountingStrategy::COMPARE_AND_SWAP},
-        {"compare_and_swap", CountingStrategy::COMPARE_AND_SWAP}
-    };
+    std::vector<Param> params{{"", CountingStrategy::RELAXED},
+                              {"relaxed", CountingStrategy::RELAXED},
+                              {"fetch_add", CountingStrategy::FETCH_ADD},
+                              {"cas", CountingStrategy::COMPARE_AND_SWAP},
+                              {"compare_and_swap", CountingStrategy::COMPARE_AND_SWAP}};
 
     const std::vector<CountingStrategy> initial = {
-        CountingStrategy::RELAXED, CountingStrategy::FETCH_ADD, CountingStrategy::COMPARE_AND_SWAP
-    };
+        CountingStrategy::RELAXED, CountingStrategy::FETCH_ADD, CountingStrategy::COMPARE_AND_SWAP};
 
-    for(const auto& init : initial) {
-        for(const auto& p : params) {
-            std::string arg0 {"command"};
-            std::string arg1 {"--"};
+    for (const auto& init : initial) {
+        for (const auto& p : params) {
+            std::string arg0{"command"};
+            std::string arg1{"--"};
             arg1 += OPTION_STRATEGY;
-            std::string arg2 {p.arg};
+            std::string arg2{p.arg};
 
-            Setting setting {0, 0, 0, 0, init};
-            char* argv[] {
-                const_cast<char*>(arg0.c_str()),
-                const_cast<char*>(arg1.c_str()),
-                const_cast<char*>(arg2.c_str()),
-                nullptr
-            };
+            Setting setting{0, 0, 0, 0, init};
+            char* argv[]{const_cast<char*>(arg0.c_str()), const_cast<char*>(arg1.c_str()),
+                         const_cast<char*>(arg2.c_str()), nullptr};
 
             parse_command_line(SizeOfArray(argv) - 1, argv, setting);
             EXPECT_EQ(0, setting.n_threads);
@@ -539,14 +517,14 @@ TEST_F(TestFunctions, Strategies) {
 }
 
 TEST_F(TestFunctions, SingleThread) {
-    constexpr decltype(Setting::doc_size) expected {1000000};
-    Setting setting {1, 1, 100, expected};
+    constexpr decltype(Setting::doc_size) expected{1000000};
+    Setting setting{1, 1, 100, expected};
     const auto acutal = execute_all(setting);
     ASSERT_EQ(expected, acutal);
 }
 
 class TestStrategies : public ::testing::TestWithParam<CountingStrategy> {
-protected:
+  protected:
     virtual void SetUp() override {
         {
             std::unique_lock<std::mutex> l(shared_state.mtx);
@@ -560,7 +538,7 @@ protected:
 };
 
 TEST_P(TestStrategies, CreateWordCount) {
-    switch(GetParam()) {
+    switch (GetParam()) {
     case CountingStrategy::RELAXED:
         EXPECT_TRUE(dynamic_cast<WordCountPlain*>(shared_state.word_count.get()));
         break;
@@ -578,7 +556,7 @@ TEST_P(TestStrategies, CreateWordCount) {
 
 TEST_P(TestStrategies, WordCountMethods) {
     auto word_count = WordCount::create(GetParam());
-    switch(GetParam()) {
+    switch (GetParam()) {
     case CountingStrategy::RELAXED:
         ASSERT_TRUE(dynamic_cast<WordCountPlain*>(word_count.get()));
         break;
@@ -593,8 +571,8 @@ TEST_P(TestStrategies, WordCountMethods) {
         break;
     }
 
-    const std::string key1 ("key1");
-    const std::string key2 ("2key");
+    const std::string key1("key1");
+    const std::string key2("2key");
     EXPECT_FALSE(word_count->get(key1));
 
     word_count->increment(key1);
@@ -629,7 +607,7 @@ TEST_P(TestStrategies, WordCountMethods) {
 
 TEST_P(TestStrategies, WordCountPresetZero) {
     auto word_count = WordCount::create(GetParam());
-    const std::string key ("key");
+    const std::string key("key");
     EXPECT_FALSE(word_count->get(key));
 
     word_count->preset_zero(key);
@@ -643,7 +621,7 @@ TEST_P(TestStrategies, WordCountPresetZero) {
 }
 
 TEST_P(TestStrategies, CountWords) {
-    const Doc doc {"a", "b", "b", "c", "c", "c"};
+    const Doc doc{"a", "b", "b", "c", "c", "c"};
     auto counts_full = WordCount::create(GetParam());
     count_words(doc, 0, 6, counts_full);
     EXPECT_EQ(1, counts_full->get("a"));
@@ -664,9 +642,9 @@ TEST_P(TestStrategies, CountWords) {
 }
 
 TEST_P(TestStrategies, GenerateWords) {
-    const std::vector<Size> dict_size_set {1, 26, 100, 676};
-    const std::vector<Size> expected_str_len {3, 3, 4, 4};
-    for(size_t i{0}; i<dict_size_set.size(); ++i) {
+    const std::vector<Size> dict_size_set{1, 26, 100, 676};
+    const std::vector<Size> expected_str_len{3, 3, 4, 4};
+    for (size_t i{0}; i < dict_size_set.size(); ++i) {
         const auto dict_size = dict_size_set.at(i);
         const auto str_len = expected_str_len.at(i);
 
@@ -674,12 +652,12 @@ TEST_P(TestStrategies, GenerateWords) {
         ASSERT_EQ(dict_size, actual.size());
 
         std::set<std::string> word_set;
-        for(const auto& key : actual) {
+        for (const auto& key : actual) {
             EXPECT_TRUE(word_set.find(key) == word_set.end());
             word_set.insert(key);
 
             EXPECT_EQ(str_len, key.size());
-            for(const auto& c : key) {
+            for (const auto& c : key) {
                 EXPECT_TRUE((c >= 'a') && (c <= 'z'));
             }
         }
@@ -687,7 +665,7 @@ TEST_P(TestStrategies, GenerateWords) {
 }
 
 TEST_P(TestStrategies, ConsumerFull) {
-    Doc doc {"a", "b", "c", "a", "b", "b", "c", "c", "c"};
+    Doc doc{"a", "b", "c", "a", "b", "b", "c", "c", "c"};
     std::swap(shared_state.doc, doc);
 
     {
@@ -702,7 +680,7 @@ TEST_P(TestStrategies, ConsumerFull) {
 }
 
 TEST_P(TestStrategies, ConsumerPartial) {
-    Doc doc {"a", "a", "b", "b", "b"};
+    Doc doc{"a", "a", "b", "b", "b"};
     std::swap(shared_state.doc, doc);
 
     {
@@ -731,12 +709,12 @@ TEST_P(TestStrategies, ProducerPrepare) {
 }
 
 TEST_P(TestStrategies, MultiThread) {
-    constexpr decltype(Setting::n_threads) n_threads {4};
+    constexpr decltype(Setting::n_threads) n_threads{4};
     constexpr decltype(Setting::doc_size) doc_size{1000000};
     constexpr auto expected = n_threads * doc_size;
 
     const auto strategy = GetParam();
-    Setting setting {n_threads, 1, 2, doc_size, strategy};
+    Setting setting{n_threads, 1, 2, doc_size, strategy};
 
     const auto acutal = execute_all(setting);
     if (strategy == CountingStrategy::RELAXED) {
@@ -748,8 +726,7 @@ TEST_P(TestStrategies, MultiThread) {
 }
 
 INSTANTIATE_TEST_CASE_P(AllStrategies, TestStrategies,
-                        ::testing::Values(CountingStrategy::RELAXED,
-                                          CountingStrategy::FETCH_ADD,
+                        ::testing::Values(CountingStrategy::RELAXED, CountingStrategy::FETCH_ADD,
                                           CountingStrategy::COMPARE_AND_SWAP));
 
 int main(int argc, char* argv[]) {
@@ -762,7 +739,7 @@ int main(int argc, char* argv[]) {
     parse_command_line(argc, argv, setting);
     std::cout << setting;
 
-    for(size_t trial{0}; trial < setting.n_trials; ++trial) {
+    for (size_t trial{0}; trial < setting.n_trials; ++trial) {
         std::cout << execute_all(setting) << std::endl;
     }
 
