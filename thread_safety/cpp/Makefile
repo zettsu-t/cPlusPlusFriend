@@ -9,10 +9,13 @@ GTEST_OBJ=$(patsubst %.cc, %.o, $(notdir $(GTEST_SOURCE)))
 SOURCE_THREAD_SAFETY=thread_safety.cpp
 OBJ_THREAD_SAFETY=thread_safety.o
 ASM_THREAD_SAFETY=thread_safety.s
+
 SOURCE_STD_EXECUTION=std_execution.cpp
 OBJ_STD_EXECUTION=std_execution.o
+ASM_STD_EXECUTION=std_execution.s
 
 OBJS=$(OBJ_THREAD_SAFETY) $(OBJ_STD_EXECUTION)
+ASMS=$(ASM_THREAD_SAFETY) $(ASM_STD_EXECUTION)
 TARGET_THREAD_SAFETY=thread_safety
 TARGET_STD_EXECUTION=std_execution
 TARGETS=$(TARGET_THREAD_SAFETY) $(TARGET_STD_EXECUTION)
@@ -22,7 +25,7 @@ CPPFLAGS=-std=gnu++17 -O2 $(GTEST_GMOCK_INCLUDE)
 LD=g++
 LIBPATH=
 LDFLAGS=
-LIBS=-lboost_program_options -pthread
+LIBS=-lboost_program_options -ltbb -pthread
 
 .PHONY: all run clean
 
@@ -34,6 +37,7 @@ $(TARGET_THREAD_SAFETY): $(OBJ_THREAD_SAFETY) $(GTEST_OBJ)
 
 $(TARGET_STD_EXECUTION): $(OBJ_STD_EXECUTION) $(GTEST_OBJ)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
+	objdump -d -M intel --demangle $@ > $(ASM_STD_EXECUTION)
 
 $(OBJ_THREAD_SAFETY): $(SOURCE_THREAD_SAFETY) Makefile
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
@@ -49,4 +53,4 @@ run: $(TARGETS)
 	./$(TARGET_STD_EXECUTION)
 
 clean:
-	rm -f $(TARGETS) $(OBJS)
+	rm -f $(TARGETS) $(OBJS) $(ASMS) $(GTEST_OBJ)

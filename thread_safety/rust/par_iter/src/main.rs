@@ -101,28 +101,120 @@ fn test_sum_vector_random() {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ParamSet {
+    n_trials: usize,
+    vec_len: usize,
+    max_num: Number,
+}
+
+impl ParamSet {
+    pub fn new(n_trials: usize, vec_len: usize, max_num: Number) -> Self {
+        Self {
+            n_trials,
+            vec_len,
+            max_num,
+        }
+    }
+}
+
+#[test]
+fn test_param_set() {
+    let n_trials = 2;
+    let vec_len = 4;
+    let max_num = 6;
+    let actual = ParamSet::new(n_trials, vec_len, max_num);
+    assert_eq!(actual.n_trials, n_trials);
+    assert_eq!(actual.vec_len, vec_len);
+    assert_eq!(actual.max_num, max_num);
+}
+
+fn parse_args(args: Vec<String>) -> ParamSet {
+    let mut opts = getopts::Options::new();
+    opts.optopt("t", "trial", "# of trials", "# of trials")
+        .optopt("s", "size", "The length of an input vector", "Vector size")
+        .optopt(
+            "m",
+            "max",
+            "The upper limit of vector elements",
+            "Max number",
+        );
+
+    let matches = opts.parse(&args[1..]).unwrap();
+
+    let n_trials = match matches.opt_str("t") {
+        Some(s) => s.parse::<usize>().unwrap(),
+        None => 1,
+    };
+
+    let vec_len = match matches.opt_str("s") {
+        Some(s) => s.parse::<usize>().unwrap(),
+        None => 10,
+    };
+
+    let max_num = match matches.opt_str("m") {
+        Some(s) => s.parse::<Number>().unwrap(),
+        None => 5,
+    };
+
+    ParamSet::new(n_trials, vec_len, max_num)
+}
+
+#[test]
+fn test_default_arguments() {
+    let args: Vec<String> = vec!["command"].iter().map(|&s| s.into()).collect();
+    let actual = parse_args(args);
+    let expected = ParamSet::new(1, 10, 5);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_short_options() {
+    let args: Vec<String> = vec!["command", "-t", "23", "-s", "45", "-m", "67"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    let actual = parse_args(args);
+    let expected = ParamSet::new(23, 45, 67);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_long_options() {
+    let args: Vec<String> = vec!["command", "--trial", "123", "--size", "456", "--max", "789"]
+        .iter()
+        .map(|&s| s.into())
+        .collect();
+    let actual = parse_args(args);
+    let expected = ParamSet::new(123, 456, 789);
+    assert_eq!(actual, expected);
+}
+
 // Run a release build : cargo run --release
 fn main() {
-    let size = 100000000;
-    let max_num = 2000;
-    let xs = generate_random_number(size, max_num);
+    let args: Vec<String> = std::env::args().collect();
+    let params = parse_args(args);
 
-    let start_double_seq = Instant::now();
-    let ys_seq = double_vector_seq(&xs);
-    print_duration_msec(&start_double_seq);
+    for _ in 0..(params.n_trials) {
+        let xs = generate_random_number(params.vec_len, params.max_num);
 
-    let start_sum_seq = Instant::now();
-    let sum_seq = sum_vector_seq(&ys_seq);
-    print_duration_msec(&start_sum_seq);
-    // Prevent optimized out
-    println!("{}", sum_seq);
+        let start_double_seq = Instant::now();
+        let ys_seq = double_vector_seq(&xs);
+        print_duration_msec(&start_double_seq);
 
-    let start_double_par = Instant::now();
-    let ys_par = double_vector_par(&xs);
-    print_duration_msec(&start_double_par);
+        let start_sum_seq = Instant::now();
+        let sum_seq = sum_vector_seq(&ys_seq);
+        print_duration_msec(&start_sum_seq);
+        // Prevent optimized out
+        println!("{}", sum_seq);
 
-    let start_sum_par = Instant::now();
-    let sum_par = sum_vector_par(&ys_par);
-    print_duration_msec(&start_sum_par);
-    println!("{}", sum_par);
+        let start_double_par = Instant::now();
+        let ys_par = double_vector_par(&xs);
+        print_duration_msec(&start_double_par);
+
+        let start_sum_par = Instant::now();
+        let sum_par = sum_vector_par(&ys_par);
+        print_duration_msec(&start_sum_par);
+        println!("{}", sum_par);
+    }
 }
