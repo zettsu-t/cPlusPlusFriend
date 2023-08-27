@@ -30,10 +30,10 @@ enum class Target {
 };
 
 struct Setting {
-    size_t n_trials {1};
-    size_t vec_len {10};
-    Number max_num {5};
-    Target target {Target::ALL};
+    size_t n_trials{1};
+    size_t vec_len{10};
+    Number max_num{5};
+    Target target{Target::ALL};
 };
 
 void print_duration_in_msec(const std::chrono::steady_clock::time_point& start,
@@ -48,11 +48,13 @@ void parse_command_line(int argc, char* argv[], Setting& setting) {
     boost::program_options::options_description description("Options");
     std::string str_target;
 
-    description.add_options()
-        (OPTION_TRIALS, boost::program_options::value<decltype(setting.n_trials)>(), "# of trials")
-        (OPTION_VEC_LEN, boost::program_options::value<decltype(setting.vec_len)>(), "The length of an input vector")
-        (OPTION_MAX_NUM, boost::program_options::value<decltype(setting.max_num)>(), "The upper limit of vector elements")
-        (OPTION_TARGET, boost::program_options::value<decltype(str_target)>(), "Targets to measure");
+    description.add_options()(
+        OPTION_TRIALS, boost::program_options::value<decltype(setting.n_trials)>(), "# of trials")(
+        OPTION_VEC_LEN, boost::program_options::value<decltype(setting.vec_len)>(),
+        "The length of an input vector")(OPTION_MAX_NUM,
+                                         boost::program_options::value<decltype(setting.max_num)>(),
+                                         "The upper limit of vector elements")(
+        OPTION_TARGET, boost::program_options::value<decltype(str_target)>(), "Targets to measure");
 
     boost::program_options::variables_map var_map;
     boost::program_options::store(parse_command_line(argc, argv, description), var_map);
@@ -74,7 +76,7 @@ void parse_command_line(int argc, char* argv[], Setting& setting) {
         str_target = var_map[OPTION_TARGET].as<decltype(str_target)>();
     }
 
-    Target target {Target::ALL};
+    Target target{Target::ALL};
     if (str_target == "for_each") {
         target = Target::FOR_EACH;
     } else if (str_target == "sort") {
@@ -131,10 +133,9 @@ void sort_parallel_vectorized(Numbers& nums) {
     std::sort(std::execution::par_unseq, nums.begin(), nums.end());
 }
 
-void for_each_all_cases(const Setting& setting, Numbers& input,
-                        Numbers& vec_sequential, Numbers& vec_vectorized,
-                        Numbers& vec_parallel, Numbers& vec_parallel_vectorized,
-                        std::ostream& os) {
+void for_each_all_cases(const Setting& setting, Numbers& input, Numbers& vec_sequential,
+                        Numbers& vec_vectorized, Numbers& vec_parallel,
+                        Numbers& vec_parallel_vectorized, std::ostream& os) {
     input = generate_numbers(setting.vec_len, setting.max_num);
 
     vec_sequential = input;
@@ -167,15 +168,14 @@ void for_each_all_cases(const Setting& setting, std::ostream& os) {
     Numbers vec_parallel;
     Numbers vec_parallel_vectorized;
 
-    for_each_all_cases(setting, input, vec_sequential, vec_vectorized,
-                       vec_parallel, vec_parallel_vectorized, os);
+    for_each_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
+                       vec_parallel_vectorized, os);
     return;
 }
 
-void sort_all_cases(const Setting& setting, Numbers& input,
-                    Numbers& vec_sequential, Numbers& vec_vectorized,
-                    Numbers& vec_parallel, Numbers& vec_parallel_vectorized,
-                    std::ostream& os) {
+void sort_all_cases(const Setting& setting, Numbers& input, Numbers& vec_sequential,
+                    Numbers& vec_vectorized, Numbers& vec_parallel,
+                    Numbers& vec_parallel_vectorized, std::ostream& os) {
     input = generate_numbers(setting.vec_len, setting.max_num);
 
     vec_sequential = input;
@@ -208,13 +208,13 @@ void sort_all_cases(const Setting& setting, std::ostream& os) {
     Numbers vec_parallel;
     Numbers vec_parallel_vectorized;
 
-    sort_all_cases(setting, input, vec_sequential, vec_vectorized,
-                   vec_parallel, vec_parallel_vectorized, os);
+    sort_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
+                   vec_parallel_vectorized, os);
     return;
 }
 
 void dispatch(const Setting& setting, std::ostream& os) {
-    for(decltype(setting.n_trials) trial{0}; trial<setting.n_trials; ++trial) {
+    for (decltype(setting.n_trials) trial{0}; trial < setting.n_trials; ++trial) {
         if ((setting.target == Target::ALL) || (setting.target == Target::FOR_EACH)) {
             for_each_all_cases(setting, os);
         }
@@ -228,10 +228,11 @@ void dispatch(const Setting& setting, std::ostream& os) {
 class TestFunctions : public ::testing::Test {};
 
 TEST_F(TestFunctions, PrintDuration) {
-    const auto start = std::chrono::steady_clock::now();
-    const std::string description {"Desc"};
+    const std::string description{"Desc"};
     const std::regex re("^Desc,\\d+msec\n$");
     std::ostringstream os;
+    const auto start = std::chrono::steady_clock::now();
+
     print_duration_in_msec(start, description, os);
     EXPECT_TRUE(std::regex_match(os.str(), re));
 }
@@ -280,11 +281,10 @@ TEST_F(TestFunctions, ParseCommandLine) {
 }
 
 TEST_F(TestFunctions, ParseTarget) {
-    std::vector<std::pair<std::string, Target>> targets {
-        {"all", Target::ALL}, {"for_each", Target::FOR_EACH}, {"sort", Target::SORT}
-    };
+    std::vector<std::pair<std::string, Target>> targets{
+        {"all", Target::ALL}, {"for_each", Target::FOR_EACH}, {"sort", Target::SORT}};
 
-    for(const auto& [arg, expected] : targets) {
+    for (const auto& [arg, expected] : targets) {
         Setting setting{0, 0, 0, Target::ALL};
         std::string arg0{"command"};
         std::string arg1{"--"};
@@ -300,17 +300,18 @@ TEST_F(TestFunctions, ParseTarget) {
 }
 
 TEST_F(TestFunctions, GenerateNumbers) {
-    const size_t vec_len {10000};
-    const Number max_num {3};
+    const size_t vec_len{10000};
+    const Number max_num{3};
     const auto input = generate_numbers(vec_len, max_num);
+
     ASSERT_EQ(vec_len, input.size());
-    EXPECT_TRUE(std::all_of(input.begin(), input.end(), [](const auto& e) {return e >= 0;}));
-    EXPECT_TRUE(std::all_of(input.begin(), input.end(), [](const auto& e) {return e <= max_num;}));
+    EXPECT_TRUE(std::all_of(input.begin(), input.end(),
+                            [](const auto& e) { return (e >= 0) && (e <= max_num); }));
 }
 
 TEST_F(TestFunctions, Twice) {
-    Number arg {3};
-    Number expected {6};
+    Number arg{3};
+    Number expected{6};
     twice(arg);
     EXPECT_EQ(expected, arg);
 }
@@ -323,7 +324,7 @@ TEST_F(TestFunctions, ForEachFixed) {
     for_each_sequential(vec_sequential);
 
     auto vec_vectorized = input;
-    for_each_sequential(vec_vectorized);
+    for_each_vectorized(vec_vectorized);
 
     auto vec_parallel = input;
     for_each_parallel(vec_parallel);
@@ -380,15 +381,16 @@ TEST_F(TestFunctions, SortFixed) {
 
 TEST_F(TestFunctions, ForEachRandom) {
     constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
-    const Setting setting {1, 4000000, max_num};
+    const Setting setting{1, 4000000, max_num};
     Numbers input;
     Numbers vec_sequential;
     Numbers vec_vectorized;
     Numbers vec_parallel;
     Numbers vec_parallel_vectorized;
     std::ostringstream os;
-    for_each_all_cases(setting, input, vec_sequential, vec_vectorized,
-                       vec_parallel, vec_parallel_vectorized, os);
+
+    for_each_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
+                       vec_parallel_vectorized, os);
 
     ASSERT_EQ(setting.vec_len, input.size());
     ASSERT_EQ(input.size(), vec_sequential.size());
@@ -412,7 +414,7 @@ TEST_F(TestFunctions, ForEachRandom) {
 
 TEST_F(TestFunctions, SortRandom) {
     constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
-    const Setting setting {1, 4000000, max_num};
+    const Setting setting{1, 4000000, max_num};
     Numbers input;
     Numbers vec_sequential;
     Numbers vec_vectorized;
@@ -420,8 +422,8 @@ TEST_F(TestFunctions, SortRandom) {
     Numbers vec_parallel_vectorized;
     std::ostringstream os;
 
-    sort_all_cases(setting, input,vec_sequential, vec_vectorized,
-                   vec_parallel, vec_parallel_vectorized, os);
+    sort_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
+                   vec_parallel_vectorized, os);
 
     ASSERT_EQ(setting.vec_len, input.size());
     ASSERT_EQ(input.size(), vec_sequential.size());
@@ -445,26 +447,20 @@ TEST_F(TestFunctions, SortRandom) {
 
 TEST_F(TestFunctions, Dispatch) {
     const std::regex re("^[^\\d,]+,\\d+msec$");
-    std::vector<Target> targets {Target::ALL, Target::FOR_EACH, Target::SORT};
+    const std::vector<Target> targets{Target::ALL, Target::FOR_EACH, Target::SORT};
 
-    const std::vector<std::string> prefixes {
-        "for_each_sequential", "for_each_vectorized",
-        "for_each_parallel", "for_each_parallel_vectorized",
-        "sort_sequential", "sort_vectorized",
-        "sort_parallel", "sort_parallel_vectorized"
-    };
+    const std::vector<std::string> prefixes{"for_each_sequential", "for_each_vectorized",
+                                            "for_each_parallel",   "for_each_parallel_vectorized",
+                                            "sort_sequential",     "sort_vectorized",
+                                            "sort_parallel",       "sort_parallel_vectorized"};
 
-    size_t n_trials {33};
-    for(const auto& target : targets) {
-        Setting setting {n_trials, 10, 6, target};
+    constexpr size_t n_trials{33};
+    for (const auto& target : targets) {
+        Setting setting{n_trials, 10, 6, target};
         std::ostringstream os;
         dispatch(setting, os);
 
-        const auto expected = os.str();
-        std::stringstream ss(expected);
-        std::string line;
-
-        size_t unit {0};
+        size_t unit{0};
         if (setting.target == Target::ALL) {
             unit = 8;
         }
@@ -473,12 +469,16 @@ TEST_F(TestFunctions, Dispatch) {
             unit = 4;
         }
 
-        size_t total {0};
-        size_t round {0};
-        while(std::getline(ss, line, '\n')) {
+        const auto expected = os.str();
+        std::stringstream ss(expected);
+        std::string line;
+        size_t total{0};
+        size_t round{0};
+
+        while (std::getline(ss, line, '\n')) {
             EXPECT_TRUE(std::regex_match(line, re));
 
-            switch(setting.target) {
+            switch (setting.target) {
             case Target::ALL:
                 round %= 8;
                 break;

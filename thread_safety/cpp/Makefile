@@ -27,7 +27,7 @@ LIBPATH=
 LDFLAGS=
 LIBS=-lboost_program_options -ltbb -pthread
 
-.PHONY: all run clean
+.PHONY: all run check clean
 
 all: $(TARGETS)
 
@@ -51,6 +51,14 @@ $(GTEST_OBJ): $(GTEST_SOURCE)
 run: $(TARGETS)
 	./$(TARGET_THREAD_SAFETY)
 	./$(TARGET_STD_EXECUTION)
+
+check: $(TARGETS)
+	./$(TARGET_THREAD_SAFETY) --threads 2 --trials 3 --dict_size 1000 --doc_size 1000000 --strategy fetch_add
+	./$(TARGET_THREAD_SAFETY) --threads 2 --trials 3 --dict_size 1000 --doc_size 1000000 --strategy compare_and_swap
+	-timeout 10 ./$(TARGET_THREAD_SAFETY) --threads 2 --trials 10 --dict_size 1000 --doc_size 1000000
+	./$(TARGET_STD_EXECUTION) ./std_execution --trial 2 --size 10000000 --max 200 --target for_each
+	./$(TARGET_STD_EXECUTION) ./std_execution --trial 2 --size 1000000 --max 200 --target sort
+	./$(TARGET_STD_EXECUTION) ./std_execution --trial 1 --size 100000 --max 200
 
 clean:
 	rm -f $(TARGETS) $(OBJS) $(ASMS) $(GTEST_OBJ)

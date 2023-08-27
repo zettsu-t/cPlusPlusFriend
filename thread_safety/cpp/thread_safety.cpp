@@ -55,6 +55,54 @@ std::ostream& operator<<(std::ostream& os, const Setting& setting) {
     return os;
 }
 
+void parse_command_line(int argc, char* argv[], Setting& setting) {
+    boost::program_options::options_description description("Options");
+    std::string str_strategy;
+
+    description.add_options()(OPTION_THREADS,
+                              boost::program_options::value<decltype(setting.n_threads)>(),
+                              "Number of trials")(
+        OPTION_TRIALS, boost::program_options::value<decltype(setting.n_trials)>(),
+        "Number of trials")(OPTION_DICT_SIZE,
+                            boost::program_options::value<decltype(setting.dict_size)>(),
+                            "Size of a dictionary")(
+        OPTION_DOC_SIZE, boost::program_options::value<decltype(setting.doc_size)>(),
+        "Length of a document")(OPTION_STRATEGY,
+                                boost::program_options::value<decltype(str_strategy)>(),
+                                "A strategy to avoid race conditions");
+
+    boost::program_options::variables_map var_map;
+    boost::program_options::store(parse_command_line(argc, argv, description), var_map);
+    boost::program_options::notify(var_map);
+
+    if (var_map.count(OPTION_THREADS)) {
+        setting.n_threads = var_map[OPTION_THREADS].as<decltype(setting.n_threads)>();
+    }
+
+    if (var_map.count(OPTION_TRIALS)) {
+        setting.n_trials = var_map[OPTION_TRIALS].as<decltype(setting.n_trials)>();
+    }
+
+    if (var_map.count(OPTION_DICT_SIZE)) {
+        setting.dict_size = var_map[OPTION_DICT_SIZE].as<decltype(setting.dict_size)>();
+    }
+
+    if (var_map.count(OPTION_DOC_SIZE)) {
+        setting.doc_size = var_map[OPTION_DOC_SIZE].as<decltype(setting.doc_size)>();
+    }
+
+    if (var_map.count(OPTION_STRATEGY)) {
+        str_strategy = var_map[OPTION_STRATEGY].as<decltype(str_strategy)>();
+        if ((str_strategy == "") || (str_strategy == "relaxed")) {
+            setting.strategy = CountingStrategy::RELAXED;
+        } else if (str_strategy == "fetch_add") {
+            setting.strategy = CountingStrategy::FETCH_ADD;
+        } else if ((str_strategy == "cas") || (str_strategy == "compare_and_swap")) {
+            setting.strategy = CountingStrategy::COMPARE_AND_SWAP;
+        }
+    }
+}
+
 class WordCount {
   public:
     WordCount(const WordCount&) = delete;
@@ -317,54 +365,6 @@ void producer(size_t dict_size, size_t doc_size, CountingStrategy strategy) {
     shared_state.cond.notify_all();
 }
 
-void parse_command_line(int argc, char* argv[], Setting& setting) {
-    boost::program_options::options_description description("Options");
-    std::string str_strategy;
-
-    description.add_options()(OPTION_THREADS,
-                              boost::program_options::value<decltype(setting.n_threads)>(),
-                              "Number of trials")(
-        OPTION_TRIALS, boost::program_options::value<decltype(setting.n_trials)>(),
-        "Number of trials")(OPTION_DICT_SIZE,
-                            boost::program_options::value<decltype(setting.dict_size)>(),
-                            "Size of a dictionary")(
-        OPTION_DOC_SIZE, boost::program_options::value<decltype(setting.doc_size)>(),
-        "Length of a document")(OPTION_STRATEGY,
-                                boost::program_options::value<decltype(str_strategy)>(),
-                                "A strategy to avoid race conditions");
-
-    boost::program_options::variables_map var_map;
-    boost::program_options::store(parse_command_line(argc, argv, description), var_map);
-    boost::program_options::notify(var_map);
-
-    if (var_map.count(OPTION_THREADS)) {
-        setting.n_threads = var_map[OPTION_THREADS].as<decltype(setting.n_threads)>();
-    }
-
-    if (var_map.count(OPTION_TRIALS)) {
-        setting.n_trials = var_map[OPTION_TRIALS].as<decltype(setting.n_trials)>();
-    }
-
-    if (var_map.count(OPTION_DICT_SIZE)) {
-        setting.dict_size = var_map[OPTION_DICT_SIZE].as<decltype(setting.dict_size)>();
-    }
-
-    if (var_map.count(OPTION_DOC_SIZE)) {
-        setting.doc_size = var_map[OPTION_DOC_SIZE].as<decltype(setting.doc_size)>();
-    }
-
-    if (var_map.count(OPTION_STRATEGY)) {
-        str_strategy = var_map[OPTION_STRATEGY].as<decltype(str_strategy)>();
-        if ((str_strategy == "") || (str_strategy == "relaxed")) {
-            setting.strategy = CountingStrategy::RELAXED;
-        } else if (str_strategy == "fetch_add") {
-            setting.strategy = CountingStrategy::FETCH_ADD;
-        } else if ((str_strategy == "cas") || (str_strategy == "compare_and_swap")) {
-            setting.strategy = CountingStrategy::COMPARE_AND_SWAP;
-        }
-    }
-}
-
 Size execute_all(const Setting& setting) {
     {
         std::unique_lock<std::mutex> l(shared_state.mtx);
@@ -407,29 +407,19 @@ class TestFunctions : public ::testing::Test {
     }
 };
 
-TEST_F(TestFunctions, GenerateDoc) {
-    const Words words{"a", "b", "c"};
-    constexpr Size doc_size{10000};
-    auto actual = generate_doc(words, doc_size);
-    ASSERT_EQ(doc_size, actual.size());
-
-    for (const auto& word : words) {
-        auto it = std::find(actual.begin(), actual.end(), word);
-        ASSERT_TRUE(it != actual.end());
-        EXPECT_TRUE(*it == word);
+class TestStrategies : public ::testing::TestWithParam<CountingStrategy> {
+  protected:
+    virtual void SetUp() override {
+        {
+            std::unique_lock<std::mutex> l(shared_state.mtx);
+            shared_state.ready.store(0);
+        }
+        Doc doc;
+        auto word_count = WordCount::create(GetParam());
+        std::swap(shared_state.doc, doc);
+        std::swap(shared_state.word_count, word_count);
     }
-
-    std::sort(actual.begin(), actual.end());
-    auto it = std::unique(actual.begin(), actual.end());
-    actual.erase(it, actual.end());
-
-    ASSERT_EQ(words.size(), actual.size());
-    for (const auto& word : actual) {
-        auto it = std::find(words.begin(), words.end(), word);
-        ASSERT_TRUE(it != words.end());
-        EXPECT_TRUE(*it == word);
-    }
-}
+};
 
 TEST_F(TestFunctions, EmptyArg) {
     const Setting expected{123, 234, 345, 456, CountingStrategy::COMPARE_AND_SWAP};
@@ -515,27 +505,6 @@ TEST_F(TestFunctions, Strategies) {
         }
     }
 }
-
-TEST_F(TestFunctions, SingleThread) {
-    constexpr decltype(Setting::doc_size) expected{1000000};
-    Setting setting{1, 1, 100, expected};
-    const auto acutal = execute_all(setting);
-    ASSERT_EQ(expected, acutal);
-}
-
-class TestStrategies : public ::testing::TestWithParam<CountingStrategy> {
-  protected:
-    virtual void SetUp() override {
-        {
-            std::unique_lock<std::mutex> l(shared_state.mtx);
-            shared_state.ready.store(0);
-        }
-        Doc doc;
-        auto word_count = WordCount::create(GetParam());
-        std::swap(shared_state.doc, doc);
-        std::swap(shared_state.word_count, word_count);
-    }
-};
 
 TEST_P(TestStrategies, CreateWordCount) {
     switch (GetParam()) {
@@ -664,6 +633,30 @@ TEST_P(TestStrategies, GenerateWords) {
     }
 }
 
+TEST_F(TestFunctions, GenerateDoc) {
+    const Words words{"a", "b", "c"};
+    constexpr Size doc_size{10000};
+    auto actual = generate_doc(words, doc_size);
+    ASSERT_EQ(doc_size, actual.size());
+
+    for (const auto& word : words) {
+        auto it = std::find(actual.begin(), actual.end(), word);
+        ASSERT_TRUE(it != actual.end());
+        EXPECT_TRUE(*it == word);
+    }
+
+    std::sort(actual.begin(), actual.end());
+    auto it = std::unique(actual.begin(), actual.end());
+    actual.erase(it, actual.end());
+
+    ASSERT_EQ(words.size(), actual.size());
+    for (const auto& word : actual) {
+        auto it = std::find(words.begin(), words.end(), word);
+        ASSERT_TRUE(it != words.end());
+        EXPECT_TRUE(*it == word);
+    }
+}
+
 TEST_P(TestStrategies, ConsumerFull) {
     Doc doc{"a", "b", "c", "a", "b", "b", "c", "c", "c"};
     std::swap(shared_state.doc, doc);
@@ -706,6 +699,13 @@ TEST_P(TestStrategies, ProducerPrepare) {
     EXPECT_EQ(doc_size, shared_state.doc.size());
     const Size expected = (GetParam() == CountingStrategy::RELAXED) ? 0 : dict_size;
     EXPECT_EQ(expected, shared_state.word_count->size());
+}
+
+TEST_F(TestFunctions, SingleThread) {
+    constexpr decltype(Setting::doc_size) expected{1000000};
+    Setting setting{1, 1, 100, expected};
+    const auto acutal = execute_all(setting);
+    ASSERT_EQ(expected, acutal);
 }
 
 TEST_P(TestStrategies, MultiThread) {
