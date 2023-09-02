@@ -514,7 +514,10 @@ int main(int argc, char* argv[]) {
     } else {
         Setting setting;
         parse_command_line(argc, argv, setting);
-        dispatch(setting, std::cout);
+
+        std::ostringstream os;
+        dispatch(setting, os);
+        std::cout << os.str() << "\n";
     }
 }
 
