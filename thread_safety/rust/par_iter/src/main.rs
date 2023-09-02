@@ -259,10 +259,9 @@ fn test_target_options() {
 
 fn dispatch(params: &ParamSet) -> String {
     let mut log = String::new();
+    let xs = generate_random_number(params.vec_len, params.max_num);
 
     for _ in 0..(params.n_trials) {
-        let xs = generate_random_number(params.vec_len, params.max_num);
-
         if (params.target == Target::All) || (params.target == Target::Double) {
             let start_double_seq = Instant::now();
             // Prevent optimized out

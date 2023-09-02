@@ -133,11 +133,9 @@ void sort_parallel_vectorized(Numbers& nums) {
     std::sort(std::execution::par_unseq, nums.begin(), nums.end());
 }
 
-void for_each_all_cases(const Setting& setting, Numbers& input, Numbers& vec_sequential,
+void for_each_all_cases(const Setting& setting, const Numbers& input, Numbers& vec_sequential,
                         Numbers& vec_vectorized, Numbers& vec_parallel,
                         Numbers& vec_parallel_vectorized, std::ostream& os) {
-    input = generate_numbers(setting.vec_len, setting.max_num);
-
     vec_sequential = input;
     const auto start_sequential = std::chrono::steady_clock::now();
     for_each_sequential(vec_sequential);
@@ -161,8 +159,7 @@ void for_each_all_cases(const Setting& setting, Numbers& input, Numbers& vec_seq
     return;
 }
 
-void for_each_all_cases(const Setting& setting, std::ostream& os) {
-    Numbers input;
+void for_each_all_cases(const Setting& setting, const Numbers& input, std::ostream& os) {
     Numbers vec_sequential;
     Numbers vec_vectorized;
     Numbers vec_parallel;
@@ -173,11 +170,9 @@ void for_each_all_cases(const Setting& setting, std::ostream& os) {
     return;
 }
 
-void sort_all_cases(const Setting& setting, Numbers& input, Numbers& vec_sequential,
+void sort_all_cases(const Setting& setting, const Numbers& input, Numbers& vec_sequential,
                     Numbers& vec_vectorized, Numbers& vec_parallel,
                     Numbers& vec_parallel_vectorized, std::ostream& os) {
-    input = generate_numbers(setting.vec_len, setting.max_num);
-
     vec_sequential = input;
     const auto start_sequential = std::chrono::steady_clock::now();
     sort_sequential(vec_sequential);
@@ -201,8 +196,7 @@ void sort_all_cases(const Setting& setting, Numbers& input, Numbers& vec_sequent
     return;
 }
 
-void sort_all_cases(const Setting& setting, std::ostream& os) {
-    Numbers input;
+void sort_all_cases(const Setting& setting, const Numbers& input, std::ostream& os) {
     Numbers vec_sequential;
     Numbers vec_vectorized;
     Numbers vec_parallel;
@@ -214,13 +208,15 @@ void sort_all_cases(const Setting& setting, std::ostream& os) {
 }
 
 void dispatch(const Setting& setting, std::ostream& os) {
+    const auto input = generate_numbers(setting.vec_len, setting.max_num);
+
     for (decltype(setting.n_trials) trial{0}; trial < setting.n_trials; ++trial) {
         if ((setting.target == Target::ALL) || (setting.target == Target::FOR_EACH)) {
-            for_each_all_cases(setting, os);
+            for_each_all_cases(setting, input, os);
         }
 
         if ((setting.target == Target::ALL) || (setting.target == Target::SORT)) {
-            sort_all_cases(setting, os);
+            sort_all_cases(setting, input, os);
         }
     }
 }
@@ -382,22 +378,25 @@ TEST_F(TestFunctions, SortFixed) {
 TEST_F(TestFunctions, ForEachRandom) {
     constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
     const Setting setting{1, 4000000, max_num};
-    Numbers input;
     Numbers vec_sequential;
     Numbers vec_vectorized;
     Numbers vec_parallel;
     Numbers vec_parallel_vectorized;
     std::ostringstream os;
 
+    const auto input = generate_numbers(setting.vec_len, setting.max_num);
+    ASSERT_EQ(setting.vec_len, input.size());
+
     for_each_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
                        vec_parallel_vectorized, os);
 
-    ASSERT_EQ(setting.vec_len, input.size());
     ASSERT_EQ(input.size(), vec_sequential.size());
     ASSERT_EQ(input.size(), vec_vectorized.size());
     ASSERT_EQ(input.size(), vec_parallel.size());
     ASSERT_EQ(input.size(), vec_parallel_vectorized.size());
 
+    EXPECT_TRUE(std::any_of(vec_sequential.begin(), vec_sequential.end(),
+                            [](const auto& x) { return x > 0; }));
     EXPECT_TRUE(std::equal(vec_sequential.begin(), vec_sequential.end(), vec_vectorized.begin(),
                            vec_vectorized.end()));
     EXPECT_TRUE(std::equal(vec_sequential.begin(), vec_sequential.end(), vec_parallel.begin(),
@@ -415,22 +414,25 @@ TEST_F(TestFunctions, ForEachRandom) {
 TEST_F(TestFunctions, SortRandom) {
     constexpr Number max_num = std::numeric_limits<Number>::max() / 8;
     const Setting setting{1, 4000000, max_num};
-    Numbers input;
     Numbers vec_sequential;
     Numbers vec_vectorized;
     Numbers vec_parallel;
     Numbers vec_parallel_vectorized;
     std::ostringstream os;
 
+    const auto input = generate_numbers(setting.vec_len, setting.max_num);
+    ASSERT_EQ(setting.vec_len, input.size());
+
     sort_all_cases(setting, input, vec_sequential, vec_vectorized, vec_parallel,
                    vec_parallel_vectorized, os);
 
-    ASSERT_EQ(setting.vec_len, input.size());
     ASSERT_EQ(input.size(), vec_sequential.size());
     ASSERT_EQ(input.size(), vec_vectorized.size());
     ASSERT_EQ(input.size(), vec_parallel.size());
     ASSERT_EQ(input.size(), vec_parallel_vectorized.size());
 
+    EXPECT_TRUE(std::any_of(vec_sequential.begin(), vec_sequential.end(),
+                            [](const auto& x) { return x > 0; }));
     EXPECT_TRUE(std::equal(vec_sequential.begin(), vec_sequential.end(), vec_vectorized.begin(),
                            vec_vectorized.end()));
     EXPECT_TRUE(std::equal(vec_sequential.begin(), vec_sequential.end(), vec_parallel.begin(),
