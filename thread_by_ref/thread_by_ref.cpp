@@ -17,6 +17,7 @@
 #define USE_STD_ARRAY 1
 
 namespace {
+    // Counts the size of an array
     template <typename T, std::size_t S> constexpr std::size_t SizeOfArray(T (&)[S]) {
         return S;
     }
@@ -29,6 +30,7 @@ using LoopCount = size_t;
 using RandomNumber = uint64_t;
 
 // Command line option(s) and runtime parameters
+// Option name(s) excluding hyphens
 #define OPTION_REF "ref"
 
 enum class PassRefToThread {
@@ -36,6 +38,7 @@ enum class PassRefToThread {
     ArrayElement,
 };
 
+// Parameters for worker threads
 struct Setting {
     PassRefToThread pass_ref_to_thread {PassRefToThread::Ref};
     LoopCount loop_count {1000000};
@@ -80,10 +83,10 @@ bool parse_command_line(int argc, char* argv[], Setting& setting) {
 class TestParseCommandLine : public ::testing::Test {};
 
 TEST_F(TestParseCommandLine, Ref) {
-    std::vector<std::tuple<std::string, PassRefToThread, bool>> targets{
+    const std::vector<std::tuple<std::string, PassRefToThread, bool>> targets{
         {"ref", PassRefToThread::Ref, false},
         {"array", PassRefToThread::ArrayElement, false},
-        {"none", PassRefToThread::Ref, true}
+        {"_none", PassRefToThread::Ref, true}
     };
 
     for (const auto& [arg, value, invalid] : targets) {
@@ -104,7 +107,7 @@ TEST_F(TestParseCommandLine, Ref) {
 }
 
 // Runs in worker threads
-void do_in_thread(LoopCount loop, Result& result) {
+void run_in_thread(LoopCount loop, Result& result) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
     std::uniform_int_distribution<RandomNumber> dist(LOWER_RAND, UPPER_RAND);
@@ -117,16 +120,16 @@ void do_in_thread(LoopCount loop, Result& result) {
     return;
 }
 
-class TestDoInThread : public ::testing::Test {};
+class TestRunInThread : public ::testing::Test {};
 
-TEST_F(TestDoInThread, All) {
+TEST_F(TestRunInThread, All) {
     constexpr LoopCount loop = 200000;
     constexpr LoopCount n_trials = 10;
 
     std::set<RandomNumber> nums;
     for(LoopCount trial{0}; trial < n_trials; ++trial) {
         Result result;
-        do_in_thread(loop, result);
+        run_in_thread(loop, result);
         ASSERT_EQ(loop, result.count);
 
         const auto actual = result.sum;
@@ -135,6 +138,7 @@ TEST_F(TestDoInThread, All) {
         nums.insert(actual);
     }
 
+    // Almost all cases succeed
     EXPECT_EQ(n_trials, nums.size());
 }
 
@@ -162,8 +166,9 @@ std::vector<Result> dispatch(const Setting& setting) {
                 std::cout << "typename: " << boost::core::demangle(name) << std::endl;
             }
 
+            // This works fine and receives result via the reference.
             threads.emplace_back(std::thread([&]{
-                do_in_thread(setting.loop_count, std::ref(result));
+                run_in_thread(setting.loop_count, std::ref(result));
             }));
         } else {
             if (i == 0) {
@@ -171,8 +176,9 @@ std::vector<Result> dispatch(const Setting& setting) {
                 std::cout << "typename: " << boost::core::demangle(name) << std::endl;
             }
 
+            // It possibly does not work.
             threads.emplace_back(std::thread([&]{
-                do_in_thread(setting.loop_count, std::ref(results[i]));
+                run_in_thread(setting.loop_count, std::ref(results[i]));
             }));
         }
     }
@@ -189,11 +195,11 @@ std::vector<Result> dispatch(const Setting& setting) {
     return ret_val;
 }
 
-class TestDispatch : public ::testing::Test {};
+class TestDispatch : public ::testing::TestWithParam<PassRefToThread> {};
 
-TEST_F(TestDispatch, Ref) {
+TEST_P(TestDispatch, Ref) {
     constexpr LoopCount loop_count {1000000};
-    Setting setting {PassRefToThread::Ref, loop_count};
+    Setting setting {GetParam(), loop_count};
     const auto results = dispatch(setting);
 
     std::set<RandomNumber> nums;
@@ -204,18 +210,8 @@ TEST_F(TestDispatch, Ref) {
     EXPECT_EQ(results.size(), nums.size());
 }
 
-TEST_F(TestDispatch, ArrayElement) {
-    constexpr LoopCount loop_count {1000000};
-    Setting setting {PassRefToThread::ArrayElement, loop_count};
-    const auto results = dispatch(setting);
-
-    std::set<RandomNumber> nums;
-    for(const auto& result : results) {
-        ASSERT_EQ(loop_count, result.count);
-        nums.insert(result.sum);
-    }
-    EXPECT_LT(results.size(), nums.size());
-}
+INSTANTIATE_TEST_CASE_P(CallByRef, TestDispatch,
+                        ::testing::Values(PassRefToThread::Ref, PassRefToThread::ArrayElement));
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
