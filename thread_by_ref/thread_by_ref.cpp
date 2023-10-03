@@ -177,7 +177,7 @@ std::vector<Result> dispatch(const Setting& setting) {
             }
 
             // It possibly does not work.
-            threads.emplace_back(std::thread([&]{
+            threads.emplace_back(std::thread([&results,setting,i]{
                 run_in_thread(setting.loop_count, std::ref(results[i]));
             }));
         }
