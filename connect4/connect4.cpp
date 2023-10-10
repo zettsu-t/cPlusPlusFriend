@@ -2,6 +2,7 @@
 #include <bitset>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -11,7 +12,12 @@
 struct Board {
     using Coordinate = int32_t;
     using HashKey = int64_t;
-    using Point = std::pair<Coordinate, Coordinate>;
+
+    struct Point {
+        Coordinate column {0};
+        Coordinate height {0};
+    };
+
     using Points = std::vector<Point>;
 
     static inline constexpr Coordinate ColumnSize = 7;
@@ -28,9 +34,9 @@ struct Board {
 
     Cells placed_;
     Cells mask_;
-    Coordinate last_ {-1};
     std::array<Cells, LineTypes> linemasks_;
     std::array<HashKey, FullSize> hashkeys_ {0};
+    HashKey digest_ {0};
 
     Board() {
         for(Coordinate column{0}; column < ColumnSize; ++column) {
@@ -58,21 +64,38 @@ struct Board {
         }
     }
 
+    void place(Board::Coordinate column, Board::Coordinate height) {
+        const auto index = to_index(column, height);
+        placed_.set(index);
+        digest_ ^= hashkeys_.at(index);
+    }
+
+    Board merge(const auto& rhs) const {
+        auto retval = *this;
+        retval.placed_ ^= rhs.placed_;
+        retval.digest_ ^= rhs.digest_;
+        return retval;
+    }
+
     static Coordinate to_index(Coordinate column, Coordinate height) {
         return column * FullHeight + height;
     }
 
-    static std::string to_string(const Cells& cells, char mark) {
+    static std::string to_string(const Cells& cells, char blank, char mark) {
         std::ostringstream oss;
-        for(Coordinate height{FullHeight-1}; height >= 0; --height) {
-            for(Coordinate column{0}; column < FullWidth; ++column) {
-                const auto c = (cells[to_index(column, height)]) ? mark : '_';
+        for(Coordinate height{MaxHeight-1}; height >= 0; --height) {
+            for(Coordinate column{0}; column < ColumnSize; ++column) {
+                const auto c = (cells[to_index(column, height)]) ? mark : blank;
                 oss << c;
             }
             oss << "\n";
         }
 
         return oss.str();
+    }
+
+    std::string to_string(char blank, char mark) const {
+        return to_string(placed_, blank, mark);
     }
 
     bool check_line(Coordinate line_index, Coordinate left_shift) const {
@@ -163,7 +186,7 @@ struct Board {
             for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
                 auto index = to_index(column, height);
                 if (!placed_[index]) {
-                    points.push_back(std::make_pair(column, height));
+                    points.push_back(Point{column, height});
                     break;
                 }
             }
@@ -189,14 +212,14 @@ TEST_F(TestBoard, Initialize) {
         ASSERT_EQ(expected, board.mask_[i]);
     }
 
-    ASSERT_GT(0, board.last_);
-
     ASSERT_EQ(Board::FullSize, board.hashkeys_.size());
     std::set<Board::HashKey> keys;
     for(const auto& key: board.hashkeys_) {
         ASSERT_NE(0, key);
         ASSERT_FALSE(keys.contains(key));
     }
+
+    ASSERT_EQ(0, board.digest_);
 }
 
 TEST_F(TestBoard, InitializeLine) {
@@ -223,6 +246,76 @@ TEST_F(TestBoard, InitializeLine) {
     }
 }
 
+TEST_F(TestBoard, Place) {
+    Board full;
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            Board one;
+
+            const auto index = Board::to_index(column, height);
+            const auto digest_one = one.hashkeys_.at(index);
+            const auto digest_old = full.digest_;
+            const auto expected_digest = digest_old ^ full.hashkeys_.at(index);
+            ASSERT_TRUE(digest_one);
+            ASSERT_NE(digest_old, expected_digest);
+
+            full.place(column, height);
+            one.place(column, height);
+            ASSERT_TRUE(full.placed_[index]);
+            ASSERT_TRUE(one.placed_[index]);
+
+            ASSERT_EQ(digest_one, one.digest_);
+            ASSERT_EQ(expected_digest, full.digest_);
+            ASSERT_TRUE(one.digest_);
+            ASSERT_TRUE(full.digest_);
+        }
+    }
+}
+
+TEST_F(TestBoard, Merge) {
+    Board zero;
+    for(Board::Coordinate offset{0}; offset < 2; ++offset) {
+        Board lhs;
+        Board rhs;
+        size_t expected {0};
+        for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+            for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+                const auto index = Board::to_index(column, height);
+                if (((column & 1) ^ (height & 1)) == offset) {
+                    lhs.placed_.set(index);
+                    ++expected;
+                } else {
+                    rhs.placed_.set(index);
+                }
+            }
+        }
+
+        const auto expected_digest = lhs.digest_ ^ rhs.digest_;
+        const auto actual_left = lhs.merge(rhs);
+        const auto actual_right = rhs.merge(lhs);
+
+        ASSERT_EQ(Board::ColumnSize * Board::MaxHeight, actual_left.placed_.count());
+        ASSERT_EQ(Board::ColumnSize * Board::MaxHeight, actual_right.placed_.count());
+        ASSERT_EQ(expected_digest, actual_left.digest_);
+        ASSERT_EQ(expected_digest, actual_left.digest_);
+
+        const auto actual_left_self = lhs.merge(lhs);
+        const auto actual_right_self = rhs.merge(rhs);
+        ASSERT_EQ(zero.placed_, actual_left_self.placed_);
+        ASSERT_EQ(zero.placed_, actual_right_self.placed_);
+        ASSERT_EQ(0, actual_left_self.digest_);
+        ASSERT_EQ(0, actual_right_self.digest_);
+
+        Board zero;
+        const auto zero_left = zero.merge(lhs);
+        const auto zero_right = lhs.merge(zero);
+        ASSERT_EQ(expected, zero_left.placed_.count());
+        ASSERT_EQ(expected, zero_right.placed_.count());
+        ASSERT_EQ(lhs.digest_, zero_left.digest_);
+        ASSERT_EQ(lhs.digest_, zero_right.digest_);
+    }
+}
+
 TEST_F(TestBoard, ToIndex) {
     Board board;
 
@@ -235,68 +328,68 @@ TEST_F(TestBoard, ToIndex) {
     ASSERT_EQ(Board::FullSize - 1, board.to_index(Board::FullWidth - 1, Board::FullHeight - 1));
 }
 
-TEST_F(TestBoard, ToStringEmpty) {
-    Board board;
-    const char mark {'+'};
-
-    const std::string line(Board::FullWidth, '_');
-    std::string s;
-    for(Board::Coordinate i{0}; i<Board::FullHeight; ++i) {
-        s += line;
-        s += "\n";
-    }
-
-    ASSERT_EQ(s, board.to_string(board.placed_, mark));
-}
-
-TEST_F(TestBoard, ToStringMask) {
-    Board board;
-    const char mark {'+'};
-
-    const std::string empty_line(Board::FullWidth, '_');
-    std::string filled_line(Board::ColumnSize, mark);
-    for(Board::Coordinate i{Board::ColumnSize}; i<Board::FullHeight; ++i) {
-        filled_line += " ";
-    }
-
-    std::string s;
-    for(Board::Coordinate i{0}; i<Board::FullHeight; ++i) {
-        if ((i + Board::MaxHeight) < Board::FullHeight) {
-            s += empty_line;
-        } else {
-            s += filled_line;
-        }
-        s += "\n";
-    }
-
-    ASSERT_EQ(s, board.to_string(board.mask_, mark));
-}
-
 TEST_F(TestBoard, ToString) {
     Board board;
+    const char blank {'_'};
     const char mark {'+'};
 
     for(Board::Coordinate offset{0}; offset < 2; ++offset) {
         Board::Cells cells;
-        std::string lines(Board::FullSize, '_');
+        std::string lines(Board::ColumnSize * Board::MaxHeight, blank);
 
-        for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
-            for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+        for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+            for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
                 if (((column ^ height) ^ offset) > 0) {
                     cells.set(Board::to_index(column, height));
-                    lines.at(column + (Board::FullHeight - 1 - height) * Board::FullWidth) = mark;
+                    lines.at(column + (Board::MaxHeight - 1 - height) * Board::ColumnSize) = mark;
                 }
             }
         }
 
         std::string s;
-        for(Board::Coordinate y{0}; y<Board::FullHeight; ++y) {
-            s += lines.substr(y * Board::FullWidth, Board::FullWidth);
+        for(Board::Coordinate y{0}; y<Board::MaxHeight; ++y) {
+            s += lines.substr(y * Board::ColumnSize, Board::ColumnSize);
             s += "\n";
         }
 
-        ASSERT_EQ(s, board.to_string(cells, mark));
+        ASSERT_EQ(s, board.to_string(cells, blank, mark));
     }
+}
+
+TEST_F(TestBoard, ToStringMask) {
+    Board board;
+    const char blank {'_'};
+    const char mark {'+'};
+
+    std::string filled_line(Board::ColumnSize, mark);
+    filled_line += "\n";
+
+    std::string s;
+    for(Board::Coordinate i{0}; i<Board::MaxHeight; ++i) {
+        s += filled_line;
+    }
+
+    ASSERT_EQ(s, board.to_string(board.mask_, blank, mark));
+}
+
+TEST_F(TestBoard, ToStringPlaced) {
+    Board board;
+    const char blank {'_'};
+    const char mark {'+'};
+
+    const std::string line(Board::ColumnSize, blank);
+    std::string s;
+    for(Board::Coordinate i{0}; i<Board::MaxHeight; ++i) {
+        s += line;
+        s += "\n";
+    }
+
+    ASSERT_EQ(s, board.to_string(blank, mark));
+
+    board.placed_.set(Board::FullHeight + Board::MaxHeight - 1);
+    const auto pos = 1;
+    s.at(pos) = mark;
+    ASSERT_EQ(s, board.to_string(blank, mark));
 }
 
 TEST_F(TestBoard, CheckVerticalLineAll) {
@@ -512,8 +605,8 @@ TEST_F(TestBoard, LegalActionsEmpty) {
     ASSERT_EQ(Board::ColumnSize, actual.size());
 
     for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
-        ASSERT_EQ(column, actual.at(column).first);
-        ASSERT_EQ(0, actual.at(column).second);
+        ASSERT_EQ(column, actual.at(column).column);
+        ASSERT_EQ(0, actual.at(column).height);
     }
 }
 
@@ -545,8 +638,8 @@ TEST_F(TestBoard, LegalActionsEach) {
         ASSERT_EQ(Board::ColumnSize, actual.size());
 
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
-            ASSERT_EQ(column, actual.at(column).first);
-            ASSERT_EQ(expected.at(column), actual.at(column).second);
+            ASSERT_EQ(column, actual.at(column).column);
+            ASSERT_EQ(expected.at(column), actual.at(column).height);
         }
     }
 }
@@ -585,29 +678,234 @@ TEST_F(TestBoard, LegalActionsMax) {
     }
 }
 
+struct Stage {
+    using Player = int;
+    static constexpr Player SizeOfPlayers {2};
+    static inline const char Blank {'_'};
+    static inline const std::string Marks {'+', '-'};
+
+    enum class Result {
+        Invalid,
+        Placed,
+        Won,
+    };
+
+    std::array<std::unique_ptr<Board>, SizeOfPlayers> boards_;
+    Player player_ {0};
+
+    Stage() {
+        for(auto&& p : boards_) {
+            p = std::make_unique<Board>();
+        }
+    }
+
+    std::string to_string() const {
+        std::string str_full;
+        for(Player player {0}; player < SizeOfPlayers; ++player) {
+            const auto str_board = boards_.at(player)->to_string(Blank, Marks.at(player));
+            if (player == 0) {
+                str_full = str_board;
+            } else {
+                auto size = str_board.size();
+                for(decltype(size) i {0}; i < size; ++i) {
+                    str_full.at(i) = (str_board.at(i) != Blank) ? str_board.at(i) : str_full.at(i);
+                }
+            }
+        }
+
+        return str_full;
+    }
+
+    Result advance(Board::Coordinate column, Board::Coordinate height) {
+        const auto merged = boards_.at(0)->merge(*(boards_.at(1).get()));
+        const auto points = merged.legal_actions();
+
+        for(const auto& [c, h] : points) {
+            if ((column == c) && (height == h)) {
+                boards_.at(player_)->place(column, height);
+                if (boards_.at(player_)->check(column, height)) {
+                    return Result::Won;
+                }
+
+                player_ = (player_ == 0) ? 1 : 0;
+                return Result::Placed;
+            }
+        }
+
+        return Result::Invalid;
+    }
+};
+
+class TestStage : public ::testing::Test {
+protected:
+    std::string get_blank_lines() {
+        std::string line (Board::ColumnSize, Stage::Blank);
+        line += "\n";
+
+        std::string expected;
+        for(Board::Coordinate i{0}; i<Board::MaxHeight; ++i) {
+            expected += line;
+        }
+        return expected;
+    }
+};
+
+TEST_F(TestStage, Initialize) {
+    Stage stage;
+
+    for(const auto& p : stage.boards_) {
+        ASSERT_TRUE(p.get());
+    }
+
+    ASSERT_EQ(0, stage.player_);
+}
+
+TEST_F(TestStage, ToStringInitial) {
+    Stage stage;
+    const auto expected = get_blank_lines();
+    const auto actual = stage.to_string();
+    ASSERT_EQ(expected, actual);
+}
+
+TEST_F(TestStage, ToStringFull) {
+    Stage stage_0;
+    Stage stage_1;
+    auto expected_0 = get_blank_lines();
+    auto expected_1 = get_blank_lines();
+
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto index_left = Board::to_index(column, height);
+            const auto column_r = Board::ColumnSize - column - 1;
+            const auto height_r = Board::MaxHeight - height - 1;
+            if ((column == column_r) && (height == height_r)) {
+                continue;
+            }
+
+            Stage stage_two;
+            stage_two.boards_.at(0)->place(column, height);
+            stage_two.boards_.at(1)->place(column_r, height_r);
+            stage_0.boards_.at(0)->place(column, height);
+            stage_1.boards_.at(1)->place(column_r, height_r);
+
+            auto expected_two = get_blank_lines();
+            const auto index_0 = column + (Board::ColumnSize + 1) * (Board::MaxHeight - height - 1);
+            const auto index_1 = column_r + (Board::ColumnSize + 1) * (Board::MaxHeight - height_r - 1);
+            expected_two.at(index_0) = Stage::Marks.at(0);
+            expected_two.at(index_1) = Stage::Marks.at(1);
+            expected_0.at(index_0) = Stage::Marks.at(0);
+            expected_1.at(index_1) = Stage::Marks.at(1);
+
+            const auto actual = stage_two.to_string();
+            const auto actual_0 = stage_0.to_string();
+            const auto actual_1 = stage_1.to_string();
+            ASSERT_EQ(expected_two, actual);
+            ASSERT_EQ(expected_0, actual_0);
+            ASSERT_EQ(expected_1, actual_1);
+        }
+    }
+}
+
+TEST_F(TestStage, Advance1) {
+    struct Step {
+        Board::Coordinate column {0};
+        Board::Coordinate height {0};
+        Stage::Result expected {Stage::Result::Invalid};
+    };
+
+    /*
+     * 3   A
+     * 2   BA
+     * 1   BBA
+     * 0AAABBBA
+     *  0123456
+     */
+    const std::vector<Step> steps {
+        {0, 0, Stage::Result::Placed},
+        {1, 1, Stage::Result::Invalid},
+        {3, 0, Stage::Result::Placed},
+        {1, 0, Stage::Result::Placed},
+        {4, 0, Stage::Result::Placed},
+        {2, 0, Stage::Result::Placed},
+        {5, 0, Stage::Result::Placed},
+        {6, 0, Stage::Result::Placed},
+        {3, 1, Stage::Result::Placed},
+        {5, 1, Stage::Result::Placed},
+        {4, 1, Stage::Result::Placed},
+        {4, 2, Stage::Result::Placed},
+        {3, 2, Stage::Result::Placed},
+        {0, 2, Stage::Result::Invalid},
+        {1, 2, Stage::Result::Invalid},
+        {2, 2, Stage::Result::Invalid},
+        {3, 5, Stage::Result::Invalid},
+        {3, 3, Stage::Result::Won},
+    };
+
+    Stage stage;
+    for(const auto& step : steps) {
+        const auto actual = stage.advance(step.column, step.height);
+        ASSERT_EQ(step.expected, actual);
+    }
+
+    ASSERT_EQ(0, stage.player_);
+}
+
+TEST_F(TestStage, Advance2) {
+    struct Step {
+        Board::Coordinate column {0};
+        Board::Coordinate height {0};
+        Stage::Result expected {Stage::Result::Invalid};
+    };
+
+    /*
+     * 3  B
+     * 2  B
+     * 1  B
+     * 0 ABAA A
+     *  0123456
+     */
+    const std::vector<Step> steps {
+        {0, 0, Stage::Result::Placed},
+        {1, 0, Stage::Result::Placed},
+        {0, 0, Stage::Result::Invalid},
+        {0, 0, Stage::Result::Invalid},
+        {2, 0, Stage::Result::Placed},
+        {1, 1, Stage::Result::Placed},
+        {3, 0, Stage::Result::Placed},
+        {1, 2, Stage::Result::Placed},
+        {6, 0, Stage::Result::Placed},
+        {1, 4, Stage::Result::Invalid},
+        {1, 3, Stage::Result::Won},
+    };
+
+    Stage stage;
+    for(const auto& step : steps) {
+        const auto actual = stage.advance(step.column, step.height);
+        ASSERT_EQ(step.expected, actual);
+    }
+
+    ASSERT_EQ(1, stage.player_);
+}
+
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
         ::testing::InitGoogleTest(&argc, argv);
         return RUN_ALL_TESTS();
     }
 
-    Board board;
+    Stage stage;
     for(;;) {
-        auto s = board.to_string(board.placed_, '.');
-        const auto actual = board.legal_actions();
-        for(const auto& [x, y] : actual) {
-            const auto pos = (Board::FullWidth + 1) * (Board::FullHeight - 1 - y) + x;
-            s.at(pos) = '*';
-        }
-        std::cout << s << std::endl;
+        std::cout << stage.to_string() << std::endl;
+        std::cout << "Player " << (1 + stage.player_) << " moves\n";
 
-        Board::Coordinate dx {0};
-        Board::Coordinate dy {0};
-        std::cin >> dx >> dy;
-        board.placed_.set(board.to_index(dx, dy));
+        Board::Coordinate column {0};
+        Board::Coordinate height {0};
+        std::cin >> column >> height;
 
-        if (board.check(dx, dy)) {
-            std::cout << board.to_string(board.placed_, '#') << "Complete!" << std::endl;
+        const auto result = stage.advance(column, height);
+
+        if (result == Stage::Result::Won) {
+            std::cout << "Player " << (1 + stage.player_) << " Win\n";
             break;
         }
     }
