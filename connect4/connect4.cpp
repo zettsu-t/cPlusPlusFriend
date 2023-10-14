@@ -1,44 +1,65 @@
+#include <cmath>
 #include <array>
 #include <bitset>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <queue>
 #include <set>
 #include <sstream>
 #include <string>
 #include <random>
+#include <vector>
 #include <gtest/gtest.h>
 
+namespace {
+    // 参加者
+    using Player = int;
+}
+
+// 盤面
 struct Board {
-    using Coordinate = int32_t;
-    using HashKey = int64_t;
-
-    struct Point {
-        Coordinate column {0};
-        Coordinate height {0};
+    // 盤面上の座標(0-based indexing)
+    using Coordinate = int32_t;  // 差を取るので符号ありにする
+    struct Position {
+        Coordinate column {0};  // 横方向
+        Coordinate height {0};  // 縦方向
     };
+    using Positions = std::vector<Position>;  // 合法手(可能手)
 
-    using Points = std::vector<Point>;
+    static constexpr Coordinate ColumnSize {7};  // 列数(横方向)
+    static constexpr Coordinate MaxHeight {6};   // 最大の高さ
+    static constexpr Coordinate FullWidth {8};   // 余白込みの盤面の幅
+    static constexpr Coordinate FullHeight {8};  // 余白込みの盤面の高さ
+    static constexpr Coordinate FullSize = FullWidth * FullHeight;  // 余白込みの盤面のマス数
+    using Cells = std::bitset<FullSize>;  // 全マス
 
-    static inline constexpr Coordinate ColumnSize = 7;
-    static inline constexpr Coordinate MaxHeight = 6;
-    static inline constexpr Coordinate FullWidth = 8;
-    static inline constexpr Coordinate FullHeight = 8;
-    static_assert(ColumnSize <= FullWidth);
-    static_assert(MaxHeight <= FullHeight);
-    static inline constexpr Coordinate FullSize = FullWidth * FullHeight;
+    // 上下と左右をつなげないために、上と右に余白を必ず設ける
+    static_assert(ColumnSize < FullWidth);
+    static_assert(MaxHeight < FullHeight);
 
-    using Cells = std::bitset<FullSize>;
-    static inline constexpr Coordinate LineTypes = 4;
-    static inline constexpr Coordinate MinLen = 4;
+    static constexpr Coordinate LineTypes {4};  // 縦横斜めの線種の数
+    static constexpr Coordinate MinLen {4};     // 線上のマスが何個並んだら勝ちか
+    using HashKey = uint64_t;  // Zobrist hashing のキー
 
-    Cells placed_;
-    Cells mask_;
-    std::array<Cells, LineTypes> linemasks_;
-    std::array<HashKey, FullSize> hashkeys_ {0};
-    HashKey digest_ {0};
+    Cells placed_;  // 石を置いたマス
+    Cells mask_;    // 余白を取り除くマスク
+    HashKey digest_ {0};  // 盤面全体のキー
 
-    Board() {
+    // メンバ変数のコピーを速くするために、インスタンスごとにハッシュキーを持つのではなく
+    // 参照にする。所有権を持たないので、スマートポインタではなく素のポインタにする。
+    // 参照にするとコピー不可になるので、盤面を複製できない。
+    using HashKeySet = std::array<HashKey, FullSize>;
+    const HashKeySet* hashkeys_;  // それぞれのマスのキー
+
+    // メンバ変数のコピーを速くするためにSingletonにする
+    // こうするとインスタンスが32 byteになる
+    static inline std::array<Cells, LineTypes> linemasks_;  // 縦横斜めの線それぞれのマスク
+
+    explicit Board(const HashKeySet& hashkeys) : hashkeys_(&hashkeys) {
+        // 石が置ける位置をマスクする
         for(Coordinate column{0}; column < ColumnSize; ++column) {
             for(Coordinate height{0}; height < MaxHeight; ++height) {
                 const auto index = to_index(column, height);
@@ -46,30 +67,49 @@ struct Board {
             }
         }
 
+        // 初めて使うときに初期化する
+        for(auto&& mask : linemasks_) {
+            if (mask.count() == 0) {
+                setup();
+                break;
+            }
+        }
+    }
+
+    static void setup(void) {
+        // 線種ごとにマスクを生成する
         for(Coordinate i{0}; i < MinLen; ++i) {
+            // 縦一列
             linemasks_.at(0).set(i);
+            // 横一列
             linemasks_.at(1).set(i * FullHeight);
+            // 左下から右上
             linemasks_.at(2).set(i * (FullHeight + 1));
+            // 右上から左下。この線だけ原点が(0,0)ではない。
             linemasks_.at(3).set(MinLen - 1 + i * (FullHeight - 1));
         }
+    }
 
-        const auto upper = std::numeric_limits<HashKey>::max();
-        const auto lower = upper / 4;
-        std::random_device seed_gen;
-        std::mt19937 engine(seed_gen());
-        std::uniform_int_distribution<HashKey> dist(lower, upper);
-
-        for(auto&& key : hashkeys_) {
-            key = dist(engine);
+    // 石を指定位置に置く。置ける場所は空のマスで範囲内。
+    void place(Board::Coordinate column, Board::Coordinate height) {
+        const auto index = to_index(column, height);
+        if (!placed_[index] && mask_[index]) {
+            placed_.set(index);
+            digest_ ^= hashkeys_->at(index);
         }
     }
 
-    void place(Board::Coordinate column, Board::Coordinate height) {
+    // 石を指定から除く。置く場所に石が必要である。
+    void remove(Board::Coordinate column, Board::Coordinate height) {
         const auto index = to_index(column, height);
-        placed_.set(index);
-        digest_ ^= hashkeys_.at(index);
+        if (placed_[index]) {
+            placed_.reset(index);
+            digest_ ^= hashkeys_->at(index);
+        }
     }
 
+    // 盤面を合成する。同じマスに複数の石が無いことが前提である。
+    // ハッシュキーはthisの方が残る
     Board merge(const auto& rhs) const {
         auto retval = *this;
         retval.placed_ ^= rhs.placed_;
@@ -77,12 +117,15 @@ struct Board {
         return retval;
     }
 
+    // 座標をビットボードの添え字に変換する
     static Coordinate to_index(Coordinate column, Coordinate height) {
         return column * FullHeight + height;
     }
 
+    // ビットボードを読める文字列に変換する
     static std::string to_string(const Cells& cells, char blank, char mark) {
         std::ostringstream oss;
+
         for(Coordinate height{MaxHeight-1}; height >= 0; --height) {
             for(Coordinate column{0}; column < ColumnSize; ++column) {
                 const auto c = (cells[to_index(column, height)]) ? mark : blank;
@@ -94,22 +137,28 @@ struct Board {
         return oss.str();
     }
 
+    // 盤面を読める文字列に変換する
     std::string to_string(char blank, char mark) const {
         return to_string(placed_, blank, mark);
     }
 
+    // 指定された位置から線が始まるかどうか調べる
     bool check_line(Coordinate line_index, Coordinate left_shift) const {
         if (left_shift < 0) {
             return false;
         }
 
+        // 線のビットマスクを、線の開始位置までシフトする。多すぎるマスは捨てる。
         auto line = linemasks_.at(line_index);
         line <<= left_shift;
         line &= mask_;
         line &= placed_;
+
+        // 余白を数えないので、上下と左右がループしていたらマスが足りなくなる。
         return (line.count() >= MinLen);
     }
 
+    // 指定された範囲[column, bottom..top]から垂直線が始まるかどうか調べる
     bool check_vertical_line(Coordinate bottom, Coordinate top, Coordinate column) const {
         for(Coordinate y {bottom}; y <= top; ++y) {
             if (check_line(0, to_index(column, y))) {
@@ -120,6 +169,7 @@ struct Board {
         return false;
     }
 
+    // 指定された範囲から[left..right, height]水平線が始まるかどうか調べる
     bool check_horizontal_line(Coordinate left, Coordinate right, Coordinate height) const {
         for(Coordinate x {left}; x <= right; ++x) {
             if (check_line(1, to_index(x, height))) {
@@ -130,6 +180,8 @@ struct Board {
         return false;
     }
 
+    // 指定された範囲から左上に向かって線が始まるかどうか調べる
+    // 座標は[column + offset, height + offset] ただし offset = left-column..right-column
     bool check_line2(Coordinate left, Coordinate right, Coordinate column, Coordinate height) const {
         for(Coordinate x {left}; x <= right; ++x) {
             const auto offset = x - column;
@@ -144,11 +196,14 @@ struct Board {
         return false;
     }
 
+    // 指定された範囲から左下に向かって線が始まるかどうか調べる
+    // 座標は[column + offset, height - offset] ただし offset = left-column..right-column
     bool check_line3(Coordinate left, Coordinate right, Coordinate column, Coordinate height) const {
         for(Coordinate x {left}; x <= right; ++x) {
             const auto offset = x - column;
             const auto y = height - offset;
             if ((y >= 0) && (y < MaxHeight)) {
+                // 原点は(0,0)ではなく(0, MinLen - 1)
                 const auto left_shift = to_index(x, y) - (MinLen - 1);
                 if (check_line(3, left_shift)) {
                     return true;
@@ -159,7 +214,9 @@ struct Board {
         return false;
     }
 
+    // 今打ったマスに線が完成したかどうか調べる
     bool check(Coordinate column, Coordinate height) const {
+        // 右と上を無駄に調べない
         const auto left = std::max(0, column - (MinLen - 1));
         const auto right = std::min(ColumnSize - MinLen, column);
         const auto bottom = std::max(0, height - (MinLen - 1));
@@ -180,26 +237,81 @@ struct Board {
         return check_line3(left, right, column, height);
     }
 
-    Points legal_actions() const {
-        Points points;
+    // 合法手を列挙する
+    Positions legal_actions() const {
+        Positions positions;
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
             for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
                 auto index = to_index(column, height);
                 if (!placed_[index]) {
-                    points.push_back(Point{column, height});
+                    positions.push_back(Position{column, height});
                     break;
                 }
             }
         }
 
-        return points;
+        return positions;
+    }
+
+    // 置ける場所が全て埋まっている
+    bool full() const {
+        return placed_.count() == mask_.count();
     }
 };
 
+// 固定ハッシュキー
+struct CommonHashKey {
+    std::vector<Board::HashKeySet> hashkeys_;  // それぞれのマスのキー(一人分)
+
+    explicit CommonHashKey(Player n_players) {
+        const Board::HashKey upper = std::numeric_limits<Board::HashKey>::max() - 1;
+        const Board::HashKey lower = 1;
+        std::random_device seed_gen;
+        std::mt19937 engine(seed_gen());
+        std::uniform_int_distribution<Board::HashKey> dist(lower, upper);
+
+        std::vector<Board::HashKeySet> hashkeys(n_players);
+        for(decltype(n_players) i{0}; i<n_players; ++i) {
+            // 非0の乱数をキーにする
+            for(auto&& key : hashkeys.at(i)) {
+                key = dist(engine);
+            }
+        }
+
+        std::swap(hashkeys_, hashkeys);
+    }
+};
+
+class TestCommonHashKey : public ::testing::Test {};
+
+// ハッシュキー
+TEST_F(TestCommonHashKey, Initialize) {
+    for(Player n_players {1}; n_players <= 2; ++n_players) {
+        CommonHashKey keys(n_players);
+        ASSERT_EQ(n_players, keys.hashkeys_.size());
+
+        for(Player i{0}; i < n_players; ++i) {
+            const auto& hashkeys = keys.hashkeys_.at(i);
+            ASSERT_EQ(Board::FullSize, hashkeys.size());
+
+            std::set<Board::HashKey> keys;
+            for(const auto& key: hashkeys) {
+                ASSERT_NE(0, key);
+                ASSERT_FALSE(keys.contains(key));
+            }
+        }
+    }
+}
+
+// 線種とハッシュキー
 class TestBoard : public ::testing::Test {};
 
+// 線種以外のメンバ変数を調べる
 TEST_F(TestBoard, Initialize) {
-    Board board;
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
+    // できるだけ小さくする
+    ASSERT_GE(64, sizeof(board));
 
     ASSERT_EQ(Board::FullSize, board.placed_.size());
     ASSERT_EQ(Board::FullSize, board.mask_.size());
@@ -212,18 +324,13 @@ TEST_F(TestBoard, Initialize) {
         ASSERT_EQ(expected, board.mask_[i]);
     }
 
-    ASSERT_EQ(Board::FullSize, board.hashkeys_.size());
-    std::set<Board::HashKey> keys;
-    for(const auto& key: board.hashkeys_) {
-        ASSERT_NE(0, key);
-        ASSERT_FALSE(keys.contains(key));
-    }
-
     ASSERT_EQ(0, board.digest_);
 }
 
-TEST_F(TestBoard, InitializeLine) {
-    Board board;
+// 線種を調べる
+TEST_F(TestBoard, SetupLines) {
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
 
     for(const auto& line : board.linemasks_) {
         ASSERT_EQ(Board::MinLen, line.count());
@@ -246,16 +353,23 @@ TEST_F(TestBoard, InitializeLine) {
     }
 }
 
+// 石を指定位置に置く
 TEST_F(TestBoard, Place) {
-    Board full;
+    CommonHashKey keys(2);
+    const auto& keys_full = keys.hashkeys_.at(0);
+    const auto& keys_one = keys.hashkeys_.at(1);
+    Board full(keys_full);  // 石を一個以上置いた盤面
+
     for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
         for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
-            Board one;
-
             const auto index = Board::to_index(column, height);
-            const auto digest_one = one.hashkeys_.at(index);
+            Board one(keys_one);  // 石を一個だけ置いた盤面
+
+            ASSERT_TRUE(one.hashkeys_);
+            ASSERT_TRUE(full.hashkeys_);
+            const auto digest_one = one.hashkeys_->at(index);
             const auto digest_old = full.digest_;
-            const auto expected_digest = digest_old ^ full.hashkeys_.at(index);
+            const auto expected_digest = digest_old ^ full.hashkeys_->at(index);
             ASSERT_TRUE(digest_one);
             ASSERT_NE(digest_old, expected_digest);
 
@@ -272,14 +386,137 @@ TEST_F(TestBoard, Place) {
     }
 }
 
+// すでに石がある場所に石を置く
+TEST_F(TestBoard, PlaceTwice) {
+    CommonHashKey keys(1);
+
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto index = Board::to_index(column, height);
+            Board one(keys.hashkeys_.at(0));
+
+            one.place(column, height);
+            const auto expected = one.digest_;
+            one.place(column, height);
+
+            ASSERT_TRUE(one.placed_[index]);
+            ASSERT_EQ(expected , one.digest_);
+            ASSERT_TRUE(one.digest_);
+        }
+    }
+}
+
+// 範囲外に石を置けない
+TEST_F(TestBoard, PlaceOutOfBounds) {
+    CommonHashKey keys(1);
+
+    for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
+        for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+            if ((column < Board::ColumnSize) && (height < Board::MaxHeight)) {
+                continue;
+            }
+
+            Board one(keys.hashkeys_.at(0));
+            const auto index = Board::to_index(column, height);
+            one.place(column, height);
+            ASSERT_FALSE(one.placed_[index]);
+            ASSERT_FALSE(one.digest_);
+        }
+    }
+}
+
+// 石を指定位置から除く
+TEST_F(TestBoard, Remove) {
+    CommonHashKey keys(2);
+    const auto& keys_one = keys.hashkeys_.at(0);
+    const auto& keys_full = keys.hashkeys_.at(1);
+
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto index = Board::to_index(column, height);
+            Board one(keys_one);
+
+            one.remove(column, height);
+            ASSERT_FALSE(one.placed_[index]);
+            ASSERT_FALSE(one.digest_);
+
+            one.place(column, height);
+            one.remove(column, height);
+
+            ASSERT_FALSE(one.placed_[index]);
+            ASSERT_FALSE(one.digest_);
+
+            one.remove(column, height);
+            ASSERT_FALSE(one.placed_[index]);
+            ASSERT_FALSE(one.digest_);
+        }
+    }
+
+    Board full(keys_full);  // 石を一個以上置いた盤面
+    std::vector<Board::HashKey> digests {0};
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto index = Board::to_index(column, height);
+            const auto expected = full.digest_;
+
+            full.remove(column, height);
+            ASSERT_FALSE(full.placed_[index]);
+            ASSERT_EQ(expected, full.digest_);
+
+            full.place(column, height);
+            digests.push_back(full.digest_);
+        }
+    }
+
+    digests.pop_back();
+    for(Board::Coordinate column{Board::ColumnSize - 1}; column >= 0; --column) {
+        for(Board::Coordinate height{Board::MaxHeight - 1}; height >= Board::MaxHeight; --height) {
+            const auto index = Board::to_index(column, height);
+            full.remove(column, height);
+            ASSERT_FALSE(full.placed_[index]);
+            ASSERT_EQ(digests.back(), full.digest_);
+
+            full.remove(column, height);
+            ASSERT_FALSE(full.placed_[index]);
+            ASSERT_EQ(digests.back(), full.digest_);
+
+            digests.pop_back();
+        }
+    }
+}
+
+// 範囲外に石は無いので除いても何も起きない
+TEST_F(TestBoard, RemoveOutOfBounds) {
+    CommonHashKey keys(1);
+
+    for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
+        for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+            Board one(keys.hashkeys_.at(0));
+            const auto index = Board::to_index(column, height);
+            one.place(column, height);
+            one.remove(column, height);
+
+            ASSERT_FALSE(one.placed_[index]);
+            ASSERT_FALSE(one.digest_);
+        }
+    }
+}
+
+// 盤面を合成する
 TEST_F(TestBoard, Merge) {
-    Board zero;
+    CommonHashKey keys(3);
+    const auto& keys_zero = keys.hashkeys_.at(0);
+    const auto& keys_left = keys.hashkeys_.at(0);
+    const auto& keys_right = keys.hashkeys_.at(0);
+    Board zero(keys_zero);
+
     for(Board::Coordinate offset{0}; offset < 2; ++offset) {
-        Board lhs;
-        Board rhs;
+        Board lhs(keys_left);
+        Board rhs(keys_right);
         size_t expected {0};
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
             for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+                // 互い違いに配置する
                 const auto index = Board::to_index(column, height);
                 if (((column & 1) ^ (height & 1)) == offset) {
                     lhs.placed_.set(index);
@@ -299,6 +536,7 @@ TEST_F(TestBoard, Merge) {
         ASSERT_EQ(expected_digest, actual_left.digest_);
         ASSERT_EQ(expected_digest, actual_left.digest_);
 
+        // 自分自身と合成すると、石とキーが打ち消し合って0になってしまう
         const auto actual_left_self = lhs.merge(lhs);
         const auto actual_right_self = rhs.merge(rhs);
         ASSERT_EQ(zero.placed_, actual_left_self.placed_);
@@ -306,7 +544,7 @@ TEST_F(TestBoard, Merge) {
         ASSERT_EQ(0, actual_left_self.digest_);
         ASSERT_EQ(0, actual_right_self.digest_);
 
-        Board zero;
+        // 空の盤面と合成するとそのままの値が返る
         const auto zero_left = zero.merge(lhs);
         const auto zero_right = lhs.merge(zero);
         ASSERT_EQ(expected, zero_left.placed_.count());
@@ -316,21 +554,20 @@ TEST_F(TestBoard, Merge) {
     }
 }
 
+// 座標をビットボードの添え字に変換する
 TEST_F(TestBoard, ToIndex) {
-    Board board;
-
-    ASSERT_EQ(0, board.to_index(0, 0));
-    ASSERT_EQ(Board::MaxHeight - 1, board.to_index(0, Board::MaxHeight - 1));
-    ASSERT_EQ(Board::FullHeight - 1, board.to_index(0, Board::FullHeight - 1));
-    ASSERT_EQ(Board::FullHeight, board.to_index(1, 0));
-    ASSERT_EQ(Board::FullHeight + Board::MaxHeight - 1, board.to_index(1, Board::MaxHeight - 1));
-    ASSERT_EQ(Board::FullHeight * 2 - 1, board.to_index(1, Board::FullHeight - 1));
-    ASSERT_EQ(Board::FullSize - 1, board.to_index(Board::FullWidth - 1, Board::FullHeight - 1));
+    ASSERT_EQ(0, Board::to_index(0, 0));
+    ASSERT_EQ(Board::MaxHeight - 1, Board::to_index(0, Board::MaxHeight - 1));
+    ASSERT_EQ(Board::FullHeight - 1, Board::to_index(0, Board::FullHeight - 1));
+    ASSERT_EQ(Board::FullHeight, Board::to_index(1, 0));
+    ASSERT_EQ(Board::FullHeight + Board::MaxHeight - 1, Board::to_index(1, Board::MaxHeight - 1));
+    ASSERT_EQ(Board::FullHeight * 2 - 1, Board::to_index(1, Board::FullHeight - 1));
+    ASSERT_EQ(Board::FullSize - 1, Board::to_index(Board::FullWidth - 1, Board::FullHeight - 1));
 }
 
-TEST_F(TestBoard, ToString) {
-    Board board;
-    const char blank {'_'};
+// ビットボードを読める文字列に変換する
+TEST_F(TestBoard, ToStringCells) {
+    const char blank {'.'};
     const char mark {'+'};
 
     for(Board::Coordinate offset{0}; offset < 2; ++offset) {
@@ -339,6 +576,7 @@ TEST_F(TestBoard, ToString) {
 
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
             for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+                // 互い違いに配置する
                 if (((column ^ height) ^ offset) > 0) {
                     cells.set(Board::to_index(column, height));
                     lines.at(column + (Board::MaxHeight - 1 - height) * Board::ColumnSize) = mark;
@@ -352,13 +590,15 @@ TEST_F(TestBoard, ToString) {
             s += "\n";
         }
 
-        ASSERT_EQ(s, board.to_string(cells, blank, mark));
+        ASSERT_EQ(s, Board::to_string(cells, blank, mark));
     }
 }
 
+// マスクを読める文字列に変換する
 TEST_F(TestBoard, ToStringMask) {
-    Board board;
-    const char blank {'_'};
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
+    const char blank {'.'};
     const char mark {'+'};
 
     std::string filled_line(Board::ColumnSize, mark);
@@ -372,9 +612,11 @@ TEST_F(TestBoard, ToStringMask) {
     ASSERT_EQ(s, board.to_string(board.mask_, blank, mark));
 }
 
+// 盤面を読める文字列に変換する
 TEST_F(TestBoard, ToStringPlaced) {
-    Board board;
-    const char blank {'_'};
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
+    const char blank {'.'};
     const char mark {'+'};
 
     const std::string line(Board::ColumnSize, blank);
@@ -383,18 +625,23 @@ TEST_F(TestBoard, ToStringPlaced) {
         s += line;
         s += "\n";
     }
-
     ASSERT_EQ(s, board.to_string(blank, mark));
 
-    board.placed_.set(Board::FullHeight + Board::MaxHeight - 1);
-    const auto pos = 1;
-    s.at(pos) = mark;
-    ASSERT_EQ(s, board.to_string(blank, mark));
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto pos = column + (Board::MaxHeight - 1 - height) * (Board::ColumnSize + 1);
+            s.at(pos) = mark;
+            board.place(column, height);
+            ASSERT_EQ(s, board.to_string(blank, mark));
+        }
+    }
 }
 
+// 垂直線が引かれているかどうか調べる
 TEST_F(TestBoard, CheckVerticalLineAll) {
+    CommonHashKey keys(1);
     for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
-        Board board;
+        Board board(keys.hashkeys_.at(0));
 
         for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
             board.placed_.set(Board::to_index(column, height));
@@ -411,21 +658,32 @@ TEST_F(TestBoard, CheckVerticalLineAll) {
 }
 
 TEST_F(TestBoard, CheckVerticalLineRanged) {
-    constexpr Board::Coordinate column {2};
-    Board board;
+    CommonHashKey keys(1);
+    constexpr auto top = Board::MaxHeight - Board::MinLen;
 
-    for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
-        board.placed_.set(Board::to_index(column, height));
+    for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
+        Board board(keys.hashkeys_.at(0));
+
+        for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+            board.placed_.set(Board::to_index(column, height));
+        }
+
+        for(Board::Coordinate x{0}; x < Board::FullWidth; ++x) {
+            if ((x == column) & (x < Board::ColumnSize)) {
+                EXPECT_FALSE(board.check_vertical_line(top + 1, Board::FullHeight - 1, x));
+                EXPECT_TRUE(board.check_vertical_line(0, top, column));
+            } else {
+                EXPECT_FALSE(board.check_vertical_line(0, Board::FullHeight - 1, x));
+            }
+        }
     }
-
-    const auto top = Board::MaxHeight - Board::MinLen;
-    EXPECT_FALSE(board.check_vertical_line(top + 1, Board::FullHeight - 1, column));
-    EXPECT_TRUE(board.check_vertical_line(0, top, column));
 }
 
+// 水平線が引かれているかどうか調べる
 TEST_F(TestBoard, CheckLineHorizontalAll) {
+    CommonHashKey keys(1);
     for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
-        Board board;
+        Board board(keys.hashkeys_.at(0));
 
         for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
             board.placed_.set(Board::to_index(column, height));
@@ -443,26 +701,39 @@ TEST_F(TestBoard, CheckLineHorizontalAll) {
 }
 
 TEST_F(TestBoard, CheckLineHorizontalRanged) {
-    constexpr Board::Coordinate height {2};
-    Board board;
+    CommonHashKey keys(1);
+    constexpr auto right = Board::ColumnSize - Board::MinLen;
 
-    for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
-        board.placed_.set(Board::to_index(column, height));
+    for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+        Board board(keys.hashkeys_.at(0));
+
+        for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
+            board.placed_.set(Board::to_index(column, height));
+        }
+
+        for(Board::Coordinate y{0}; y < Board::FullHeight; ++y) {
+            if ((y == height) & (y < Board::MaxHeight)) {
+                EXPECT_FALSE(board.check_horizontal_line(right + 1, Board::FullWidth - 1, y));
+                EXPECT_TRUE(board.check_horizontal_line(0, right, height));
+            } else {
+                EXPECT_FALSE(board.check_horizontal_line(0, Board::FullWidth - 1, y));
+            }
+        }
     }
-
-    const auto right = Board::ColumnSize - Board::MinLen;
-    EXPECT_FALSE(board.check_horizontal_line(right + 1, Board::FullWidth - 1, height));
-    EXPECT_TRUE(board.check_horizontal_line(0, right, height));
 }
 
+// 指定された範囲から左上に向かって線が始まるかどうか調べる
 TEST_F(TestBoard, CheckLine2All) {
+    CommonHashKey keys(1);
     for(Board::Coordinate column{-Board::FullWidth}; column < Board::FullWidth; ++column) {
-        Board board;
+        Board board(keys.hashkeys_.at(0));
 
+        Board::Coordinate n_placed {0};
         for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
             const auto x = column + height;
             if ((x >= 0) && (x < Board::FullWidth)) {
                 board.placed_.set(Board::to_index(x, height));
+                n_placed += (x < Board::ColumnSize) & (height < Board::MaxHeight);
             }
         }
 
@@ -472,32 +743,29 @@ TEST_F(TestBoard, CheckLine2All) {
             const bool expected = ((x - y) == column) &
                 (x <= (Board::ColumnSize - Board::MinLen)) &
                 (y <= (Board::MaxHeight - Board::MinLen));
+
             ASSERT_EQ(expected, board.check_line(2, i));
+
+            if ((x < Board::ColumnSize) && (y < Board::MaxHeight)) {
+                const bool expected_line = ((x - y) == column) & (n_placed >= Board::MinLen);
+                ASSERT_EQ(expected_line, board.check_line2(0, x, x, y));
+            }
         }
     }
 }
 
-TEST_F(TestBoard, CheckLine2Ranged) {
-    Board board;
-    for(Board::Coordinate i{0}; i < Board::FullWidth; ++i) {
-        board.placed_.set(Board::to_index(i, i));
-    }
-
-    const auto right = Board::ColumnSize - 1;
-    for(Board::Coordinate column{0}; column <= right; ++column) {
-        const auto expected = column <= (std::min(Board::ColumnSize, Board::MaxHeight) - Board::MinLen);
-        EXPECT_EQ(expected, board.check_line2(column, right, right, right));
-    }
-}
-
+// 指定された範囲から左下に向かって線が始まるかどうか調べる
 TEST_F(TestBoard, CheckLine3All) {
+    CommonHashKey keys(1);
     for(Board::Coordinate column{-Board::FullWidth}; column < Board::FullWidth; ++column) {
-        Board board;
+        Board board(keys.hashkeys_.at(0));
 
+        Board::Coordinate n_placed {0};
         for(Board::Coordinate height{Board::FullHeight - 1}; height >= 0; --height) {
             const auto x = column + Board::FullHeight - 1 - height;
             if ((x >= 0) && (x < Board::FullWidth)) {
                 board.placed_.set(Board::to_index(x, height));
+                n_placed += (x < Board::ColumnSize) & (height < Board::MaxHeight);
             }
         }
 
@@ -505,29 +773,23 @@ TEST_F(TestBoard, CheckLine3All) {
             const auto x = i / Board::FullHeight;
             const auto y = i % Board::FullHeight;
             const auto total = std::min(Board::ColumnSize - x, y + 1);
-            const bool expected = ((x + y) == (column + Board::FullHeight - 1)) &
-                (x < Board::ColumnSize) & (y < Board::MaxHeight) && (total >= Board::MinLen);
+            const auto xy_sum = column + Board::FullHeight - 1;
+            const bool expected = ((x + y) == xy_sum) &
+                (x < Board::ColumnSize) & (y < Board::MaxHeight) & (total >= Board::MinLen);
             EXPECT_EQ(expected, board.check_line(3, i - (Board::MinLen - 1)));
+
+            if ((x < Board::ColumnSize) && (y < Board::MaxHeight)) {
+                const bool expected_line = ((x + y) == xy_sum) & (n_placed >= Board::MinLen);
+                ASSERT_EQ(expected_line, board.check_line3(0, x, x, y));
+            }
         }
     }
 }
 
-TEST_F(TestBoard, CheckLine3Ranged) {
-    Board board;
-    const auto size = std::min(Board::ColumnSize, Board::MaxHeight);
-    for(Board::Coordinate i{0}; i < size; ++i) {
-        board.placed_.set(Board::to_index(i, size - 1 - i));
-    }
-
-    const auto right = size - 1;
-    for(Board::Coordinate column{0}; column < size; ++column) {
-        const auto expected = column <= (size - Board::MinLen);
-        EXPECT_EQ(expected, board.check_line3(column, right, column, size - 1 - column));
-    }
-}
-
+// 角だけ調べる
 TEST_F(TestBoard, CheckLineCorners) {
     using Coord = Board::Coordinate;
+    // 線の始点X,Y, 線の方向(差分) DX,DY
     const std::vector<std::tuple<Coord, Coord, Coord, Coord>> cases {
         {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 1, 1},
         {0, Board::MaxHeight - 1, 1, 0}, {0, Board::MaxHeight - 1, 0, -1}, {0, Board::MaxHeight - 1, 1, -1},
@@ -537,9 +799,10 @@ TEST_F(TestBoard, CheckLineCorners) {
         {Board::ColumnSize - 1, Board::MaxHeight - 1, -1, -1}
     };
 
+    CommonHashKey keys(1);
     for(const auto& [sx, sy, dx, dy] : cases) {
         std::set<std::pair<Coord, Coord>> ps;
-        Board board;
+        Board board(keys.hashkeys_.at(0));
         auto x = sx;
         auto y = sy;
 
@@ -561,20 +824,22 @@ TEST_F(TestBoard, CheckLineCorners) {
     }
 }
 
+// すべての起点のすべての線
 TEST_F(TestBoard, CheckLineAll) {
     using Coord = Board::Coordinate;
     const std::vector<std::tuple<Coord, Coord>> dxys {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
 
+    CommonHashKey keys(1);
     for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
         for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
             for(const auto& [dx, dy] : dxys) {
-                Board board;
+                Board board(keys.hashkeys_.at(0));
                 std::set<std::pair<Coord, Coord>> ps;
                 auto x = column;
                 auto y = height;
 
                 Coord total {0};
-                for(;;) {
+                for(Board::Coordinate len{0}; len < Board::MinLen; ++len) {
                     if ((x < 0) || (x >= Board::ColumnSize) || (y < 0) || (y >= Board::MaxHeight)) {
                         break;
                     }
@@ -598,8 +863,48 @@ TEST_F(TestBoard, CheckLineAll) {
     }
 }
 
+// 上下左右がつながっている場合(余白があればつながらない)
+TEST_F(TestBoard, CheckLoop) {
+    using Coord = Board::Coordinate;
+    const std::vector<std::tuple<Coord, Coord>> dxys {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+
+    CommonHashKey keys(1);
+    for(Board::Coordinate column{0}; column < Board::FullWidth; ++column) {
+        for(Board::Coordinate height{0}; height < Board::FullHeight; ++height) {
+            for(const auto& [dx, dy] : dxys) {
+                Board board(keys.hashkeys_.at(0));
+                std::set<std::pair<Coord, Coord>> ps;
+                auto x = column;
+                auto y = height;
+
+                Coord total {0};
+                for(Board::Coordinate len{0}; len < Board::MinLen; ++len) {
+                    if ((x >= 0) && (x < Board::ColumnSize) && (y >= 0) && (y < Board::MaxHeight)) {
+                        ++total;
+                    }
+
+                    board.placed_.set(Board::to_index(x, y));
+                    ps.insert(std::make_pair(x, y));
+                    x = (x + dx + Board::FullWidth) % Board::FullWidth;
+                    y = (y + dy + Board::FullHeight) % Board::FullHeight;
+                }
+
+                for(Board::Coordinate sx{0}; sx < Board::FullWidth; ++sx) {
+                    for(Board::Coordinate sy{0}; sy < Board::FullHeight; ++sy) {
+                        const auto p = std::make_pair(sx, sy);
+                        const auto expected = (total >= Board::MinLen) && ps.contains(p);
+                        EXPECT_EQ(expected, board.check(p.first, p.second));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 初手の合法手
 TEST_F(TestBoard, LegalActionsEmpty) {
-    Board board;
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
 
     const auto actual = board.legal_actions();
     ASSERT_EQ(Board::ColumnSize, actual.size());
@@ -610,8 +915,10 @@ TEST_F(TestBoard, LegalActionsEmpty) {
     }
 }
 
+// 全部のマスが埋まっているときの合法手
 TEST_F(TestBoard, LegalActionsFull) {
-    Board board;
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
 
     for(size_t i{0}; i<board.placed_.size(); ++i) {
         board.placed_.set(i);
@@ -621,20 +928,23 @@ TEST_F(TestBoard, LegalActionsFull) {
     ASSERT_TRUE(actual.empty());
 }
 
-TEST_F(TestBoard, LegalActionsEach) {
+// 一番上のマスの上以外は置ける
+TEST_F(TestBoard, LegalActionsHeight) {
+    CommonHashKey keys(1);
+
     for(Board::Coordinate i{0}; i < (Board::MaxHeight - 1); ++i) {
         const auto h = Board::MaxHeight - 1 - i;
         std::vector<Board::Coordinate> expected {i, h, i, h, i, h, i};
         ASSERT_EQ(Board::ColumnSize, expected.size());
 
-        Board board;
+        Board board(keys.hashkeys_.at(0));
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
             for(Board::Coordinate height{0}; height < expected.at(column); ++height) {
                 board.placed_.set(Board::to_index(column, height));
             }
         }
 
-            const auto actual = board.legal_actions();
+        const auto actual = board.legal_actions();
         ASSERT_EQ(Board::ColumnSize, actual.size());
 
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
@@ -644,12 +954,14 @@ TEST_F(TestBoard, LegalActionsEach) {
     }
 }
 
+// 一番上のマスの上には置けない
 TEST_F(TestBoard, LegalActionsMax) {
+    CommonHashKey keys(1);
     std::vector<Board::Coordinate> expected(Board::ColumnSize, 0);
     std::iota(expected.begin(), expected.end(), 0);
 
     for(Board::Coordinate i{0}; i < Board::MaxHeight; ++i) {
-        Board board;
+        Board board(keys.hashkeys_.at(0));
         for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
             for(Board::Coordinate height{0}; height < expected.at(column); ++height) {
                 board.placed_.set(Board::to_index(column, height));
@@ -672,37 +984,59 @@ TEST_F(TestBoard, LegalActionsMax) {
             }
         }
 
+        // 全部の列を一段上げる
         for(auto&& x : expected) {
-            x = std::max(x, Board::MaxHeight - 1);
+            x = std::min(x + 1, Board::MaxHeight - 1);
         }
     }
 }
 
-struct Stage {
-    using Player = int;
-    static constexpr Player SizeOfPlayers {2};
-    static inline const char Blank {'_'};
-    static inline const std::string Marks {'+', '-'};
+// 置ける場所が全て埋まっている
+TEST_F(TestBoard, Full) {
+    CommonHashKey keys(1);
+    Board board(keys.hashkeys_.at(0));
+    Board::Coordinate total {0};
+    ASSERT_FALSE(board.full());
 
-    enum class Result {
-        Invalid,
-        Placed,
-        Won,
-    };
-
-    std::array<std::unique_ptr<Board>, SizeOfPlayers> boards_;
-    Player player_ {0};
-
-    Stage() {
-        for(auto&& p : boards_) {
-            p = std::make_unique<Board>();
+    for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+        for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+            board.placed_.set(Board::to_index(column, height));
+            ++total;
+            const auto expected = (total == (Board::MaxHeight * Board::ColumnSize));
+            ASSERT_EQ(expected, board.full());
         }
     }
+}
 
+// 局面
+struct Stage {
+    static constexpr Player SizeOfPlayers {2};
+    static inline const char Blank {'.'};
+    static inline const std::string Marks {'+', '-'};
+
+    // 手を打った結果
+    enum class Result {
+        Invalid,  // 無効な手を打った
+        Won,      // 有効な手を打って勝った
+        Draw,     // 有効な手を打って引き分けた
+        Placed,   // 有効な手を打ち、勝敗はまだ決まっていない
+    };
+
+    std::array<Board, SizeOfPlayers> boards_;  // 先手と後手の盤面
+    Board  merged_board_;  // 先手番と後手番を統合した盤面
+    Player player_ {0};    // 先手番なら0, 後手番なら1
+
+    explicit Stage(const CommonHashKey& keys) :
+        boards_({Board(keys.hashkeys_.at(0)), Board(keys.hashkeys_.at(1))}),
+        merged_board_(keys.hashkeys_.at(0)) {
+        merge_boards();
+    }
+
+    // 文字列表記を返す
     std::string to_string() const {
         std::string str_full;
         for(Player player {0}; player < SizeOfPlayers; ++player) {
-            const auto str_board = boards_.at(player)->to_string(Blank, Marks.at(player));
+            const auto str_board = boards_.at(player).to_string(Blank, Marks.at(player));
             if (player == 0) {
                 str_full = str_board;
             } else {
@@ -716,22 +1050,55 @@ struct Stage {
         return str_full;
     }
 
-    Result advance(Board::Coordinate column, Board::Coordinate height) {
-        const auto merged = boards_.at(0)->merge(*(boards_.at(1).get()));
-        const auto points = merged.legal_actions();
+    // 先手番と後手番を統合する
+    void merge_boards(void) {
+        merged_board_ = boards_.at(player_).merge(boards_.at(1 - player_));
+    }
 
-        for(const auto& [c, h] : points) {
+    // 局面を表すダイジェスト
+    Board::HashKey digest(void) const {
+        return merged_board_.digest_;
+    }
+
+    // 打てる場所が無ければtrue、あればfalse
+    bool full() const {
+        return merged_board_.full();
+    }
+
+    // 合法手を列挙する
+    Board::Positions legal_actions() const {
+        return merged_board_.legal_actions();
+    }
+
+    // 指定した場所に一手打つ
+    // 勝負がついていなければ打ち手を逆にする
+    Result advance(Board::Coordinate column, Board::Coordinate height) {
+        const auto positions = legal_actions();
+        if (positions.empty()) {
+            return Result::Draw;
+        }
+
+        for(const auto& [c, h] : positions) {
             if ((column == c) && (height == h)) {
-                boards_.at(player_)->place(column, height);
-                if (boards_.at(player_)->check(column, height)) {
+                // 合法手かどうかは呼び出し先では確認しない
+                boards_.at(player_).place(column, height);
+                // 統合した盤面は後で使うので、適切に更新する
+                merge_boards();
+
+                if (boards_.at(player_).check(column, height)) {
                     return Result::Won;
                 }
 
-                player_ = (player_ == 0) ? 1 : 0;
+                if (full()) {
+                    return Result::Draw;
+                }
+
+                player_ ^= 1;
                 return Result::Placed;
             }
         }
 
+        // 打てる手が無かった
         return Result::Invalid;
     }
 };
@@ -750,31 +1117,38 @@ protected:
     }
 };
 
+// メンバ変数を調べる
 TEST_F(TestStage, Initialize) {
-    Stage stage;
-
-    for(const auto& p : stage.boards_) {
-        ASSERT_TRUE(p.get());
-    }
-
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
     ASSERT_EQ(0, stage.player_);
+
+    ASSERT_TRUE(stage.merged_board_.hashkeys_);
+    for(const auto& key : *(stage.merged_board_.hashkeys_)) {
+        ASSERT_TRUE(key);
+    }
 }
 
+// 初期状態を文字列にする
 TEST_F(TestStage, ToStringInitial) {
-    Stage stage;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
     const auto expected = get_blank_lines();
     const auto actual = stage.to_string();
     ASSERT_EQ(expected, actual);
 }
 
+// 局面を文字列にする
 TEST_F(TestStage, ToStringFull) {
-    Stage stage_0;
-    Stage stage_1;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage_0(keys);
+    Stage stage_1(keys);
     auto expected_0 = get_blank_lines();
     auto expected_1 = get_blank_lines();
 
     for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
         for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            // 左右対称に打つ。ここでは合法手とは限らない。
             const auto index_left = Board::to_index(column, height);
             const auto column_r = Board::ColumnSize - column - 1;
             const auto height_r = Board::MaxHeight - height - 1;
@@ -782,12 +1156,13 @@ TEST_F(TestStage, ToStringFull) {
                 continue;
             }
 
-            Stage stage_two;
-            stage_two.boards_.at(0)->place(column, height);
-            stage_two.boards_.at(1)->place(column_r, height_r);
-            stage_0.boards_.at(0)->place(column, height);
-            stage_1.boards_.at(1)->place(column_r, height_r);
+            Stage stage_two(keys);
+            stage_two.boards_.at(0).place(column, height);
+            stage_two.boards_.at(1).place(column_r, height_r);
+            stage_0.boards_.at(0).place(column, height);
+            stage_1.boards_.at(1).place(column_r, height_r);
 
+            // 打ったうちに対応して出力文字列を変える
             auto expected_two = get_blank_lines();
             const auto index_0 = column + (Board::ColumnSize + 1) * (Board::MaxHeight - height - 1);
             const auto index_1 = column_r + (Board::ColumnSize + 1) * (Board::MaxHeight - height_r - 1);
@@ -806,6 +1181,90 @@ TEST_F(TestStage, ToStringFull) {
     }
 }
 
+TEST_F(TestStage, MergeBoards) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    constexpr Board::Coordinate index0 {2};
+    constexpr Board::Coordinate index1 {5};
+    ASSERT_FALSE(stage.merged_board_.placed_[index0]);
+    ASSERT_FALSE(stage.merged_board_.placed_[index1]);
+
+    stage.boards_.at(0).placed_.set(index0);
+    stage.merge_boards();
+    ASSERT_EQ(stage.boards_.at(0).hashkeys_, stage.merged_board_.hashkeys_);
+    ASSERT_TRUE(stage.merged_board_.placed_[index0]);
+    ASSERT_FALSE(stage.merged_board_.placed_[index1]);
+
+    stage.player_ = 1;
+    stage.boards_.at(1).placed_.set(index1);
+    stage.merge_boards();
+    ASSERT_EQ(stage.boards_.at(1).hashkeys_, stage.merged_board_.hashkeys_);
+    ASSERT_TRUE(stage.merged_board_.placed_[index0]);
+    ASSERT_TRUE(stage.merged_board_.placed_[index1]);
+}
+
+TEST_F(TestStage, Digest) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    constexpr Board::Coordinate index0 {3};
+    constexpr Board::Coordinate index1 {7};
+
+    stage.boards_.at(0).placed_.set(index0);
+    auto expected = stage.boards_.at(0).merge(stage.boards_.at(1)).digest_;
+    stage.merge_boards();
+    ASSERT_EQ(expected, stage.merged_board_.digest_);
+
+    stage.boards_.at(1).placed_.set(index1);
+    expected = stage.boards_.at(0).merge(stage.boards_.at(1)).digest_;
+    stage.merge_boards();
+    ASSERT_EQ(expected, stage.merged_board_.digest_);
+}
+
+TEST_F(TestStage, Full) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+
+    // 本来あり得ない盤面だが、テストケースなのでよしとする
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            const auto index = Board::to_index(column, height);
+            if ((height & 1) == 0) {
+                stage.boards_.at(0).placed_.set(index);
+            } else {
+                stage.boards_.at(1).placed_.set(index);
+            }
+
+            stage.merge_boards();
+            const auto expected = (((column + 1) == Board::ColumnSize) && ((height + 1) == Board::MaxHeight));
+            ASSERT_EQ(expected, stage.full());
+        }
+    }
+}
+
+// 一手ずつ交互に合法手を打つ
+TEST_F(TestStage, LegalActions) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    auto actual = stage.legal_actions();
+    ASSERT_EQ(Board::ColumnSize, actual.size());
+
+    for(Board::Coordinate i{0}; i < Board::ColumnSize; ++i) {
+        ASSERT_EQ(i, actual.at(i).column);
+    }
+
+    for(Board::Coordinate i{0}; i < Board::MaxHeight; ++i) {
+        stage.advance(0, i);
+    }
+
+    actual = stage.legal_actions();
+    ASSERT_EQ(Board::ColumnSize - 1, actual.size());
+
+    for(Board::Coordinate i{0}; i < (Board::ColumnSize - 1); ++i) {
+        ASSERT_EQ(i+1, actual.at(i).column);
+    }
+}
+
+// 一手ずつ交互に合法手を打つ
 TEST_F(TestStage, Advance1) {
     struct Step {
         Board::Coordinate column {0};
@@ -841,15 +1300,23 @@ TEST_F(TestStage, Advance1) {
         {3, 3, Stage::Result::Won},
     };
 
-    Stage stage;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    decltype(stage.player_) player {0};
     for(const auto& step : steps) {
         const auto actual = stage.advance(step.column, step.height);
         ASSERT_EQ(step.expected, actual);
+
+        if (step.expected == Stage::Result::Placed) {
+            player = (player == 0) ? 1 : 0;
+        }
+        ASSERT_EQ(player, stage.player_);
     }
 
     ASSERT_EQ(0, stage.player_);
 }
 
+// 一手ずつ交互に合法手を打つ
 TEST_F(TestStage, Advance2) {
     struct Step {
         Board::Coordinate column {0};
@@ -878,13 +1345,695 @@ TEST_F(TestStage, Advance2) {
         {1, 3, Stage::Result::Won},
     };
 
-    Stage stage;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    decltype(stage.player_) player {0};
     for(const auto& step : steps) {
         const auto actual = stage.advance(step.column, step.height);
         ASSERT_EQ(step.expected, actual);
+
+        if (step.expected == Stage::Result::Placed) {
+            player = (player == 0) ? 1 : 0;
+        }
+        ASSERT_EQ(player, stage.player_);
     }
 
     ASSERT_EQ(1, stage.player_);
+}
+
+// 盤面が埋まったら引き分け
+TEST_F(TestStage, Draw) {
+    constexpr auto size = Board::MaxHeight * Board::ColumnSize;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    decltype(stage.player_) turn {0};
+
+    const auto half_x = (Board::ColumnSize / 2);
+    for(Board::Coordinate column{0}; column < Board::ColumnSize; ++column) {
+        if (column == half_x) {
+            continue;
+        }
+
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            if (((column + 1) != Board::ColumnSize) || ((height + 1) != Board::MaxHeight)) {
+                const auto actual = stage.advance(column, height);
+                ++turn;
+                ASSERT_EQ(Stage::Result::Placed, actual);
+                ASSERT_EQ(turn & 1, stage.player_);
+            }
+        }
+    }
+
+    for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+        const auto actual = stage.advance(half_x, height);
+        ++turn;
+        ASSERT_EQ(Stage::Result::Placed, actual);
+        ASSERT_EQ(turn & 1, stage.player_);
+    }
+
+    // 最後の一手で引き分けが決まる
+    auto actual = stage.advance(Board::ColumnSize - 1, Board::MaxHeight - 1);
+    ASSERT_EQ(Stage::Result::Draw, actual);
+    ASSERT_EQ(1, stage.player_);
+
+    // どこに打っても引き分ける
+    actual = stage.advance(0, 0);
+    ASSERT_EQ(Stage::Result::Draw, actual);
+    ASSERT_EQ(1, stage.player_);
+}
+
+// 最後の一手で勝ち
+TEST_F(TestStage, WinAtLastMove) {
+    // 本来あり得ない盤面だが、テストケースなのでよしとする
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    const auto size = Board::FullHeight * (Board::ColumnSize - 1) + Board::MaxHeight;
+
+    for(Board::Coordinate i{0}; i < (size - 4); ++i) {
+        if ((i % Board::FullHeight) < Board::MaxHeight) {
+            stage.boards_.at(1).placed_.set(i);
+        }
+    }
+
+    for(Board::Coordinate i{size-4}; i < (size-1); ++i) {
+        stage.boards_.at(0).placed_.set(i);
+    }
+    stage.merge_boards();
+
+    // 最後の一手で勝つ
+    auto actual = stage.advance(Board::ColumnSize - 1, Board::MaxHeight - 1);
+    ASSERT_EQ(Stage::Result::Won, actual);
+    ASSERT_EQ(0, stage.player_);
+
+    // どこに打っても引き分ける
+    actual = stage.advance(Board::ColumnSize - 1, Board::MaxHeight - 1);
+    ASSERT_EQ(Stage::Result::Draw, actual);
+    ASSERT_EQ(0, stage.player_);
+}
+
+// 局面を納めるノード
+struct Node {
+    using Count = long long int;
+    Stage stage_;  // 局面
+    Count n_tried {0};              // このノードを探索した回数
+    Count n_first_player_won {0};   // 先手が勝った回数
+    Count n_second_player_won {0};  // 後手が勝った回数
+    // 一手ごとに石が増えるので、親子関係が循環することはあり得ない
+    std::vector<std::shared_ptr<Node>> parents_;   // 親ノード
+    std::vector<std::shared_ptr<Node>> children_;  // 子ノード
+
+    explicit Node(const Stage& stage) : stage_(stage) {}
+
+    // このノードのダイジェスト
+    Board::HashKey digest(void) const {
+        return stage_.digest();
+    }
+
+    // 親ノードを追加する
+    void add_parent(std::shared_ptr<Node>& node) {
+        parents_.push_back(node);
+    }
+
+    // 子ノードを追加する
+    void add_child(std::shared_ptr<Node>& node) {
+        children_.push_back(node);
+    }
+};
+
+class TestNode : public ::testing::Test {};
+
+// 初期状態から順に追加する
+TEST_F(TestNode, Digest) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    Node node(stage);
+
+    const auto expected = stage.digest();
+    const auto actual = node.digest();
+    ASSERT_EQ(expected, actual);
+
+    // 先手
+    stage.advance(0, 0);
+    Node node1(stage);
+    const auto expected1 = stage.digest();
+    ASSERT_NE(expected1, expected);
+    const auto actual1 = node1.digest();
+    ASSERT_EQ(expected1, actual1);
+
+    // 後手
+    stage.advance(1, 0);
+    Node node2(stage);
+    const auto expected2 = stage.digest();
+    ASSERT_NE(expected2, expected);
+    ASSERT_NE(expected2, expected1);
+    const auto actual2 = node2.digest();
+    ASSERT_EQ(expected2, actual2);
+}
+
+// 親ノードを追加する
+TEST_F(TestNode, AddParent) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    Node  node(stage);
+    using Size = decltype(node.parents_)::size_type;
+
+    std::vector<std::shared_ptr<Node>> expected;
+    for(Size i{1}; i<=3; ++i) {
+        auto parent = std::make_shared<Node>(stage);
+        expected.push_back(parent);
+        node.add_parent(parent);
+        ASSERT_EQ(i, node.parents_.size());
+        ASSERT_EQ(expected.at(i-1), node.parents_.at(i-1));
+    };
+
+    ASSERT_FALSE(node.children_.size());
+}
+
+// 子ノードを追加する
+TEST_F(TestNode, AddChild) {
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+    Node  node(stage);
+    using Size = decltype(node.children_)::size_type;
+
+    std::vector<std::shared_ptr<Node>> expected;
+    for(Size i{1}; i<=3; ++i) {
+        auto child = std::make_shared<Node>(stage);
+        expected.push_back(child);
+        node.add_child(child);
+        ASSERT_EQ(i, node.children_.size());
+        ASSERT_EQ(expected.at(i-1), node.children_.at(i-1));
+    };
+
+    ASSERT_FALSE(node.parents_.size());
+}
+
+// 重複するノードを持たない集合
+struct NodeSet {
+    using Ptr = std::shared_ptr<Node>;
+    std::map<Board::HashKey, Ptr> set_;  // ノードの集合
+
+    NodeSet() = default;
+
+    // ノードを追加する。既にあるならあったものを返す。
+    std::shared_ptr<Node> add(Ptr& node) {
+        const auto digest = node->digest();
+        if (set_.find(digest) == set_.end()) {
+            set_[digest] = node;
+        }
+        return set_[digest];
+    }
+
+    // 盤面からノードを探す
+    std::shared_ptr<Node> find(const Stage& stage) {
+        std::shared_ptr<Node> zero;
+        const auto digest = stage.digest();
+        if (set_.find(digest) == set_.end()) {
+            return zero;
+        }
+
+        return set_[digest];
+    }
+};
+
+class TestNodeSet : public ::testing::Test {};
+
+// 初期状態から順に追加する
+TEST_F(TestNodeSet, Add) {
+    NodeSet nodeset;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+
+    auto zero0 = std::make_shared<Node>(stage);
+    auto actual = nodeset.add(zero0);
+    ASSERT_EQ(zero0, actual);
+    ASSERT_EQ(1, nodeset.set_.size());
+
+    // 二度追加すると最初の物が得られる
+    actual = nodeset.add(zero0);
+    ASSERT_EQ(zero0, actual);
+    ASSERT_EQ(1, nodeset.set_.size());
+
+    // 初手
+    stage.advance(0, 0);
+    auto zero1 = std::make_shared<Node>(stage);
+    actual = nodeset.add(zero1);
+    ASSERT_EQ(zero1, actual);
+    ASSERT_EQ(2, nodeset.set_.size());
+
+    actual = nodeset.add(zero1);
+    ASSERT_EQ(zero1, actual);
+    ASSERT_EQ(2, nodeset.set_.size());
+
+    // 二番手
+    stage.advance(0, 1);
+    auto zero2 = std::make_shared<Node>(stage);
+    actual = nodeset.add(zero2);
+    ASSERT_EQ(zero2, actual);
+    ASSERT_EQ(3, nodeset.set_.size());
+
+    // Stageはノード間で共有しないので、初期状態も初手も残っている
+    ASSERT_EQ(zero0, nodeset.add(zero0));
+    ASSERT_EQ(0, zero0->stage_.merged_board_.placed_.count());
+    ASSERT_EQ(zero1, nodeset.add(zero1));
+    ASSERT_EQ(1, zero1->stage_.merged_board_.placed_.count());
+    ASSERT_EQ(2, zero2->stage_.merged_board_.placed_.count());
+}
+
+// 盤面からノードを探す
+TEST_F(TestNodeSet, Find) {
+    NodeSet nodeset;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+
+    auto zero0 = std::make_shared<Node>(stage);
+    auto actual = nodeset.add(zero0);
+    ASSERT_EQ(zero0, actual);
+    ASSERT_EQ(actual, nodeset.find(stage));
+
+    stage.advance(0, 0);
+    ASSERT_FALSE(nodeset.find(stage).get());
+}
+
+// MCTS (Monte Carlo Tree Search)
+struct MtcsEngine {
+    static constexpr Node::Count ToExpand {15};  // 何回たどり着いたら展開するか
+    static_assert(ToExpand > 0);
+    using Metric = double;  // 評価指標
+    static constexpr Metric Epsilon = 1e-8;   // 0除算防止のガード
+    static constexpr Metric UcbConst = 1e+2;  // UCB1の定数
+
+    NodeSet nodeset_;  // 探索木のノード
+    CommonHashKey hashkeys_;  // 盤面に共通のハッシュキー
+    Stage initial_stage_;     // 初期盤面
+    std::shared_ptr<Node> root_;  // 根つまり初期局面
+
+    // 乱数生成器
+    std::random_device rand_dev;
+    std::mt19937 rand_gen;
+
+    using Depth = Node::Count;  // 探索の深さ
+
+    // 葉まで探索した結果
+    struct Result {
+        Stage::Result result;  // 勝ちか引き分け
+        Player winner;  // 勝者
+        Depth depth;    // 探索の深さ
+    };
+
+    MtcsEngine(void) :
+        hashkeys_(Stage::SizeOfPlayers), initial_stage_(hashkeys_),
+        root_(std::make_shared<Node>(initial_stage_)), rand_gen(rand_dev()) {
+    }
+
+    // ハッシュキーをこの探索と共有する初期局面を返す
+    // ハッシュキーを共有しない局面は探しても見つからない
+    Stage initial_stage() const {
+        return root_->stage_;
+    }
+
+    // ノードを深くたどり着けるところまで選ぶ
+    std::pair<std::shared_ptr<Node>, Node::Count> visit(std::shared_ptr<Node>& node, Node::Count depth) {
+        if (node->n_tried < ToExpand) {
+            return std::make_pair(node, depth);
+        }
+
+        if (node->n_tried == ToExpand) {
+            expand(node);
+        }
+
+        auto child = select(node);
+        if (child == node) {
+            // 子ノードが無かった
+            return std::make_pair(node, depth);
+        }
+
+        return visit(child, depth + 1);
+    }
+
+    // ノードを子から選ぶ
+    std::shared_ptr<Node> select(std::shared_ptr<Node>& parent) {
+        if (parent->children_.empty()) {
+            // 自身を返す
+            return parent;
+        }
+
+        auto size = parent->children_.size();
+        std::vector<Metric> scores(size);
+
+        Node::Count all_tried {0};
+        for(const auto& child : parent->children_) {
+            const auto n_tried = child->n_first_player_won + child->n_second_player_won;
+            if (n_tried == 0) {
+                return child;
+            }
+            all_tried += n_tried;
+        }
+
+        for(decltype(size) i{0}; i<size; ++i) {
+            auto& child = parent->children_.at(i);
+            scores.at(i) = ucb1(parent->stage_.player_, all_tried, child);
+        }
+
+        const auto index = std::max_element(scores.begin(), scores.end()) - scores.begin();
+        return parent->children_.at(index);
+    }
+
+    // UCB1
+    Metric ucb1(Player player, Node::Count all_tried, std::shared_ptr<Node>& node) {
+        Metric n_tried = node->n_first_player_won + node->n_second_player_won;
+        n_tried += Epsilon;
+
+        // 先手も後手もそれぞれ自分が勝てる子ノードを探索する
+        // 親ノードの始点でこのノード(node)を選ぶと勝てるかどうか見ているので、
+        // 親ノードのplayerとこのノード(node)のnode->stage_.player_は反対であることに注意する
+        // 多くの実装では勝率を反転することで視点切り替えを組み込んでいる
+        const Metric n_win = (player == 0) ?
+            node->n_first_player_won : node->n_second_player_won;
+
+        Metric d = 2.0;
+        d *= std::log(all_tried);
+        d /= n_tried;
+        return n_win / n_tried + UcbConst * std::sqrt(d);
+    }
+
+    // ノードを一段展開する
+    void expand(std::shared_ptr<Node>& parent) {
+        const auto actions = parent->stage_.legal_actions();
+
+        std::vector<std::shared_ptr<Node>> children;
+        for(const auto& action : actions) {
+            auto next_stage = parent->stage_;
+            const auto result = next_stage.advance(action.column, action.height);
+
+            if (result == Stage::Result::Invalid) {
+                continue;
+            }
+
+            auto child = std::make_shared<Node>(next_stage);
+            if (result == Stage::Result::Won) {
+                child = nodeset_.add(child);
+                parent->add_child(child);
+                child->add_parent(parent);
+                return;
+            }
+
+            children.push_back(child);
+        }
+
+        for(auto&& child : children) {
+            child = nodeset_.add(child);
+            parent->add_child(child);
+            child->add_parent(parent);
+        }
+    }
+
+    // 指定した局面以降をランダムにプレイする
+    Result play(const auto& stage, Node::Count depth) {
+        const auto actions = stage.legal_actions();
+        if (actions.empty()) {
+            return Result{Stage::Result::Draw, stage.player_, depth};
+        }
+
+        for(const auto& action : actions) {
+            auto next_stage = stage;
+            const auto result = next_stage.advance(action.column, action.height);
+            if ((result == Stage::Result::Won) || (result == Stage::Result::Invalid)) {
+                return Result{result, stage.player_, depth};
+            }
+        }
+
+        std::uniform_int_distribution<size_t> dist(0, actions.size() - 1);
+        const auto action = actions.at(dist(rand_gen));
+        auto next_stage = stage;
+        next_stage.advance(action.column, action.height);
+        return play(next_stage, depth + 1);
+    }
+
+    // 木を探索して試行する
+    void playout() {
+        auto [top_node, depth] = visit(root_, 0);
+        const auto result = play(top_node->stage_, 0);
+
+        std::set<std::shared_ptr<Node>> visited_nodes;
+        std::queue<std::shared_ptr<Node>> nodes;
+        nodes.push(top_node);
+
+        while(!nodes.empty()) {
+            auto node = nodes.front();
+            nodes.pop();
+
+            if (visited_nodes.contains(node)) {
+                continue;
+            }
+            visited_nodes.insert(node);
+
+            node->n_tried += 1;
+            if (result.result == Stage::Result::Won) {
+                if (result.winner == 0) {
+                    node->n_first_player_won += 1;
+                } else {
+                    node->n_second_player_won += 1;
+                }
+            }
+
+            for(auto&& parent : node->parents_) {
+                nodes.push(parent);
+            }
+        }
+    }
+
+    // ランダムな手を選ぶ
+    std::optional<Board::Position> select_random(const Stage& stage) {
+        const auto actions = stage.legal_actions();
+        if (actions.empty()) {
+            std::optional<Board::Position> zero;
+            return zero;
+        }
+
+        std::uniform_int_distribution<size_t> dist(0, actions.size() - 1);
+        return actions.at(dist(rand_gen));
+    }
+
+    // 学習した手を選ぶ
+    std::optional<Board::Position> select(const Stage& stage) {
+        const auto actions = stage.legal_actions();
+        if (actions.empty()) {
+            std::optional<Board::Position> zero;
+            return zero;
+        }
+
+        const auto player = stage.player_;
+        std::optional<Board::Position> best_action;
+        Metric max_value = std::numeric_limits<Metric>::min();
+
+        for(const auto& action : actions) {
+            auto next_stage = stage;
+            next_stage.advance(action.column, action.height);
+            auto node = nodeset_.find(next_stage);
+            if (!node) {
+                continue;
+            }
+
+            const auto n_tried = node->n_first_player_won + node->n_second_player_won;
+            const auto n_win = (player == 0) ?
+                node->n_first_player_won : node->n_second_player_won;
+
+            Metric ratio = n_win;
+            ratio /= n_tried;
+            if (max_value < ratio) {
+                best_action = Board::Position {action.column, action.height};
+            }
+            max_value = std::max(max_value, ratio);
+        }
+
+        if (best_action.has_value()) {
+            return best_action;
+        }
+
+        return select_random(stage);
+    }
+};
+
+class TestMtcsEngine : public ::testing::Test {};
+
+// ノードを一段展開する
+TEST_F(TestMtcsEngine, ExpandRoot) {
+    MtcsEngine engine;
+    Stage stage(engine.hashkeys_);
+    std::shared_ptr<Node> root = std::make_shared<Node>(stage);
+    engine.expand(root);
+    ASSERT_EQ(Board::ColumnSize, root->children_.size());
+
+    for(const auto& child : root->children_) {
+        ASSERT_FALSE(child->children_.size());
+        ASSERT_EQ(1, child->parents_.size());
+        ASSERT_EQ(root, child->parents_.at(0));
+    }
+}
+
+// 異なる手順で同じ盤面に到達する
+TEST_F(TestMtcsEngine, Join) {
+    MtcsEngine engine;
+    Stage stage(engine.hashkeys_);
+
+    auto stage1 = stage;
+    auto stage2 = stage;
+    stage1.advance(1, 0);
+    stage1.advance(2, 0);
+    stage2.advance(2, 0);
+    stage2.advance(1, 0);
+
+    std::shared_ptr<Node> node1 = std::make_shared<Node>(stage1);
+    engine.expand(node1);
+    ASSERT_EQ(Board::ColumnSize, node1->children_.size());
+
+    std::shared_ptr<Node> node2 = std::make_shared<Node>(stage1);
+    engine.expand(node2);
+    ASSERT_EQ(Board::ColumnSize, node2->children_.size());
+
+    for(Board::Coordinate i{0}; i < Board::ColumnSize; ++i) {
+        ASSERT_EQ(node1->children_.at(i), node2->children_.at(i));
+    }
+
+    for(const auto& child : node1->children_) {
+        ASSERT_EQ(2, child->parents_.size());
+        ASSERT_EQ(node1, child->parents_.at(0));
+        ASSERT_EQ(node2, child->parents_.at(1));
+    }
+}
+
+// 上まで積みあげる
+TEST_F(TestMtcsEngine, ExpandColumns) {
+    MtcsEngine engine;
+    Stage stage(engine.hashkeys_);
+    constexpr auto len = Board::MinLen - 1;
+
+    for(Board::Coordinate column{0}; column < len; ++column) {
+        for(Board::Coordinate height{0}; height < Board::MaxHeight; ++height) {
+            stage.advance(column, height);
+        }
+
+        auto new_stage = stage;
+        std::shared_ptr<Node> parent = std::make_shared<Node>(new_stage);
+        engine.expand(parent);
+
+        if ((column + 1) == len) {
+            ASSERT_EQ(1, parent->children_.size());
+            const auto& child = parent->children_.at(0);
+            ASSERT_FALSE(child->children_.size());
+            ASSERT_EQ(1, child->parents_.size());
+            ASSERT_EQ(parent, child->parents_.at(0));
+        } else {
+            const auto expected = Board::ColumnSize - 1 - column;
+            ASSERT_EQ(expected, parent->children_.size());
+
+            for(const auto& child : parent->children_) {
+                for(const auto& p : child->parents_) {
+                    ASSERT_FALSE(child->children_.size());
+                    ASSERT_EQ(1, child->parents_.size());
+                    ASSERT_EQ(parent, child->parents_.at(0));
+                }
+            }
+        }
+    }
+}
+
+// 初期状態からランダムにプレイする
+// ランダムなら先手有利らしい
+TEST_F(TestMtcsEngine, Play) {
+    MtcsEngine engine;
+
+    std::array<Player, Stage::SizeOfPlayers> ct {0};
+    for(Node::Count i{0}; i<1000; ++i) {
+        MtcsEngine::Result result = engine.play(engine.initial_stage_, 0);
+        if (result.result == Stage::Result::Won) {
+            ct.at(result.winner) += 1;
+        }
+    }
+
+    EXPECT_GT(ct.at(0), ct.at(1));
+}
+
+TEST_F(TestMtcsEngine, Playout) {
+    MtcsEngine engine;
+
+    std::array<Player, Stage::SizeOfPlayers> ct {0};
+    for(Node::Count i{0}; i<1000; ++i) {
+        engine.playout();
+    }
+
+    EXPECT_GT(engine.root_->n_first_player_won,engine.root_->n_second_player_won);
+}
+
+TEST_F(TestMtcsEngine, Match) {
+    MtcsEngine engine;
+    auto initial_stage = engine.initial_stage();
+    Node::Count n_train = 300000;
+
+    for(decltype(n_train) i{0}; i<n_train; ++i) {
+        engine.playout();
+    }
+
+    Node::Count n_draw {0};
+    Node::Count n_first_learned {0};
+    Node::Count n_first_random {0};
+    Node::Count n_second_learned {0};
+    Node::Count n_second_random {0};
+
+    for(Node::Count i{0}; i<10000; ++i) {
+        const bool random_first = ((i & 1) == 0);
+        // Engineとハッシュキーを共通にする
+        auto stage = initial_stage;
+
+        for(;;) {
+            std::optional<Board::Position> first;
+            if (random_first) {
+                first = engine.select_random(stage);
+            } else {
+                first = engine.select(stage);
+            }
+
+            if (!first.has_value()) {
+                ++n_draw;
+                break;
+            }
+
+            if (stage.advance(first.value().column, first.value().height) == Stage::Result::Won) {
+                if (random_first) {
+                    ++n_first_random;
+                } else {
+                    ++n_first_learned;
+                }
+                break;
+            }
+
+            std::optional<Board::Position> second;
+            if (random_first) {
+                second = engine.select(stage);
+            } else {
+                second = engine.select_random(stage);
+            }
+
+            if (!second.has_value()) {
+                ++n_draw;
+                break;
+            }
+
+            if (stage.advance(second.value().column, second.value().height) == Stage::Result::Won) {
+                if (random_first) {
+                    ++n_second_learned;
+                } else {
+                    ++n_second_random;
+                }
+                break;
+            }
+        }
+    }
+
+    std::cout << "1st player learned win and loss : " << n_first_learned << " , " << n_second_random << "\n";
+    std::cout << "2nd player learned win and loss : " << n_second_learned << " , " << n_first_random << "\n";
+    std::cout << "draw : " << n_draw << "\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -893,7 +2042,9 @@ int main(int argc, char* argv[]) {
         return RUN_ALL_TESTS();
     }
 
-    Stage stage;
+    CommonHashKey keys(Stage::SizeOfPlayers);
+    Stage stage(keys);
+
     for(;;) {
         std::cout << stage.to_string() << std::endl;
         std::cout << "Player " << (1 + stage.player_) << " moves\n";

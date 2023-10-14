@@ -14,13 +14,13 @@ TARGET=connect4
 TARGETS=$(TARGET)
 
 CXX=g++
-CPPFLAGS=-std=gnu++20 -O2 $(GTEST_GMOCK_INCLUDE)
+CPPFLAGS=-std=gnu++20 -O3 $(GTEST_GMOCK_INCLUDE)
 LD=g++
 LIBPATH=
 LDFLAGS=
 LIBS=-pthread
 
-.PHONY: all run clean
+.PHONY: all run test clean
 
 all: $(TARGETS)
 
@@ -28,6 +28,9 @@ $(TARGET): $(OBJ) $(GTEST_OBJ)
 	$(LD) $(LIBPATH) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 run: $(TARGET)
+	./$(TARGET)
+
+test: $(TARGET)
 	./$(TARGET)
 
 $(OBJ): $(SOURCE) Makefile
