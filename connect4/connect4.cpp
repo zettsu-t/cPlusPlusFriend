@@ -1771,8 +1771,8 @@ struct MtcsEngine {
     }
 
     // 木を探索して試行する
-    void playout() {
-        auto [top_node, depth] = visit(root_, 0);
+    void playout(std::shared_ptr<Node>& root_node) {
+        auto [top_node, depth] = visit(root_node, 0);
         const auto result = play(top_node->stage_, 0);
 
         std::set<std::shared_ptr<Node>> visited_nodes;
@@ -1801,6 +1801,38 @@ struct MtcsEngine {
                 nodes.push(parent);
             }
         }
+    }
+
+    // 初期盤面からプレイする
+    void playout() {
+        playout(root_);
+    }
+
+    // 指定した局面からプレイする
+    // 指定した局面は既に登録されていることが前提である
+    void playout(const Stage& stage) {
+        auto node = std::make_shared<Node>(stage);
+        node = nodeset_.add(node);
+        playout(node);
+    }
+
+    // 対戦中に一手進める
+    // ここまでの手番は既に登録されていることが前提である
+    void advance(const Stage& stage, const Board::Position& action) {
+        auto parent = std::make_shared<Node>(stage);
+        parent = nodeset_.add(parent);
+        auto next_stage = stage;
+        const auto result = next_stage.advance(action.column, action.height);
+
+        if (result == Stage::Result::Invalid) {
+            return;
+        }
+
+        auto child = std::make_shared<Node>(next_stage);
+        child = nodeset_.add(child);
+        parent->add_child(child);
+        child->add_parent(parent);
+        return;
     }
 
     // ランダムな手を選ぶ
@@ -1855,7 +1887,96 @@ struct MtcsEngine {
     }
 };
 
-class TestMtcsEngine : public ::testing::Test {};
+class TestMtcsEngine : public ::testing::Test {
+protected:
+    // 戦略
+    enum class Strategy {
+        Random,
+        OnlineMtcs,
+    };
+
+    using ResultMatrix = std::array<std::array<Node::Count, Stage::SizeOfPlayers>, Stage::SizeOfPlayers>;
+    using Strategies = std::array<Strategy, Stage::SizeOfPlayers>;
+    struct Result {
+        Node::Count n_trials {0};
+        Node::Count n_draw {0};
+        ResultMatrix matrix {{{0, 0}, {0, 0}}};
+
+        Result(Node::Count n_trials, const ResultMatrix& mat) :
+            n_trials(n_trials), n_draw(n_trials), matrix(mat) {
+            for(const auto& vec : matrix) {
+                for(const auto& ct : vec) {
+                    n_draw -= ct;
+                }
+            }
+        }
+    };
+
+    // ランダムにプレイするときはtrue、そうでないときはfalse
+    Result match(Node::Count n_trials, Node::Count n_train_online,
+                 const Strategies& strategies, MtcsEngine& engine) {
+        // 各プレイヤーが何番目の戦略を使うか
+        std::vector<size_t> strategy_index(Stage::SizeOfPlayers);
+        std::iota(strategy_index.begin(), strategy_index.end(), 0);
+
+        // プレイヤー * 戦略の結果
+        ResultMatrix result;
+        for(auto&& vec : result) {
+            for(auto&& ct : vec) {
+                ct = 0;
+            }
+        }
+
+        for(Node::Count i{0}; i<n_trials; ++i) {
+            // Engineとハッシュキーを共通にする
+            auto stage = engine.initial_stage();
+
+            bool gameover {false};
+            while(!gameover) {
+                for(Player player{0}; player < Stage::SizeOfPlayers; ++player) {
+                    // 先手/後手が打つ手番を探す
+                    std::optional<Board::Position> action;
+
+                    // ランダムな手番か、MTCSで探すか
+                    const auto strategy = strategies.at(strategy_index.at(player));
+                    switch(strategy) {
+                    case Strategy::OnlineMtcs:
+                        action = engine.select(stage);
+                        break;
+                    default:
+                        action = engine.select_random(stage);
+                    }
+
+                    // 打つ手がなければ引き分け
+                    if (!action.has_value()) {
+                        gameover = true;
+                        break;
+                    }
+
+                    // MTCSエンジンにこの局面と次の局面を登録する
+                    engine.advance(stage, action.value());
+
+                    // 先手/後手が打つ
+                    if (stage.advance(action.value().column, action.value().height) == Stage::Result::Won) {
+                        result.at(player).at(strategy_index.at(player)) += 1;
+                        gameover = true;
+                        break;
+                    }
+
+                    // MTCSエンジンでこの局面から探索を開始する
+                    for(decltype(n_train_online) i{0}; i<n_train_online; ++i) {
+                        engine.playout(stage);
+                    }
+                }
+            }
+
+            // 先手と後手の戦略を入れ替える
+            std::rotate(strategy_index.begin(), strategy_index.begin() + 1, strategy_index.end());
+        }
+
+        return Result(n_trials, result);
+    }
+};
 
 // ノードを一段展開する
 TEST_F(TestMtcsEngine, ExpandRoot) {
@@ -1945,7 +2066,7 @@ TEST_F(TestMtcsEngine, Play) {
     MtcsEngine engine;
 
     std::array<Player, Stage::SizeOfPlayers> ct {0};
-    for(Node::Count i{0}; i<1000; ++i) {
+    for(Node::Count i{0}; i<10000; ++i) {
         MtcsEngine::Result result = engine.play(engine.initial_stage_, 0);
         if (result.result == Stage::Result::Won) {
             ct.at(result.winner) += 1;
@@ -1953,6 +2074,7 @@ TEST_F(TestMtcsEngine, Play) {
     }
 
     EXPECT_GT(ct.at(0), ct.at(1));
+    std::cout << "Random match 1st vs 2nd : " << ct.at(0) << " , " << ct.at(1) << "\n";
 }
 
 TEST_F(TestMtcsEngine, Playout) {
@@ -1966,74 +2088,91 @@ TEST_F(TestMtcsEngine, Playout) {
     EXPECT_GT(engine.root_->n_first_player_won,engine.root_->n_second_player_won);
 }
 
-TEST_F(TestMtcsEngine, Match) {
+// ランダム同士で対戦する
+TEST_F(TestMtcsEngine, MatchRandom) {
     MtcsEngine engine;
-    auto initial_stage = engine.initial_stage();
-    Node::Count n_train = 300000;
+    const Node::Count n_trials = 400;
+    const Strategies strategies {Strategy::Random, Strategy::Random};
+    const auto result = match(n_trials, 0, strategies, engine);
 
-    for(decltype(n_train) i{0}; i<n_train; ++i) {
+    std::cout << "Random vs random\n";
+    std::cout << "1st player win and loss : " <<
+        result.matrix.at(0).at(0) << " , " << result.matrix.at(0).at(1) << "\n";
+    std::cout << "2nd player win and loss : " <<
+        result.matrix.at(1).at(0) << " , " << result.matrix.at(1).at(1) << "\n";
+    std::cout << "draw : " << result.n_draw << "\n";
+}
+
+// MTCS対ランダムで対戦する
+TEST_F(TestMtcsEngine, MatchMtcsRandom) {
+    MtcsEngine engine;
+    Node::Count n_train_full = 25000;
+
+    for(decltype(n_train_full) i{0}; i<n_train_full; ++i) {
         engine.playout();
     }
 
-    Node::Count n_draw {0};
-    Node::Count n_first_learned {0};
-    Node::Count n_first_random {0};
-    Node::Count n_second_learned {0};
-    Node::Count n_second_random {0};
+    const Node::Count n_trials = 400;
+    Node::Count n_train_online = 100;
+    const Strategies strategies {Strategy::OnlineMtcs, Strategy::Random};
+    const auto result = match(n_trials, n_train_online, strategies, engine);
 
-    for(Node::Count i{0}; i<10000; ++i) {
-        const bool random_first = ((i & 1) == 0);
-        // Engineとハッシュキーを共通にする
-        auto stage = initial_stage;
+    std::cout << "MTCS online vs random\n";
+    std::cout << "1st player learned win and loss : " <<
+        result.matrix.at(0).at(0) << " , " << result.matrix.at(0).at(1) << "\n";
+    std::cout << "2nd player learned win and loss : " <<
+        result.matrix.at(1).at(0) << " , " << result.matrix.at(1).at(1) << "\n";
+    std::cout << "draw : " << result.n_draw << "\n";
+}
 
-        for(;;) {
-            std::optional<Board::Position> first;
-            if (random_first) {
-                first = engine.select_random(stage);
-            } else {
-                first = engine.select(stage);
-            }
+// MTCS同士で対戦する
+TEST_F(TestMtcsEngine, MatchMtcs) {
+    MtcsEngine engine;
+    Node::Count n_train_full = 25000;
 
-            if (!first.has_value()) {
-                ++n_draw;
-                break;
-            }
-
-            if (stage.advance(first.value().column, first.value().height) == Stage::Result::Won) {
-                if (random_first) {
-                    ++n_first_random;
-                } else {
-                    ++n_first_learned;
-                }
-                break;
-            }
-
-            std::optional<Board::Position> second;
-            if (random_first) {
-                second = engine.select(stage);
-            } else {
-                second = engine.select_random(stage);
-            }
-
-            if (!second.has_value()) {
-                ++n_draw;
-                break;
-            }
-
-            if (stage.advance(second.value().column, second.value().height) == Stage::Result::Won) {
-                if (random_first) {
-                    ++n_second_learned;
-                } else {
-                    ++n_second_random;
-                }
-                break;
-            }
-        }
+    for(decltype(n_train_full) i{0}; i<n_train_full; ++i) {
+        engine.playout();
     }
 
-    std::cout << "1st player learned win and loss : " << n_first_learned << " , " << n_second_random << "\n";
-    std::cout << "2nd player learned win and loss : " << n_second_learned << " , " << n_first_random << "\n";
-    std::cout << "draw : " << n_draw << "\n";
+    const Node::Count n_trials = 400;
+    Node::Count n_train_online = 500;
+    const Strategies strategies {Strategy::OnlineMtcs, Strategy::OnlineMtcs};
+    const auto result = match(n_trials, n_train_online, strategies, engine);
+
+    std::cout << "MTCS online vs MTCS online\n";
+    std::cout << "1st player win and loss : " <<
+        result.matrix.at(0).at(0) << " , " << result.matrix.at(0).at(1) << "\n";
+    std::cout << "2nd player win and loss : " <<
+        result.matrix.at(1).at(0) << " , " << result.matrix.at(1).at(1) << "\n";
+    std::cout << "draw : " << result.n_draw << "\n";
+}
+
+// MTCSだが対戦中は学習しない vs ランダム
+TEST_F(TestMtcsEngine, MatchMtcsOfflineRandom) {
+    MtcsEngine engine;
+    Node::Count n_train_full = 25000;
+
+//  初期盤面から学習する
+//  これくらい長く実行するとよいが、21分掛かる
+//  TestMtcsEngine.Match (1321686 ms)
+//  Node::Count n_train = 300000 * 6 * 15;
+//  1st player learned win and loss : 4236 , 748
+//  2nd player learned win and loss : 3668 , 1321
+
+    for(decltype(n_train_full) i{0}; i<n_train_full; ++i) {
+        engine.playout();
+    }
+
+    const Node::Count n_trials = 400;
+    const Strategies strategies {Strategy::OnlineMtcs, Strategy::Random};
+    const auto result = match(n_trials, 0, strategies, engine);
+
+    std::cout << "MTCS offline vs random\n";
+    std::cout << "1st player learned win and loss : " <<
+        result.matrix.at(0).at(0) << " , " << result.matrix.at(0).at(1) << "\n";
+    std::cout << "2nd player learned win and loss : " <<
+        result.matrix.at(1).at(0) << " , " << result.matrix.at(1).at(1) << "\n";
+    std::cout << "draw : " << result.n_draw << "\n";
 }
 
 int main(int argc, char* argv[]) {
