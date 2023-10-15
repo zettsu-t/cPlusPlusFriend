@@ -1,7 +1,7 @@
 #include <cmath>
 #include <array>
 #include <bitset>
-#include <functional>
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -15,8 +15,12 @@
 #include <gtest/gtest.h>
 
 namespace {
-    // 参加者
-    using Player = int;
+// 参加者
+using Player = int;
+
+// ミリ秒
+using MilliSec = std::chrono::milliseconds;
+const MilliSec ZeroMilliSec {0};
 }
 
 // 盤面
@@ -45,17 +49,18 @@ struct Board {
     using HashKey = uint64_t;  // Zobrist hashing のキー
 
     Cells placed_;  // 石を置いたマス
-    Cells mask_;    // 余白を取り除くマスク
     HashKey digest_ {0};  // 盤面全体のキー
 
     // メンバ変数のコピーを速くするために、インスタンスごとにハッシュキーを持つのではなく
     // 参照にする。所有権を持たないので、スマートポインタではなく素のポインタにする。
     // 参照にするとコピー不可になるので、盤面を複製できない。
+    // staticにするとマルチスレッド化が難しい
     using HashKeySet = std::array<HashKey, FullSize>;
     const HashKeySet* hashkeys_;  // それぞれのマスのキー
 
     // メンバ変数のコピーを速くするためにSingletonにする
-    // こうするとインスタンスが32 byteになる
+    // こうするとインスタンスが24 byteになる
+    static inline Cells mask_;  // 余白を取り除くマスク
     static inline std::array<Cells, LineTypes> linemasks_;  // 縦横斜めの線それぞれのマスク
 
     explicit Board(const HashKeySet& hashkeys) : hashkeys_(&hashkeys) {
@@ -77,6 +82,14 @@ struct Board {
     }
 
     static void setup(void) {
+        // 石が置ける位置をマスクする
+        for(Coordinate column{0}; column < ColumnSize; ++column) {
+            for(Coordinate height{0}; height < MaxHeight; ++height) {
+                const auto index = to_index(column, height);
+                mask_.set(index);
+            }
+        }
+
         // 線種ごとにマスクを生成する
         for(Coordinate i{0}; i < MinLen; ++i) {
             // 縦一列
@@ -310,8 +323,9 @@ class TestBoard : public ::testing::Test {};
 TEST_F(TestBoard, Initialize) {
     CommonHashKey keys(1);
     Board board(keys.hashkeys_.at(0));
+
     // できるだけ小さくする
-    ASSERT_GE(64, sizeof(board));
+    ASSERT_GE(32, sizeof(board));
 
     ASSERT_EQ(Board::FullSize, board.placed_.size());
     ASSERT_EQ(Board::FullSize, board.mask_.size());
@@ -1895,12 +1909,16 @@ protected:
         OnlineMtcs,
     };
 
+    // 対戦結果(どのプレイヤーが、どの戦略で、何回勝ったか
     using ResultMatrix = std::array<std::array<Node::Count, Stage::SizeOfPlayers>, Stage::SizeOfPlayers>;
+    // プレイヤーの戦略。試行ごとに入れ替えて実行する。
     using Strategies = std::array<Strategy, Stage::SizeOfPlayers>;
+
+    // 対戦結果
     struct Result {
-        Node::Count n_trials {0};
-        Node::Count n_draw {0};
-        ResultMatrix matrix {{{0, 0}, {0, 0}}};
+        Node::Count n_trials {0};  // 試行回数
+        Node::Count n_draw {0};    // 勝敗が付かなかった=引き分けの回数
+        ResultMatrix matrix {{{0, 0}, {0, 0}}};  // 勝った回数
 
         Result(Node::Count n_trials, const ResultMatrix& mat) :
             n_trials(n_trials), n_draw(n_trials), matrix(mat) {
@@ -1912,8 +1930,13 @@ protected:
         }
     };
 
-    // ランダムにプレイするときはtrue、そうでないときはfalse
-    Result match(Node::Count n_trials, Node::Count n_train_online,
+    // 対戦する
+    // n_trials: 試行回数(対戦回数)
+    // n_train_online: 一手ごとのMTCS探索回数(0なら探索しない)
+    // limit_msec: 一手ごとのMTCS探索時間(ミリ秒、0なら探索しない)
+    // strategies: プレイヤーの戦略
+    // engine: MTCSの探索エンジン
+    Result match(Node::Count n_trials, Node::Count n_train_online, MilliSec limit_msec,
                  const Strategies& strategies, MtcsEngine& engine) {
         // 各プレイヤーが何番目の戦略を使うか
         std::vector<size_t> strategy_index(Stage::SizeOfPlayers);
@@ -1928,10 +1951,10 @@ protected:
         }
 
         for(Node::Count i{0}; i<n_trials; ++i) {
-            // Engineとハッシュキーを共通にする
+            // 初期盤面は、ハッシュキーを共通にするためにMTCSエンジンから取得する
             auto stage = engine.initial_stage();
 
-            bool gameover {false};
+            bool gameover {false};  // ゲーム終了
             while(!gameover) {
                 for(Player player{0}; player < Stage::SizeOfPlayers; ++player) {
                     // 先手/後手が打つ手番を探す
@@ -1945,6 +1968,7 @@ protected:
                         break;
                     default:
                         action = engine.select_random(stage);
+                        break;
                     }
 
                     // 打つ手がなければ引き分け
@@ -1964,7 +1988,15 @@ protected:
                     }
 
                     // MTCSエンジンでこの局面から探索を開始する
+                    // 指定回数まで時間いっぱいまでの少ない方まで探索する。時間0なら全く検索しない。
+                    // 1ミリ秒で10-100回くらいplayoutできる
+                    const auto start_time = std::chrono::high_resolution_clock::now();
                     for(decltype(n_train_online) i{0}; i<n_train_online; ++i) {
+                        const auto diff = std::chrono::high_resolution_clock::now() - start_time;
+                        if ((limit_msec == ZeroMilliSec) || (diff >= limit_msec)) {
+                            break;
+                        }
+
                         engine.playout(stage);
                     }
                 }
@@ -2091,9 +2123,9 @@ TEST_F(TestMtcsEngine, Playout) {
 // ランダム同士で対戦する
 TEST_F(TestMtcsEngine, MatchRandom) {
     MtcsEngine engine;
-    const Node::Count n_trials = 400;
+    const Node::Count n_trials = 2000;
     const Strategies strategies {Strategy::Random, Strategy::Random};
-    const auto result = match(n_trials, 0, strategies, engine);
+    const auto result = match(n_trials, 0, ZeroMilliSec, strategies, engine);
 
     std::cout << "Random vs random\n";
     std::cout << "1st player win and loss : " <<
@@ -2103,8 +2135,8 @@ TEST_F(TestMtcsEngine, MatchRandom) {
     std::cout << "draw : " << result.n_draw << "\n";
 }
 
-// MTCS対ランダムで対戦する
-TEST_F(TestMtcsEngine, MatchMtcsRandom) {
+// MTCS対ランダムで対戦する。対戦中も探索する。
+TEST_F(TestMtcsEngine, MatchMtcsOnlineRandom) {
     MtcsEngine engine;
     Node::Count n_train_full = 25000;
 
@@ -2112,10 +2144,11 @@ TEST_F(TestMtcsEngine, MatchMtcsRandom) {
         engine.playout();
     }
 
-    const Node::Count n_trials = 400;
-    Node::Count n_train_online = 100;
+    const Node::Count n_trials = 2000;
+    Node::Count n_train_online = 100000;
+    const MilliSec limit_msec {10};
     const Strategies strategies {Strategy::OnlineMtcs, Strategy::Random};
-    const auto result = match(n_trials, n_train_online, strategies, engine);
+    const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
 
     std::cout << "MTCS online vs random\n";
     std::cout << "1st player learned win and loss : " <<
@@ -2125,8 +2158,8 @@ TEST_F(TestMtcsEngine, MatchMtcsRandom) {
     std::cout << "draw : " << result.n_draw << "\n";
 }
 
-// MTCS同士で対戦する
-TEST_F(TestMtcsEngine, MatchMtcs) {
+// MTCS同士で対戦する。対戦中も探索する。
+TEST_F(TestMtcsEngine, MatchMtcsOnline) {
     MtcsEngine engine;
     Node::Count n_train_full = 25000;
 
@@ -2134,10 +2167,11 @@ TEST_F(TestMtcsEngine, MatchMtcs) {
         engine.playout();
     }
 
-    const Node::Count n_trials = 400;
-    Node::Count n_train_online = 500;
+    const Node::Count n_trials = 2000;
+    Node::Count n_train_online = 100000;
+    const MilliSec limit_msec {10};
     const Strategies strategies {Strategy::OnlineMtcs, Strategy::OnlineMtcs};
-    const auto result = match(n_trials, n_train_online, strategies, engine);
+    const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
 
     std::cout << "MTCS online vs MTCS online\n";
     std::cout << "1st player win and loss : " <<
@@ -2163,9 +2197,9 @@ TEST_F(TestMtcsEngine, MatchMtcsOfflineRandom) {
         engine.playout();
     }
 
-    const Node::Count n_trials = 400;
+    const Node::Count n_trials = 2000;
     const Strategies strategies {Strategy::OnlineMtcs, Strategy::Random};
-    const auto result = match(n_trials, 0, strategies, engine);
+    const auto result = match(n_trials, 0, ZeroMilliSec, strategies, engine);
 
     std::cout << "MTCS offline vs random\n";
     std::cout << "1st player learned win and loss : " <<
