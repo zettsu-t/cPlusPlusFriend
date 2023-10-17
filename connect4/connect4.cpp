@@ -285,8 +285,9 @@ struct CommonHashKey {
         std::uniform_int_distribution<Board::HashKey> dist(lower, upper);
 
         std::vector<Board::HashKeySet> hashkeys(n_players);
+
         for(decltype(n_players) i{0}; i<n_players; ++i) {
-            // 非0の乱数をキーにする
+            // 非0の乱数をキーにする。乱数はプレイヤーごとに異なる。
             for(auto&& key : hashkeys.at(i)) {
                 key = dist(engine);
             }
@@ -1453,11 +1454,15 @@ struct Node {
     Count n_tried {0};              // このノードを探索した回数
     Count n_first_player_won {0};   // 先手が勝った回数
     Count n_second_player_won {0};  // 後手が勝った回数
-    // 一手ごとに石が増えるので、親子関係が循環することはあり得ない
-    std::vector<std::shared_ptr<Node>> parents_;   // 親ノード
-    std::vector<std::shared_ptr<Node>> children_;  // 子ノード
+    bool expanded_ {false};  // 子ノードを展開済
 
-    explicit Node(const Stage& stage) : stage_(stage) {}
+    // 一手ごとに石が増えるので、親子関係が循環することはあり得ない
+    // ノードの所有権はNodeSetが持っているので、ここでは生ポインタにする
+    // そうしないと親子ノードでshared_ptrが循環参照してオブジェクトを解放できなくなる
+    std::vector<Node*> parents_;   // 親ノード
+    std::vector<Node*> children_;  // 子ノード
+
+    explicit Node(const Stage& stage) : stage_(stage), expanded_{false} {}
 
     // このノードのダイジェスト
     Board::HashKey digest(void) const {
@@ -1465,12 +1470,12 @@ struct Node {
     }
 
     // 親ノードを追加する
-    void add_parent(std::shared_ptr<Node>& node) {
+    void add_parent(Node* node) {
         parents_.push_back(node);
     }
 
     // 子ノードを追加する
-    void add_child(std::shared_ptr<Node>& node) {
+    void add_child(Node* node) {
         children_.push_back(node);
     }
 };
@@ -1512,13 +1517,11 @@ TEST_F(TestNode, AddParent) {
     Node  node(stage);
     using Size = decltype(node.parents_)::size_type;
 
-    std::vector<std::shared_ptr<Node>> expected;
     for(Size i{1}; i<=3; ++i) {
-        auto parent = std::make_shared<Node>(stage);
-        expected.push_back(parent);
-        node.add_parent(parent);
+        auto parent = std::make_unique<Node>(stage);
+        node.add_parent(parent.get());
         ASSERT_EQ(i, node.parents_.size());
-        ASSERT_EQ(expected.at(i-1), node.parents_.at(i-1));
+        ASSERT_EQ(parent.get(), node.parents_.at(i-1));
     };
 
     ASSERT_FALSE(node.children_.size());
@@ -1531,13 +1534,11 @@ TEST_F(TestNode, AddChild) {
     Node  node(stage);
     using Size = decltype(node.children_)::size_type;
 
-    std::vector<std::shared_ptr<Node>> expected;
     for(Size i{1}; i<=3; ++i) {
-        auto child = std::make_shared<Node>(stage);
-        expected.push_back(child);
-        node.add_child(child);
+        auto child = std::make_unique<Node>(stage);
+        node.add_child(child.get());
         ASSERT_EQ(i, node.children_.size());
-        ASSERT_EQ(expected.at(i-1), node.children_.at(i-1));
+        ASSERT_EQ(child.get(), node.children_.at(i-1));
     };
 
     ASSERT_FALSE(node.parents_.size());
@@ -1545,29 +1546,32 @@ TEST_F(TestNode, AddChild) {
 
 // 重複するノードを持たない集合
 struct NodeSet {
-    using Ptr = std::shared_ptr<Node>;
+    using Ptr = std::unique_ptr<Node>;
     std::map<Board::HashKey, Ptr> set_;  // ノードの集合
 
     NodeSet() = default;
 
     // ノードを追加する。既にあるならあったものを返す。
-    std::shared_ptr<Node> add(Ptr& node) {
+    // いずれにせよ呼び出し元のスマートポインタは空になる
+    Node* add(Ptr& node) {
         const auto digest = node->digest();
         if (set_.find(digest) == set_.end()) {
-            set_[digest] = node;
+            set_[digest] = std::move(node);
+        } else {
+            node.reset();
         }
-        return set_[digest];
+        return set_[digest].get();
     }
 
     // 盤面からノードを探す
-    std::shared_ptr<Node> find(const Stage& stage) {
-        std::shared_ptr<Node> zero;
+    Node* find(const Stage& stage) {
         const auto digest = stage.digest();
         if (set_.find(digest) == set_.end()) {
-            return zero;
+            return nullptr;
         }
 
-        return set_[digest];
+        auto it = set_.find(digest);
+        return (it != set_.end()) ? (it->second).get() : nullptr;
     }
 };
 
@@ -1579,40 +1583,50 @@ TEST_F(TestNodeSet, Add) {
     CommonHashKey keys(Stage::SizeOfPlayers);
     Stage stage(keys);
 
-    auto zero0 = std::make_shared<Node>(stage);
-    auto actual = nodeset.add(zero0);
-    ASSERT_EQ(zero0, actual);
+    auto node0 = std::make_unique<Node>(stage);
+    auto ptr0 = node0.get();
+    auto actual = nodeset.add(node0);
+    ASSERT_FALSE(node0);
+    ASSERT_EQ(ptr0, actual);
     ASSERT_EQ(1, nodeset.set_.size());
 
     // 二度追加すると最初の物が得られる
-    actual = nodeset.add(zero0);
-    ASSERT_EQ(zero0, actual);
+    auto node0_alt = std::make_unique<Node>(stage);
+    auto node02 = std::make_unique<Node>(stage);
+    actual = nodeset.add(node0_alt);
+    ASSERT_FALSE(node0_alt);
+    ASSERT_EQ(ptr0, actual);
     ASSERT_EQ(1, nodeset.set_.size());
 
     // 初手
     stage.advance(0, 0);
-    auto zero1 = std::make_shared<Node>(stage);
-    actual = nodeset.add(zero1);
-    ASSERT_EQ(zero1, actual);
+    auto node1 = std::make_unique<Node>(stage);
+    auto node12 = std::make_unique<Node>(stage);
+    auto ptr1 = node1.get();
+    actual = nodeset.add(node1);
+    ASSERT_FALSE(node1);
+    ASSERT_EQ(ptr1, actual);
     ASSERT_EQ(2, nodeset.set_.size());
 
-    actual = nodeset.add(zero1);
-    ASSERT_EQ(zero1, actual);
+    auto node1_ptr = std::make_unique<Node>(stage);
+    actual = nodeset.add(node1_ptr);
+    ASSERT_EQ(ptr1, actual);
     ASSERT_EQ(2, nodeset.set_.size());
 
     // 二番手
     stage.advance(0, 1);
-    auto zero2 = std::make_shared<Node>(stage);
-    actual = nodeset.add(zero2);
-    ASSERT_EQ(zero2, actual);
+    auto node2 = std::make_unique<Node>(stage);
+    auto ptr2 = node2.get();
+    actual = nodeset.add(node2);
+    ASSERT_EQ(ptr2, actual);
     ASSERT_EQ(3, nodeset.set_.size());
 
     // Stageはノード間で共有しないので、初期状態も初手も残っている
-    ASSERT_EQ(zero0, nodeset.add(zero0));
-    ASSERT_EQ(0, zero0->stage_.merged_board_.placed_.count());
-    ASSERT_EQ(zero1, nodeset.add(zero1));
-    ASSERT_EQ(1, zero1->stage_.merged_board_.placed_.count());
-    ASSERT_EQ(2, zero2->stage_.merged_board_.placed_.count());
+    ASSERT_EQ(ptr0, nodeset.add(node02));
+    ASSERT_EQ(0, ptr0->stage_.merged_board_.placed_.count());
+    ASSERT_EQ(ptr1, nodeset.add(node12));
+    ASSERT_EQ(1, ptr1->stage_.merged_board_.placed_.count());
+    ASSERT_EQ(2, ptr2->stage_.merged_board_.placed_.count());
 }
 
 // 盤面からノードを探す
@@ -1621,13 +1635,14 @@ TEST_F(TestNodeSet, Find) {
     CommonHashKey keys(Stage::SizeOfPlayers);
     Stage stage(keys);
 
-    auto zero0 = std::make_shared<Node>(stage);
-    auto actual = nodeset.add(zero0);
-    ASSERT_EQ(zero0, actual);
-    ASSERT_EQ(actual, nodeset.find(stage));
+    auto node0 = std::make_unique<Node>(stage);
+    auto ptr0 = node0.get();
+    auto actual = nodeset.add(node0);
+    ASSERT_EQ(ptr0, actual);
+    ASSERT_EQ(ptr0, nodeset.find(stage));
 
     stage.advance(0, 0);
-    ASSERT_FALSE(nodeset.find(stage).get());
+    ASSERT_FALSE(nodeset.find(stage));
 }
 
 // MCTS (Monte Carlo Tree Search)
@@ -1641,7 +1656,7 @@ struct MctsEngine {
     NodeSet nodeset_;  // 探索木のノード
     CommonHashKey hashkeys_;  // 盤面に共通のハッシュキー
     Stage initial_stage_;     // 初期盤面
-    std::shared_ptr<Node> root_;  // 根つまり初期局面
+    Node* root_ {nullptr};    // 根つまり初期局面
 
     // 乱数生成器
     std::random_device rand_dev;
@@ -1657,8 +1672,9 @@ struct MctsEngine {
     };
 
     MctsEngine(void) :
-        hashkeys_(Stage::SizeOfPlayers), initial_stage_(hashkeys_),
-        root_(std::make_shared<Node>(initial_stage_)), rand_gen(rand_dev()) {
+        hashkeys_(Stage::SizeOfPlayers), initial_stage_(hashkeys_), rand_gen(rand_dev()) {
+        auto node = std::make_unique<Node>(initial_stage_);
+        root_ = nodeset_.add(node);
     }
 
     // ハッシュキーをこの探索と共有する初期局面を返す
@@ -1668,7 +1684,7 @@ struct MctsEngine {
     }
 
     // ノードを深くたどり着けるところまで選ぶ
-    std::pair<std::shared_ptr<Node>, Node::Count> visit(std::shared_ptr<Node>& node, Node::Count depth) {
+    std::pair<Node*, Node::Count> visit(Node* node, Node::Count depth) {
         if (node->n_tried < ToExpand) {
             return std::make_pair(node, depth);
         }
@@ -1687,7 +1703,7 @@ struct MctsEngine {
     }
 
     // ノードを子から選ぶ
-    std::shared_ptr<Node> select(std::shared_ptr<Node>& parent) {
+    Node* select(Node* parent) {
         if (parent->children_.empty()) {
             // 自身を返す
             return parent;
@@ -1715,7 +1731,7 @@ struct MctsEngine {
     }
 
     // UCB1
-    Metric ucb1(Player player, Node::Count all_tried, std::shared_ptr<Node>& node) {
+    Metric ucb1(Player player, Node::Count all_tried, Node* node) {
         Metric n_tried = node->n_first_player_won + node->n_second_player_won;
         n_tried += Epsilon;
 
@@ -1733,10 +1749,17 @@ struct MctsEngine {
     }
 
     // ノードを一段展開する
-    void expand(std::shared_ptr<Node>& parent) {
-        const auto actions = parent->stage_.legal_actions();
+    void expand(Node* parent) {
+        // 展開済なら何もしない
+        if (parent->expanded_) {
+            return;
+        }
 
-        std::vector<std::shared_ptr<Node>> children;
+        const auto actions = parent->stage_.legal_actions();
+        // Early returnしても展開済にする
+        parent->expanded_ = true;
+
+        std::vector<std::unique_ptr<Node>> children;
         for(const auto& action : actions) {
             auto next_stage = parent->stage_;
             const auto result = next_stage.advance(action.column, action.height);
@@ -1745,21 +1768,21 @@ struct MctsEngine {
                 continue;
             }
 
-            auto child = std::make_shared<Node>(next_stage);
+            auto child = std::make_unique<Node>(next_stage);
             if (result == Stage::Result::Won) {
-                child = nodeset_.add(child);
-                parent->add_child(child);
-                child->add_parent(parent);
+                auto ptr = nodeset_.add(child);
+                parent->add_child(ptr);
+                ptr->add_parent(parent);
                 return;
             }
 
-            children.push_back(child);
+            children.push_back(std::move(child));
         }
 
         for(auto&& child : children) {
-            child = nodeset_.add(child);
-            parent->add_child(child);
-            child->add_parent(parent);
+            auto ptr = nodeset_.add(child);
+            parent->add_child(ptr);
+            ptr->add_parent(parent);
         }
     }
 
@@ -1786,12 +1809,12 @@ struct MctsEngine {
     }
 
     // 木を探索して試行する
-    void playout(std::shared_ptr<Node>& root_node) {
+    void playout(Node* root_node) {
         auto [top_node, depth] = visit(root_node, 0);
         const auto result = play(top_node->stage_, 0);
 
-        std::set<std::shared_ptr<Node>> visited_nodes;
-        std::queue<std::shared_ptr<Node>> nodes;
+        std::set<Node*> visited_nodes;
+        std::queue<Node*> nodes;
         nodes.push(top_node);
 
         while(!nodes.empty()) {
@@ -1826,16 +1849,16 @@ struct MctsEngine {
     // 指定した局面からプレイする
     // 指定した局面は既に登録されていることが前提である
     void playout(const Stage& stage) {
-        auto node = std::make_shared<Node>(stage);
-        node = nodeset_.add(node);
+        auto node_obj = std::make_unique<Node>(stage);
+        auto node = nodeset_.add(node_obj);
         playout(node);
     }
 
     // 対戦中に一手進める
     // ここまでの手番は既に登録されていることが前提である
     void advance(const Stage& stage, const Board::Position& action) {
-        auto parent = std::make_shared<Node>(stage);
-        parent = nodeset_.add(parent);
+        auto parent_obj = std::make_unique<Node>(stage);
+        auto parent = nodeset_.add(parent_obj);
         auto next_stage = stage;
         const auto result = next_stage.advance(action.column, action.height);
 
@@ -1843,8 +1866,8 @@ struct MctsEngine {
             return;
         }
 
-        auto child = std::make_shared<Node>(next_stage);
-        child = nodeset_.add(child);
+        auto child_obj = std::make_unique<Node>(next_stage);
+        auto child = nodeset_.add(child_obj);
         parent->add_child(child);
         child->add_parent(parent);
         return;
@@ -1920,10 +1943,11 @@ protected:
     struct Result {
         Node::Count n_trials {0};  // 試行回数
         Node::Count n_draw {0};    // 勝敗が付かなかった=引き分けの回数
+        Node::Count n_playout {0}; // Playout回数
         ResultMatrix matrix {{{0, 0}, {0, 0}}};  // 勝った回数
 
-        Result(Node::Count n_trials, const ResultMatrix& mat) :
-            n_trials(n_trials), n_draw(n_trials), matrix(mat) {
+        Result(Node::Count arg_n_trials, Node::Count arg_n_playout, const ResultMatrix& mat) :
+            n_trials(arg_n_trials), n_draw(arg_n_trials), n_playout(arg_n_playout), matrix(mat) {
             for(const auto& vec : matrix) {
                 for(const auto& ct : vec) {
                     n_draw -= ct;
@@ -1951,6 +1975,8 @@ protected:
                 ct = 0;
             }
         }
+
+        Node::Count n_playout {0}; // Playout回数
 
         for(Node::Count i{0}; i<n_trials; ++i) {
             // 初期盤面は、ハッシュキーを共通にするためにMCTSエンジンから取得する
@@ -2000,6 +2026,7 @@ protected:
                         }
 
                         engine.playout(stage);
+                        ++n_playout;
                     }
                 }
             }
@@ -2008,7 +2035,7 @@ protected:
             std::rotate(strategy_index.begin(), strategy_index.begin() + 1, strategy_index.end());
         }
 
-        return Result(n_trials, result);
+        return Result(n_trials, n_playout, result);
     }
 };
 
@@ -2016,45 +2043,53 @@ protected:
 TEST_F(TestMctsEngine, ExpandRoot) {
     MctsEngine engine;
     Stage stage(engine.hashkeys_);
-    std::shared_ptr<Node> root = std::make_shared<Node>(stage);
-    engine.expand(root);
-    ASSERT_EQ(Board::ColumnSize, root->children_.size());
 
-    for(const auto& child : root->children_) {
+    ASSERT_TRUE(engine.root_);
+    ASSERT_FALSE(engine.root_->expanded_);
+    engine.expand(engine.root_);
+    ASSERT_TRUE(engine.root_->expanded_);
+    ASSERT_EQ(Board::ColumnSize, engine.root_->children_.size());
+
+    for(const auto& child : engine.root_->children_) {
         ASSERT_FALSE(child->children_.size());
         ASSERT_EQ(1, child->parents_.size());
-        ASSERT_EQ(root, child->parents_.at(0));
+        ASSERT_EQ(engine.root_, child->parents_.at(0));
     }
 }
 
 // 異なる手順で同じ盤面に到達する
-TEST_F(TestMctsEngine, Join) {
+TEST_F(TestMctsEngine, Join1) {
     MctsEngine engine;
     Stage stage(engine.hashkeys_);
 
-    auto stage1 = stage;
-    auto stage2 = stage;
-    stage1.advance(1, 0);
-    stage1.advance(2, 0);
-    stage2.advance(2, 0);
-    stage2.advance(1, 0);
+    auto stage12 = stage;
+    auto stage21 = stage;
+    stage12.advance(1, 0);
+    stage12.advance(3, 0);
+    stage12.advance(2, 0);
+    stage12.advance(4, 0);
 
-    std::shared_ptr<Node> node1 = std::make_shared<Node>(stage1);
-    engine.expand(node1);
-    ASSERT_EQ(Board::ColumnSize, node1->children_.size());
+    stage21.advance(2, 0);
+    stage21.advance(4, 0);
+    stage21.advance(1, 0);
+    stage21.advance(3, 0);
 
-    std::shared_ptr<Node> node2 = std::make_shared<Node>(stage1);
-    engine.expand(node2);
-    ASSERT_EQ(Board::ColumnSize, node2->children_.size());
+    auto node12_obj = std::make_unique<Node>(stage12);
+    auto node12 = engine.nodeset_.add(node12_obj);
+    ASSERT_FALSE(node12->expanded_);
+    engine.expand(node12);
+    ASSERT_TRUE(node12->expanded_);
+    ASSERT_EQ(Board::ColumnSize, node12->children_.size());
 
-    for(Board::Coordinate i{0}; i < Board::ColumnSize; ++i) {
-        ASSERT_EQ(node1->children_.at(i), node2->children_.at(i));
-    }
+    auto node21_obj = std::make_unique<Node>(stage21);
+    auto node21 = engine.nodeset_.add(node21_obj);
+    ASSERT_EQ(node21, node12);
+    ASSERT_TRUE(node21->expanded_);
+    EXPECT_EQ(Board::ColumnSize, node21->children_.size());
 
-    for(const auto& child : node1->children_) {
-        ASSERT_EQ(2, child->parents_.size());
-        ASSERT_EQ(node1, child->parents_.at(0));
-        ASSERT_EQ(node2, child->parents_.at(1));
+    for(const auto& child : node12->children_) {
+        ASSERT_EQ(1, child->parents_.size());
+        ASSERT_EQ(node12, child->parents_.at(0));
     }
 }
 
@@ -2070,8 +2105,11 @@ TEST_F(TestMctsEngine, ExpandColumns) {
         }
 
         auto new_stage = stage;
-        std::shared_ptr<Node> parent = std::make_shared<Node>(new_stage);
+        auto parent_obj = std::make_unique<Node>(new_stage);
+        auto parent = engine.nodeset_.add(parent_obj);
+        ASSERT_FALSE(parent->expanded_);
         engine.expand(parent);
+        ASSERT_TRUE(parent->expanded_);
 
         if ((column + 1) == len) {
             ASSERT_EQ(1, parent->children_.size());
@@ -2148,7 +2186,7 @@ TEST_F(TestMctsEngine, MatchMctsOnlineRandom) {
 
     const Node::Count n_trials = 2000;
     Node::Count n_train_online = 100000;
-    const MilliSec limit_msec {10};
+    const MilliSec limit_msec {1};
     const Strategies strategies {Strategy::OnlineMcts, Strategy::Random};
     const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
 
@@ -2158,6 +2196,8 @@ TEST_F(TestMctsEngine, MatchMctsOnlineRandom) {
     std::cout << "2nd player learned win and loss : " <<
         result.matrix.at(1).at(0) << " , " << result.matrix.at(1).at(1) << "\n";
     std::cout << "draw : " << result.n_draw << "\n";
+    std::cout << "n_trials : " << result.n_trials << "\n";
+    std::cout << "n_playout : " << result.n_playout << "\n";
 }
 
 // MCTS同士で対戦する。対戦中も探索する。
@@ -2171,7 +2211,7 @@ TEST_F(TestMctsEngine, MatchMctsOnline) {
 
     const Node::Count n_trials = 2000;
     Node::Count n_train_online = 100000;
-    const MilliSec limit_msec {10};
+    const MilliSec limit_msec {1};
     const Strategies strategies {Strategy::OnlineMcts, Strategy::OnlineMcts};
     const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
 
