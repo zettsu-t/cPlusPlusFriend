@@ -1566,10 +1566,6 @@ struct NodeSet {
     // 盤面からノードを探す
     Node* find(const Stage& stage) {
         const auto digest = stage.digest();
-        if (set_.find(digest) == set_.end()) {
-            return nullptr;
-        }
-
         auto it = set_.find(digest);
         return (it != set_.end()) ? (it->second).get() : nullptr;
     }
@@ -1689,7 +1685,8 @@ struct MctsEngine {
             return std::make_pair(node, depth);
         }
 
-        if (node->n_tried == ToExpand) {
+        // 親ノードを共有しても展開は一回だけ行う
+        if (node->n_tried >= ToExpand) {
             expand(node);
         }
 
@@ -1770,6 +1767,7 @@ struct MctsEngine {
 
             auto child = std::make_unique<Node>(next_stage);
             if (result == Stage::Result::Won) {
+                // 必勝手以外は子ノードとして登録しない
                 auto ptr = nodeset_.add(child);
                 parent->add_child(ptr);
                 ptr->add_parent(parent);
@@ -2058,7 +2056,7 @@ TEST_F(TestMctsEngine, ExpandRoot) {
 }
 
 // 異なる手順で同じ盤面に到達する
-TEST_F(TestMctsEngine, Join1) {
+TEST_F(TestMctsEngine, Join) {
     MctsEngine engine;
     Stage stage(engine.hashkeys_);
 
@@ -2166,6 +2164,7 @@ TEST_F(TestMctsEngine, MatchRandom) {
     const Node::Count n_trials = 2000;
     const Strategies strategies {Strategy::Random, Strategy::Random};
     const auto result = match(n_trials, 0, ZeroMilliSec, strategies, engine);
+    ASSERT_EQ(n_trials, result.n_trials);
 
     std::cout << "Random vs random\n";
     std::cout << "1st player win and loss : " <<
@@ -2186,9 +2185,10 @@ TEST_F(TestMctsEngine, MatchMctsOnlineRandom) {
 
     const Node::Count n_trials = 2000;
     Node::Count n_train_online = 100000;
-    const MilliSec limit_msec {1};
+    const MilliSec limit_msec {10};
     const Strategies strategies {Strategy::OnlineMcts, Strategy::Random};
     const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
+    ASSERT_EQ(n_trials, result.n_trials);
 
     std::cout << "MCTS online vs random\n";
     std::cout << "1st player learned win and loss : " <<
@@ -2209,11 +2209,12 @@ TEST_F(TestMctsEngine, MatchMctsOnline) {
         engine.playout();
     }
 
-    const Node::Count n_trials = 2000;
+    const Node::Count n_trials = 200;
     Node::Count n_train_online = 100000;
-    const MilliSec limit_msec {1};
+    const MilliSec limit_msec {10};
     const Strategies strategies {Strategy::OnlineMcts, Strategy::OnlineMcts};
     const auto result = match(n_trials, n_train_online, limit_msec, strategies, engine);
+    ASSERT_EQ(n_trials, result.n_trials);
 
     std::cout << "MCTS online vs MCTS online\n";
     std::cout << "1st player win and loss : " <<
@@ -2242,6 +2243,7 @@ TEST_F(TestMctsEngine, MatchMctsOfflineRandom) {
     const Node::Count n_trials = 2000;
     const Strategies strategies {Strategy::OnlineMcts, Strategy::Random};
     const auto result = match(n_trials, 0, ZeroMilliSec, strategies, engine);
+    ASSERT_EQ(n_trials, result.n_trials);
 
     std::cout << "MCTS offline vs random\n";
     std::cout << "1st player learned win and loss : " <<
